@@ -983,48 +983,60 @@
             
             // Ajouter un nouveau produit
             addProduct: function(category, product) {
-                // Vérifier que la catégorie existe
-                if (!this.categories[category]) {
-                    this.categories[category] = [];
-                }
-                
-                // Vérifier si le produit existe déjà
-                const existingIndex = this.categories[category].findIndex(p => p.name === product.name);
-                
-                if (existingIndex !== -1) {
-                    // Si la quantité a changé, ajouter à l'historique
-                    const oldQuantity = this.categories[category][existingIndex].quantity;
-                    if (oldQuantity !== product.quantity) {
+                try {
+                    console.log("Ajout du produit:", product, "dans la catégorie:", category);
+                    
+                    // Vérifier que la catégorie existe
+                    if (!this.categories[category]) {
+                        console.log("Création de la catégorie:", category);
+                        this.categories[category] = [];
+                    }
+                    
+                    // Vérifier si le produit existe déjà
+                    const existingIndex = this.categories[category].findIndex(p => p.name === product.name);
+                    
+                    if (existingIndex !== -1) {
+                        console.log("Mise à jour du produit existant");
+                        // Si la quantité a changé, ajouter à l'historique
+                        const oldQuantity = this.categories[category][existingIndex].quantity;
+                        if (oldQuantity !== product.quantity) {
+                            this.addToHistory({
+                                date: new Date(),
+                                product: product.name,
+                                category: category,
+                                action: oldQuantity < product.quantity ? 'ajout' : 'retrait',
+                                quantity: Math.abs(oldQuantity - product.quantity),
+                                unit: product.unit
+                            });
+                        }
+                        
+                        // Mettre à jour le produit existant
+                        this.categories[category][existingIndex] = {...product};
+                    } else {
+                        console.log("Ajout d'un nouveau produit");
+                        // Ajouter un nouveau produit
+                        this.categories[category].push({...product, lowStock: product.quantity <= product.alert});
+                        
+                        // Ajouter à l'historique
                         this.addToHistory({
                             date: new Date(),
                             product: product.name,
                             category: category,
-                            action: oldQuantity < product.quantity ? 'ajout' : 'retrait',
-                            quantity: Math.abs(oldQuantity - product.quantity),
+                            action: 'création',
+                            quantity: product.quantity,
                             unit: product.unit
                         });
                     }
                     
-                    // Mettre à jour le produit existant
-                    this.categories[category][existingIndex] = {...product};
-                } else {
-                    // Ajouter un nouveau produit
-                    this.categories[category].push({...product, lowStock: product.quantity <= product.alert});
+                    // Sauvegarder les données
+                    const saved = this.saveData();
+                    console.log("Données sauvegardées:", saved);
                     
-                    // Ajouter à l'historique
-                    this.addToHistory({
-                        date: new Date(),
-                        product: product.name,
-                        category: category,
-                        action: 'création',
-                        quantity: product.quantity,
-                        unit: product.unit
-                    });
+                    return true;
+                } catch (error) {
+                    console.error("Erreur lors de l'ajout du produit:", error);
+                    return false;
                 }
-                
-                // Sauvegarder les données
-                this.saveData();
-                return true;
             },
             
             // Ajouter un produit à la liste de commandes
@@ -1124,12 +1136,22 @@
             // Sauvegarder les données dans localStorage
             saveData: function() {
                 try {
+                    if (typeof localStorage === 'undefined') {
+                        console.warn('LocalStorage n\'est pas disponible dans cet environnement');
+                        return false;
+                    }
+                    
+                    console.log("Sauvegarde des données...");
+                    console.log("Catégories:", this.categories);
+                    
                     localStorage.setItem('greenSushiStockData', JSON.stringify(this.categories));
                     localStorage.setItem('greenSushiOrdersData', JSON.stringify(this.orders));
                     localStorage.setItem('greenSushiHistoryData', JSON.stringify(this.history));
+                    
+                    console.log("Données sauvegardées avec succès");
                     return true;
                 } catch (e) {
-                    console.warn('Erreur lors de la sauvegarde des données', e);
+                    console.error('Erreur lors de la sauvegarde des données', e);
                     return false;
                 }
             },
@@ -1137,9 +1159,18 @@
             // Charger les données depuis localStorage
             loadData: function() {
                 try {
+                    if (typeof localStorage === 'undefined') {
+                        console.warn('LocalStorage n\'est pas disponible dans cet environnement');
+                        return false;
+                    }
+                    
+                    console.log("Chargement des données...");
+                    
                     const stockData = localStorage.getItem('greenSushiStockData');
                     const ordersData = localStorage.getItem('greenSushiOrdersData');
                     const historyData = localStorage.getItem('greenSushiHistoryData');
+                    
+                    console.log("Données stockées:", stockData ? "Présentes" : "Absentes");
                     
                     if (stockData) {
                         this.categories = JSON.parse(stockData);
@@ -1156,9 +1187,9 @@
                         this.history = [];
                     }
                     
-                    return stockData && ordersData;
+                    return !!stockData && !!ordersData;
                 } catch (e) {
-                    console.warn('Erreur lors du chargement des données', e);
+                    console.error('Erreur lors du chargement des données', e);
                     return false;
                 }
             },
@@ -1642,13 +1673,18 @@
         
         // Fonction pour afficher la liste des produits
         function renderProductsList(categoryTitle) {
+            console.log("Rendu de la liste des produits pour la catégorie:", categoryTitle);
+            
             const productsList = document.getElementById('products-list');
             productsList.innerHTML = '';
             
-            if (!StockData.categories[categoryTitle] || StockData.categories[categoryTitle].length === 0) {
+            if (!StockData.categories || !StockData.categories[categoryTitle] || StockData.categories[categoryTitle].length === 0) {
+                console.log("Aucun produit dans cette catégorie");
                 productsList.innerHTML = '<div class="empty-state">Aucun produit dans cette catégorie</div>';
                 return;
             }
+            
+            console.log("Nombre de produits:", StockData.categories[categoryTitle].length);
             
             // Créer un fragment pour optimiser le DOM
             const fragment = document.createDocumentFragment();
@@ -1664,6 +1700,8 @@
             
             // Créer les éléments pour chaque produit
             sortedProducts.forEach(product => {
+                console.log("Création de l'élément pour le produit:", product.name);
+                
                 // Vérifier si le produit est déjà dans la commande
                 const isInOrder = StockData.orders[categoryTitle] && 
                                  StockData.orders[categoryTitle].some(p => p.name === product.name);
@@ -1959,23 +1997,35 @@
         // ------------------------------
         
         function initApp() {
-            // Charger les données ou initialiser les données démo
-            if (!StockData.loadData()) {
-                StockData.resetToDemo();
-            }
-            
-            // Initialiser le compteur d'alertes
-            updateAlertCount();
-            
-            // Navigation entre les pages via les onglets
-            const tabs = document.querySelectorAll('.tab');
-            tabs.forEach(tab => {
-                tab.addEventListener('click', function() {
-                    const pageId = this.dataset.page;
-                    showPage(pageId);
-                    activateTab(pageId);
+            try {
+                console.log("Initialisation de l'application...");
+                
+                // Charger les données ou initialiser les données démo
+                if (!StockData.loadData()) {
+                    console.log("Chargement des données impossible, initialisation des données démo");
+                    StockData.resetToDemo();
+                }
+                
+                // Vérifier si les catégories sont chargées correctement
+                if (!StockData.categories || Object.keys(StockData.categories).length === 0) {
+                    console.log("Catégories manquantes, réinitialisation des données démo");
+                    StockData.resetToDemo();
+                }
+                
+                // Initialiser le compteur d'alertes
+                updateAlertCount();
+                
+                console.log("Données chargées :", StockData.categories);
+                
+                // Navigation entre les pages via les onglets
+                const tabs = document.querySelectorAll('.tab');
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', function() {
+                        const pageId = this.dataset.page;
+                        showPage(pageId);
+                        activateTab(pageId);
+                    });
                 });
-            });
             
             // Délégation d'événements pour les catégories sur la page d'accueil
             document.getElementById('categories-container').addEventListener('click', function(event) {
@@ -2031,26 +2081,36 @@
             // Bouton d'ajout de produit
             document.getElementById('add-product').addEventListener('click', function() {
                 try {
+                    console.log("Clic sur le bouton d'ajout de produit");
+                    
                     // Réinitialiser le formulaire
                     prepareProductForm();
+                    
+                    // Récupérer la catégorie active
                     const categoryTitle = document.getElementById('category-title');
-                    if (categoryTitle && document.getElementById('product-category')) {
-                        document.getElementById('product-category').value = categoryTitle.textContent;
+                    const categoryValue = categoryTitle ? categoryTitle.textContent : '';
+                    
+                    console.log("Catégorie active:", categoryValue);
+                    
+                    if (categoryValue && document.getElementById('product-category')) {
+                        document.getElementById('product-category').value = categoryValue;
                     }
                     
                     // S'assurer que tous les champs sont vides
                     document.getElementById('product-name').value = '';
-                    document.getElementById('product-quantity').value = '';
+                    document.getElementById('product-quantity').value = '0';
                     document.getElementById('product-unit').value = '';
-                    document.getElementById('product-alert').value = '';
+                    document.getElementById('product-alert').value = '0';
                     document.getElementById('product-supplier').value = '';
+                    document.getElementById('product-price').value = '0';
                     document.getElementById('product-original-name').value = '';
                     document.getElementById('form-title').textContent = 'Ajouter Produit';
                     
+                    // Afficher la page d'ajout de produit
                     showPage('add-product-page');
                 } catch (error) {
                     console.error('Erreur lors de l\'ajout:', error);
-                    showNotification('Erreur lors de l\'ajout d\'un produit');
+                    showNotification('Erreur lors de l\'ajout d\'un produit: ' + error.message, 3000);
                 }
             });
             
@@ -2065,60 +2125,87 @@
             document.getElementById('product-form').addEventListener('submit', function(e) {
                 e.preventDefault();
                 
-                const name = document.getElementById('product-name').value;
-                const quantity = parseInt(document.getElementById('product-quantity').value);
-                const unit = document.getElementById('product-unit').value;
-                const alert = parseInt(document.getElementById('product-alert').value);
-                const supplier = document.getElementById('product-supplier').value;
-                const price = parseFloat(document.getElementById('product-price').value) || 0;
-                const category = document.getElementById('product-category').value;
-                const originalName = document.getElementById('product-original-name').value;
-                
-                const product = {
-                    name,
-                    quantity,
-                    unit,
-                    alert,
-                    supplier,
-                    price,
-                    lowStock: quantity <= alert
-                };
-                
-                // Si on modifie un produit existant
-                if (originalName && originalName !== name) {
-                    // Supprimer l'ancien produit
-                    const categoryProducts = StockData.categories[category];
-                    const index = categoryProducts.findIndex(p => p.name === originalName);
-                    if (index !== -1) {
-                        categoryProducts.splice(index, 1);
+                try {
+                    console.log("Soumission du formulaire de produit");
+                    
+                    const name = document.getElementById('product-name').value;
+                    const quantity = parseInt(document.getElementById('product-quantity').value) || 0;
+                    const unit = document.getElementById('product-unit').value;
+                    const alert = parseInt(document.getElementById('product-alert').value) || 0;
+                    const supplier = document.getElementById('product-supplier').value;
+                    const price = parseFloat(document.getElementById('product-price').value) || 0;
+                    const category = document.getElementById('product-category').value;
+                    const originalName = document.getElementById('product-original-name').value;
+                    
+                    // Vérifier que les champs requis sont remplis
+                    if (!name || !unit || !supplier || !category) {
+                        showNotification('Veuillez remplir tous les champs obligatoires', 3000);
+                        return;
                     }
                     
-                    // Ajouter une entrée dans l'historique pour le changement de nom
-                    StockData.addToHistory({
-                        date: new Date(),
-                        product: originalName,
-                        category: category,
-                        action: 'renommage',
-                        quantity: 0,
-                        unit: '',
-                        details: `Renommé en "${name}"`
-                    });
+                    console.log("Données du produit:", {name, quantity, unit, alert, supplier, price, category, originalName});
+                    
+                    // Vérifier que la catégorie existe
+                    if (!StockData.categories[category]) {
+                        console.log("Création de la catégorie:", category);
+                        StockData.categories[category] = [];
+                    }
+                    
+                    const product = {
+                        name,
+                        quantity,
+                        unit,
+                        alert,
+                        supplier,
+                        price,
+                        lowStock: quantity <= alert
+                    };
+                    
+                    // Si on modifie un produit existant
+                    if (originalName && originalName !== name) {
+                        // Supprimer l'ancien produit
+                        const categoryProducts = StockData.categories[category];
+                        if (categoryProducts) {
+                            const index = categoryProducts.findIndex(p => p.name === originalName);
+                            if (index !== -1) {
+                                categoryProducts.splice(index, 1);
+                            }
+                        }
+                        
+                        // Ajouter une entrée dans l'historique pour le changement de nom
+                        StockData.addToHistory({
+                            date: new Date(),
+                            product: originalName,
+                            category: category,
+                            action: 'renommage',
+                            quantity: 0,
+                            unit: '',
+                            details: `Renommé en "${name}"`
+                        });
+                    }
+                    
+                    // Ajouter ou mettre à jour le produit
+                    const result = StockData.addProduct(category, product);
+                    
+                    if (result) {
+                        showNotification(originalName ? 'Produit modifié avec succès!' : 'Produit ajouté avec succès!');
+                        
+                        // Mettre à jour le compteur d'alertes
+                        updateAlertCount();
+                        
+                        // Mettre à jour les statistiques
+                        updateStats();
+                        
+                        // Revenir à la page des produits
+                        showPage('products-page');
+                        renderProductsList(category);
+                    } else {
+                        showNotification('Erreur lors de la sauvegarde du produit. Veuillez réessayer.', 3000);
+                    }
+                } catch (error) {
+                    console.error('Erreur lors de l\'ajout ou de la modification du produit:', error);
+                    showNotification('Erreur lors de l\'ajout du produit: ' + error.message, 3000);
                 }
-                
-                // Ajouter ou mettre à jour le produit
-                StockData.addProduct(category, product);
-                
-                showNotification(originalName ? 'Produit modifié avec succès!' : 'Produit ajouté avec succès!');
-                
-                // Mettre à jour le compteur d'alertes
-                updateAlertCount();
-                
-                // Mettre à jour les statistiques
-                updateStats();
-                
-                // Revenir à la page des produits
-                showPage('products-page');
-                renderProductsList(category);
             });
             
             // Export des commandes par email

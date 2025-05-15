@@ -1,6 +1,5 @@
 // Service Worker pour Green Sushi Stock PWA
 const CACHE_NAME = 'green-sushi-v1';
-
 // Fichiers à mettre en cache pour le fonctionnement hors ligne
 const CACHE_ASSETS = [
   './',
@@ -10,7 +9,6 @@ const CACHE_ASSETS = [
   './icon-192.png',
   './icon-512.png'
 ];
-
 // Installation du service worker
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -21,7 +19,6 @@ self.addEventListener('install', (event) => {
       })
   );
 });
-
 // Activation et nettoyage des anciens caches
 self.addEventListener('activate', (event) => {
   const cacheWhitelist = [CACHE_NAME];
@@ -38,7 +35,6 @@ self.addEventListener('activate', (event) => {
     })
   );
 });
-
 // Stratégie de cache : Cache First, puis réseau
 self.addEventListener('fetch', (event) => {
   event.respondWith(

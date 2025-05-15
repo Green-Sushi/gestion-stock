@@ -4,341 +4,427 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#088F8F">
-    <title>Gestion de Stock - Green Sushi (Prévisualisation)</title>
+    <title>Gestion de Stock - Green Sushi (Version Light)</title>
     <style>
-        /* --- STYLES GLOBAUX --- */
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+        /* Styles basiques */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: #f5f5f5; color: #333; }
         
-        body {
-            background-color: #f5f5f5;
-            color: #333;
-        }
+        /* Header */
+        header { background-color: #088F8F; color: white; padding: 15px; text-align: center; position: fixed; top: 0; left: 0; right: 0; z-index: 100; }
         
-        /* --- HEADER --- */
-        header {
-            background-color: #088F8F;
-            color: white;
-            padding: 15px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 100;
-        }
+        /* Conteneur principal */
+        .container { margin-top: 70px; margin-bottom: 70px; padding: 15px; }
         
-        header h1 {
-            font-size: 1.2rem;
-            text-align: center;
-            margin-bottom: 5px;
-        }
+        /* Cartes et éléments */
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
+        .card { background-color: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; }
+        .icon { font-size: 2rem; margin-bottom: 10px; }
         
-        .alert-badge {
-            background-color: #e74c3c;
-            color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.8rem;
-            position: absolute;
-            top: 10px;
-            right: 10px;
-        }
+        /* Item de produit */
+        .item { background-color: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .item-name { font-weight: bold; }
+        .item-supplier { font-size: 0.8rem; color: #777; }
+        .low-stock { color: #e74c3c; font-weight: bold; }
         
-        /* --- CONTENEUR PRINCIPAL --- */
-        .container {
-            margin-top: 70px;
-            margin-bottom: 70px;
-            padding: 15px;
-        }
+        /* Navigation */
+        nav { background-color: white; display: flex; justify-content: space-around; position: fixed; bottom: 0; left: 0; right: 0; box-shadow: 0 -2px 5px rgba(0,0,0,0.1); }
+        .tab { padding: 10px; text-align: center; flex: 1; }
+        .active { color: #088F8F; border-top: 2px solid #088F8F; }
         
-        /* --- CARTES CATÉGORIES --- */
-        .categories-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-top: 20px;
-        }
+        /* Boutons */
+        button { background: none; border: none; cursor: pointer; }
+        .add-button { background-color: #088F8F; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: fixed; bottom: 80px; right: 20px; font-size: 1.5rem; }
         
-        .category-card {
-            background-color: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            text-align: center;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-        
-        .category-card:hover {
-            transform: translateY(-5px);
-        }
-        
-        .category-icon {
-            font-size: 2rem;
-            margin-bottom: 10px;
-        }
-        
-        /* --- LISTE DE PRODUITS --- */
-        .products-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        
-        .product-item {
-            background-color: white;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .product-info {
-            flex: 1;
-        }
-        
-        .product-name {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        
-        .product-supplier {
-            font-size: 0.8rem;
-            color: #777;
-        }
-        
-        .product-controls {
-            display: flex;
-            align-items: center;
-            margin: 0 10px;
-        }
-        
-        .product-quantity {
-            margin-right: 10px;
-            min-width: 80px;
-            text-align: right;
-        }
-        
-        .product-quantity.low-stock {
-            color: #e74c3c;
-            font-weight: bold;
-        }
-        
-        .product-unit {
-            margin-left: 5px;
-            color: #777;
-            min-width: 20px;
-        }
-        
-        .product-actions {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .product-actions button {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1.2rem;
-        }
-        
-        .order-button.active {
-            color: #088F8F;
-            background-color: rgba(8, 143, 143, 0.1);
-            border-radius: 50%;
-            padding: 5px;
-        }
-        
-        /* --- NAVIGATION --- */
-        nav {
-            background-color: white;
-            display: flex;
-            justify-content: space-around;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
-            z-index: 100;
-        }
-        
-        .tab {
-            padding: 10px;
-            text-align: center;
-            flex: 1;
-            cursor: pointer;
-        }
-        
-        .tab.active {
-            color: #088F8F;
-            border-top: 2px solid #088F8F;
-        }
-        
-        /* --- EMPTY STATE --- */
-        .empty-state {
-            text-align: center;
-            padding: 30px;
-            color: #777;
-        }
-        
-        .add-button {
-            background-color: #088F8F;
-            color: white;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: fixed;
-            bottom: 80px;
-            right: 20px;
-            font-size: 1.5rem;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            cursor: pointer;
-            border: none;
-            z-index: 99;
-        }
-        
-        /* --- STATS CARDS --- */
-        .stats-cards {
-            display: flex; 
-            flex-direction: column; 
-            gap: 10px;
-            margin-top: 20px;
-        }
-        
-        .stats-card {
-            display: flex; 
-            justify-content: space-between; 
-            padding: 10px; 
-            background-color: white; 
-            border-radius: 5px;
-        }
+        /* Notifications */
+        .notification { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background-color: #088F8F; color: white; padding: 10px 20px; border-radius: 5px; text-align: center; display: none; }
     </style>
 </head>
 <body>
-    <!-- HEADER -->
     <header>
         <h1>Gestion de Stock - Green Sushi</h1>
-        <div class="alert-badge">3</div>
     </header>
     
-    <!-- CONTENEUR PRINCIPAL -->
-    <div class="container">
-        <div class="categories-grid">
-            <div class="category-card">
-                <div class="category-icon">🌾</div>
+    <div class="container" id="content">
+        <!-- Contenu dynamique -->
+        <div class="grid" id="categories">
+            <div class="card" onclick="showCategory('sec')">
+                <div class="icon">🌾</div>
                 <div>Stock Sec</div>
             </div>
-            <div class="category-card">
-                <div class="category-icon">🧀</div>
+            <div class="card" onclick="showCategory('frais')">
+                <div class="icon">🧀</div>
                 <div>Stock Frais</div>
             </div>
-            <div class="category-card">
-                <div class="category-icon">❄️</div>
+            <div class="card" onclick="showCategory('surgele')">
+                <div class="icon">❄️</div>
                 <div>Stock Surgelé</div>
             </div>
-            <div class="category-card">
-                <div class="category-icon">🧃</div>
+            <div class="card" onclick="showCategory('boissons')">
+                <div class="icon">🧃</div>
                 <div>Stock Boissons</div>
             </div>
-            <div class="category-card">
-                <div class="category-icon">🥢</div>
+            <div class="card" onclick="showCategory('consommable')">
+                <div class="icon">🥢</div>
                 <div>Stock Consommable</div>
             </div>
-            <div class="category-card">
-                <div class="category-icon">📋</div>
+            <div class="card" onclick="showOrders()">
+                <div class="icon">📋</div>
                 <div>Liste Commandes</div>
             </div>
         </div>
         
+        <!-- Alertes -->
         <h2 style="margin-top: 30px; margin-bottom: 15px;">Produits en alerte</h2>
-        
-        <div class="product-item">
-            <div class="product-info">
-                <div class="product-name">Huile d'olive</div>
-                <div class="product-supplier">Stock Sec - Métro</div>
-            </div>
-            <div class="product-controls">
-                <div class="product-quantity low-stock">2 L</div>
-            </div>
-            <div class="product-actions">
-                <button class="order-button">📋</button>
-            </div>
-        </div>
-        
-        <div class="product-item">
-            <div class="product-info">
-                <div class="product-name">Beurre</div>
-                <div class="product-supplier">Stock Frais - Métro</div>
-            </div>
-            <div class="product-controls">
-                <div class="product-quantity low-stock">2 kg</div>
-            </div>
-            <div class="product-actions">
-                <button class="order-button active">📋</button>
-            </div>
-        </div>
-        
-        <div class="product-item">
-            <div class="product-info">
-                <div class="product-name">Fruits de mer</div>
-                <div class="product-supplier">Stock Surgelé - Poissonnerie Maritime</div>
-            </div>
-            <div class="product-controls">
-                <div class="product-quantity low-stock">3 kg</div>
-            </div>
-            <div class="product-actions">
-                <button class="order-button active">📋</button>
-            </div>
-        </div>
-        
-        <h2 style="margin-top: 30px; margin-bottom: 15px;">Statistiques</h2>
-        
-        <div class="stats-cards">
-            <div class="stats-card">
-                <div>🌾 Stock Sec</div>
-                <div>4 produits</div>
-            </div>
-            <div class="stats-card">
-                <div>🧀 Stock Frais</div>
-                <div>3 produits</div>
-            </div>
-            <div class="stats-card">
-                <div>❄️ Stock Surgelé</div>
-                <div>2 produits</div>
-            </div>
-            <div class="stats-card">
-                <div>🧃 Stock Boissons</div>
-                <div>2 produits</div>
-            </div>
-            <div class="stats-card">
-                <div>🥢 Stock Consommable</div>
-                <div>2 produits</div>
-            </div>
+        <div id="alerts">
+            <!-- Rempli par JavaScript -->
         </div>
     </div>
     
-    <!-- NAVIGATION -->
     <nav>
-        <div class="tab active">🏠<br>Accueil</div>
-        <div class="tab">🔔<br>Alertes</div>
-        <div class="tab">📋<br>Commandes</div>
-        <div class="tab">📊<br>Stats</div>
+        <div class="tab active" onclick="showHome()">🏠<br>Accueil</div>
+        <div class="tab" onclick="showAlerts()">🔔<br>Alertes</div>
+        <div class="tab" onclick="showOrders()">📋<br>Commandes</div>
+        <div class="tab" onclick="showStats()">📊<br>Stats</div>
     </nav>
+    
+    <div class="notification" id="notification">Notification</div>
+    
+    <script>
+        // Données de base
+        const data = {
+            'Stock Sec': [
+                {name: "Riz", quantity: 10, unit: "kg", supplier: "Métro", alert: 5},
+                {name: "Farine", quantity: 8, unit: "kg", supplier: "Promocash", alert: 3},
+                {name: "Huile d'olive", quantity: 2, unit: "L", supplier: "Métro", alert: 3},
+                {name: "Sel", quantity: 4, unit: "kg", supplier: "Promocash", alert: 2}
+            ],
+            'Stock Frais': [
+                {name: "Fromage", quantity: 5, unit: "kg", supplier: "Fromager Local", alert: 3},
+                {name: "Crème fraîche", quantity: 7, unit: "L", supplier: "Métro", alert: 4},
+                {name: "Beurre", quantity: 2, unit: "kg", supplier: "Métro", alert: 4}
+            ],
+            'Stock Surgelé': [
+                {name: "Fruits de mer", quantity: 3, unit: "kg", supplier: "Poissonnerie Maritime", alert: 5},
+                {name: "Frites", quantity: 8, unit: "kg", supplier: "Promocash", alert: 4}
+            ],
+            'Stock Boissons': [
+                {name: "Vin rouge", quantity: 15, unit: "bouteilles", supplier: "Caviste", alert: 5},
+                {name: "Coca-Cola", quantity: 6, unit: "packs", supplier: "Distriboissons", alert: 10}
+            ],
+            'Stock Consommable': [
+                {name: "Serviettes", quantity: 3, unit: "paquets", supplier: "Fournitures Pro", alert: 5},
+                {name: "Film alimentaire", quantity: 4, unit: "rouleaux", supplier: "Métro", alert: 2}
+            ]
+        };
+        
+        const orders = {};
+        
+        // Affichage de la page d'accueil
+        function showHome() {
+            document.getElementById('content').innerHTML = `
+                <div class="grid" id="categories">
+                    <div class="card" onclick="showCategory('sec')">
+                        <div class="icon">🌾</div>
+                        <div>Stock Sec</div>
+                    </div>
+                    <div class="card" onclick="showCategory('frais')">
+                        <div class="icon">🧀</div>
+                        <div>Stock Frais</div>
+                    </div>
+                    <div class="card" onclick="showCategory('surgele')">
+                        <div class="icon">❄️</div>
+                        <div>Stock Surgelé</div>
+                    </div>
+                    <div class="card" onclick="showCategory('boissons')">
+                        <div class="icon">🧃</div>
+                        <div>Stock Boissons</div>
+                    </div>
+                    <div class="card" onclick="showCategory('consommable')">
+                        <div class="icon">🥢</div>
+                        <div>Stock Consommable</div>
+                    </div>
+                    <div class="card" onclick="showOrders()">
+                        <div class="icon">📋</div>
+                        <div>Liste Commandes</div>
+                    </div>
+                </div>
+                
+                <h2 style="margin-top: 30px; margin-bottom: 15px;">Produits en alerte</h2>
+                <div id="alerts"></div>
+            `;
+            updateAlerts();
+            setActiveTab(0);
+        }
+        
+        // Afficher une catégorie
+        function showCategory(category) {
+            const categoryTitle = 
+                category === 'sec' ? 'Stock Sec' : 
+                category === 'frais' ? 'Stock Frais' : 
+                category === 'surgele' ? 'Stock Surgelé' : 
+                category === 'boissons' ? 'Stock Boissons' : 
+                'Stock Consommable';
+                
+            let html = `
+                <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                    <button onclick="showHome()" style="font-size: 1.2rem; color: #088F8F; margin-right: 10px;">←</button>
+                    <h2>${categoryTitle}</h2>
+                </div>
+                <div id="products">`;
+                
+            if (data[categoryTitle] && data[categoryTitle].length > 0) {
+                data[categoryTitle].forEach(product => {
+                    const isLowStock = product.quantity <= product.alert;
+                    html += `
+                        <div class="item">
+                            <div>
+                                <div class="item-name">${product.name}</div>
+                                <div class="item-supplier">${product.supplier}</div>
+                            </div>
+                            <div style="min-width: 80px; text-align: right;" class="${isLowStock ? 'low-stock' : ''}">
+                                ${product.quantity} ${product.unit}
+                            </div>
+                            <button onclick="toggleOrder('${categoryTitle}', '${product.name}')">📋</button>
+                        </div>
+                    `;
+                });
+            } else {
+                html += `<div style="text-align: center; padding: 30px; color: #777;">Aucun produit dans cette catégorie</div>`;
+            }
+            
+            html += `</div>`;
+            
+            document.getElementById('content').innerHTML = html;
+        }
+        
+        // Afficher les alertes
+        function showAlerts() {
+            let alertsHtml = `<h2>Alertes Stock Bas</h2><div id="alerts-list">`;
+            
+            // Collecter toutes les alertes
+            let hasAlerts = false;
+            for (const category in data) {
+                data[category].forEach(product => {
+                    if (product.quantity <= product.alert) {
+                        hasAlerts = true;
+                        alertsHtml += `
+                            <div class="item">
+                                <div>
+                                    <div class="item-name">${product.name}</div>
+                                    <div class="item-supplier">${category} - ${product.supplier}</div>
+                                </div>
+                                <div style="min-width: 80px; text-align: right;" class="low-stock">
+                                    ${product.quantity} ${product.unit}
+                                </div>
+                                <button onclick="toggleOrder('${category}', '${product.name}')">📋</button>
+                            </div>
+                        `;
+                    }
+                });
+            }
+            
+            if (!hasAlerts) {
+                alertsHtml += `<div style="text-align: center; padding: 30px; color: #777;">Aucune alerte de stock bas</div>`;
+            }
+            
+            alertsHtml += `</div>`;
+            document.getElementById('content').innerHTML = alertsHtml;
+            setActiveTab(1);
+        }
+        
+        // Afficher les commandes
+        function showOrders() {
+            let ordersHtml = `<h2>Liste de Commandes</h2><div id="orders-list">`;
+            
+            const categories = Object.keys(orders);
+            if (categories.length === 0) {
+                ordersHtml += `<div style="text-align: center; padding: 30px; color: #777;">Aucune commande en cours</div>`;
+            } else {
+                categories.forEach(category => {
+                    const categoryIcon = 
+                        category === 'Stock Sec' ? '🌾' : 
+                        category === 'Stock Frais' ? '🧀' : 
+                        category === 'Stock Surgelé' ? '❄️' : 
+                        category === 'Stock Boissons' ? '🧃' : '🥢';
+                        
+                    ordersHtml += `
+                        <div style="margin-bottom: 15px;">
+                            <div style="background-color: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 5px;">
+                                ${categoryIcon} ${category} (${orders[category].length})
+                            </div>
+                    `;
+                    
+                    orders[category].forEach(product => {
+                        ordersHtml += `
+                            <div class="item" style="margin-left: 20px;">
+                                <div>
+                                    <div class="item-name">${product.name}</div>
+                                    <div class="item-supplier">${product.supplier}</div>
+                                </div>
+                                <div style="min-width: 80px; text-align: right;">
+                                    ${product.quantity} ${product.unit}
+                                </div>
+                                <button onclick="removeOrder('${category}', '${product.name}')">❌</button>
+                            </div>
+                        `;
+                    });
+                    
+                    ordersHtml += `</div>`;
+                });
+            }
+            
+            ordersHtml += `</div>`;
+            document.getElementById('content').innerHTML = ordersHtml;
+            setActiveTab(2);
+        }
+        
+        // Afficher les statistiques
+        function showStats() {
+            let statsHtml = `
+                <h2>Statistiques</h2>
+                <div style="text-align: center; padding: 30px; color: #777;">Fonctionnalité statistiques en développement</div>
+                <div style="margin-top: 20px;">
+                    <div style="font-weight: bold; margin-bottom: 15px; text-align: center;">Aperçu des stocks par catégorie</div>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+            `;
+            
+            for (const category in data) {
+                const categoryIcon = 
+                    category === 'Stock Sec' ? '🌾' : 
+                    category === 'Stock Frais' ? '🧀' : 
+                    category === 'Stock Surgelé' ? '❄️' : 
+                    category === 'Stock Boissons' ? '🧃' : '🥢';
+                    
+                statsHtml += `
+                    <div style="display: flex; justify-content: space-between; padding: 10px; background-color: white; border-radius: 5px;">
+                        <div>${categoryIcon} ${category}</div>
+                        <div>${data[category].length} produits</div>
+                    </div>
+                `;
+            }
+            
+            statsHtml += `</div></div>`;
+            document.getElementById('content').innerHTML = statsHtml;
+            setActiveTab(3);
+        }
+        
+        // Ajouter/Retirer un produit de la commande
+        function toggleOrder(category, productName) {
+            // Vérifier si la catégorie existe dans les commandes
+            if (!orders[category]) {
+                orders[category] = [];
+            }
+            
+            // Vérifier si le produit est déjà dans la commande
+            const index = orders[category].findIndex(p => p.name === productName);
+            
+            if (index === -1) {
+                // Trouver le produit dans les données
+                const product = data[category].find(p => p.name === productName);
+                if (product) {
+                    // Ajouter à la commande
+                    orders[category].push({...product});
+                    showNotification(`${productName} ajouté à la commande`);
+                }
+            } else {
+                // Retirer de la commande
+                orders[category].splice(index, 1);
+                
+                // Supprimer la catégorie si vide
+                if (orders[category].length === 0) {
+                    delete orders[category];
+                }
+                
+                showNotification(`${productName} retiré de la commande`);
+            }
+            
+            // Mettre à jour l'affichage si on est sur la page des commandes
+            if (document.querySelector('.tab.active').textContent.includes('Commandes')) {
+                showOrders();
+            }
+        }
+        
+        // Supprimer une commande
+        function removeOrder(category, productName) {
+            if (orders[category]) {
+                const index = orders[category].findIndex(p => p.name === productName);
+                if (index !== -1) {
+                    orders[category].splice(index, 1);
+                    
+                    // Supprimer la catégorie si vide
+                    if (orders[category].length === 0) {
+                        delete orders[category];
+                    }
+                    
+                    showNotification(`${productName} retiré de la commande`);
+                    showOrders(); // Rafraîchir l'affichage
+                }
+            }
+        }
+        
+        // Afficher les alertes sur la page d'accueil
+        function updateAlerts() {
+            const alertsContainer = document.getElementById('alerts');
+            if (!alertsContainer) return;
+            
+            let alertsHtml = '';
+            let hasAlerts = false;
+            
+            for (const category in data) {
+                data[category].forEach(product => {
+                    if (product.quantity <= product.alert) {
+                        hasAlerts = true;
+                        alertsHtml += `
+                            <div class="item">
+                                <div>
+                                    <div class="item-name">${product.name}</div>
+                                    <div class="item-supplier">${category} - ${product.supplier}</div>
+                                </div>
+                                <div style="min-width: 80px; text-align: right;" class="low-stock">
+                                    ${product.quantity} ${product.unit}
+                                </div>
+                                <button onclick="toggleOrder('${category}', '${product.name}')">📋</button>
+                            </div>
+                        `;
+                    }
+                });
+            }
+            
+            if (!hasAlerts) {
+                alertsHtml = `<div style="text-align: center; padding: 30px; color: #777;">Aucune alerte de stock bas</div>`;
+            }
+            
+            alertsContainer.innerHTML = alertsHtml;
+        }
+        
+        // Définir l'onglet actif
+        function setActiveTab(index) {
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach((tab, i) => {
+                if (i === index) {
+                    tab.classList.add('active');
+                } else {
+                    tab.classList.remove('active');
+                }
+            });
+        }
+        
+        // Afficher une notification
+        function showNotification(message, duration = 2000) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, duration);
+        }
+        
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', function() {
+            showHome();
+        });
+    </script>
 </body>
 </html>

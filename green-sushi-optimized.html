@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#088F8F">
+    <title>Gestion de Stock - Green Sushi (Prévisualisation)</title>
+    <style>
+        /* --- STYLES GLOBAUX --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        /* --- HEADER --- */
+        header {
+            background-color: #088F8F;
+            color: white;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+        
+        header h1 {
+            font-size: 1.2rem;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        
+        .alert-badge {
+            background-color: #e74c3c;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        
+        /* --- CONTENEUR PRINCIPAL --- */
+        .container {
+            margin-top: 70px;
+            margin-bottom: 70px;
+            padding: 15px;
+        }
+        
+        /* --- CARTES CATÉGORIES --- */
+        .categories-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .category-card {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .category-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .category-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        /* --- LISTE DE PRODUITS --- */
+        .products-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .product-item {
+            background-color: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .product-info {
+            flex: 1;
+        }
+        
+        .product-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .product-supplier {
+            font-size: 0.8rem;
+            color: #777;
+        }
+        
+        .product-controls {
+            display: flex;
+            align-items: center;
+            margin: 0 10px;
+        }
+        
+        .product-quantity {
+            margin-right: 10px;
+            min-width: 80px;
+            text-align: right;
+        }
+        
+        .product-quantity.low-stock {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .product-unit {
+            margin-left: 5px;
+            color: #777;
+            min-width: 20px;
+        }
+        
+        .product-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .product-actions button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+        
+        .order-button.active {
+            color: #088F8F;
+            background-color: rgba(8, 143, 143, 0.1);
+            border-radius: 50%;
+            padding: 5px;
+        }
+        
+        /* --- NAVIGATION --- */
+        nav {
+            background-color: white;
+            display: flex;
+            justify-content: space-around;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        
+        .tab {
+            padding: 10px;
+            text-align: center;
+            flex: 1;
+            cursor: pointer;
+        }
+        
+        .tab.active {
+            color: #088F8F;
+            border-top: 2px solid #088F8F;
+        }
+        
+        /* --- EMPTY STATE --- */
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #777;
+        }
+        
+        .add-button {
+            background-color: #088F8F;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            font-size: 1.5rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            cursor: pointer;
+            border: none;
+            z-index: 99;
+        }
+        
+        /* --- STATS CARDS --- */
+        .stats-cards {
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .stats-card {
+            display: flex; 
+            justify-content: space-between; 
+            padding: 10px; 
+            background-color: white; 
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <header>
+        <h1>Gestion de Stock - Green Sushi</h1>
+        <div class="alert-badge">3</div>
+    </header>
+    
+    <!-- CONTENEUR PRINCIPAL -->
+    <div class="container">
+        <div class="categories-grid">
+            <div class="category-card">
+                <div class="category-icon">🌾</div>
+                <div>Stock Sec</div>
+            </div>
+            <div class="category-card">
+                <div class="category-icon">🧀</div>
+                <div>Stock Frais</div>
+            </div>
+            <div class="category-card">
+                <div class="category-icon">❄️</div>
+                <div>Stock Surgelé</div>
+            </div>
+            <div class="category-card">
+                <div class="category-icon">🧃</div>
+                <div>Stock Boissons</div>
+            </div>
+            <div class="category-card">
+                <div class="category-icon">🥢</div>
+                <div>Stock Consommable</div>
+            </div>
+            <div class="category-card">
+                <div class="category-icon">📋</div>
+                <div>Liste Commandes</div>
+            </div>
+        </div>
+        
+        <h2 style="margin-top: 30px; margin-bottom: 15px;">Produits en alerte</h2>
+        
+        <div class="product-item">
+            <div class="product-info">
+                <div class="product-name">Huile d'olive</div>
+                <div class="product-supplier">Stock Sec - Métro</div>
+            </div>
+            <div class="product-controls">
+                <div class="product-quantity low-stock">2 L</div>
+            </div>
+            <div class="product-actions">
+                <button class="order-button">📋</button>
+            </div>
+        </div>
+        
+        <div class="product-item">
+            <div class="product-info">
+                <div class="product-name">Beurre</div>
+                <div class="product-supplier">Stock Frais - Métro</div>
+            </div>
+            <div class="product-controls">
+                <div class="product-quantity low-stock">2 kg</div>
+            </div>
+            <div class="product-actions">
+                <button class="order-button active">📋</button>
+            </div>
+        </div>
+        
+        <div class="product-item">
+            <div class="product-info">
+                <div class="product-name">Fruits de mer</div>
+                <div class="product-supplier">Stock Surgelé - Poissonnerie Maritime</div>
+            </div>
+            <div class="product-controls">
+                <div class="product-quantity low-stock">3 kg</div>
+            </div>
+            <div class="product-actions">
+                <button class="order-button active">📋</button>
+            </div>
+        </div>
+        
+        <h2 style="margin-top: 30px; margin-bottom: 15px;">Statistiques</h2>
+        
+        <div class="stats-cards">
+            <div class="stats-card">
+                <div>🌾 Stock Sec</div>
+                <div>4 produits</div>
+            </div>
+            <div class="stats-card">
+                <div>🧀 Stock Frais</div>
+                <div>3 produits</div>
+            </div>
+            <div class="stats-card">
+                <div>❄️ Stock Surgelé</div>
+                <div>2 produits</div>
+            </div>
+            <div class="stats-card">
+                <div>🧃 Stock Boissons</div>
+                <div>2 produits</div>
+            </div>
+            <div class="stats-card">
+                <div>🥢 Stock Consommable</div>
+                <div>2 produits</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- NAVIGATION -->
+    <nav>
+        <div class="tab active">🏠<br>Accueil</div>
+        <div class="tab">🔔<br>Alertes</div>
+        <div class="tab">📋<br>Commandes</div>
+        <div class="tab">📊<br>Stats</div>
+    </nav>
+</body>
+</html>

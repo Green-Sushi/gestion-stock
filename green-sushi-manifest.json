@@ -1,0 +1,24 @@
+{
+  "name": "Green Sushi - Gestion de Stock",
+  "short_name": "GS Stock",
+  "description": "Application de gestion de stock pour le restaurant Green Sushi",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#088F8F",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

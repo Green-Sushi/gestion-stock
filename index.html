@@ -826,14 +826,14 @@
         const StockData = {
             // Liste des fournisseurs disponibles
             suppliers: [
-                "Métro",
+                "Asie Caraïbes",
                 "Promocash",
-                "Fromager Local",
-                "Poissonnerie Maritime",
-                "Caviste",
-                "Distriboissons",
-                "Fournitures Pro",
-                "Distributeur Asiatique",
+                "MG Store",
+                "Gerembal",
+                "LeVert Emballage",
+                "Carrefour Cluny",
+                "Carrefour Dillon",
+                "Primeur",
                 "Grossiste Bio"
             ],
             
@@ -893,6 +893,7 @@
                     {name: "MR BASIL - Grenade", quantity: 10, unit: "bouteilles", supplier: "Distriboissons", alert: 5, lowStock: false, price: 4.2},
                     {name: "MR BASIL - Kiwi", quantity: 10, unit: "bouteilles", supplier: "Distriboissons", alert: 5, lowStock: false, price: 4.2},
                     {name: "MR BASIL - Cocktails", quantity: 10, unit: "bouteilles", supplier: "Distriboissons", alert: 5, lowStock: false, price: 4.8},
+                    {name: "MR BASIL - Litchi", quantity: 10, unit: "bouteilles", supplier: "Distriboissons", alert: 5, lowStock: false, price: 4.8},
                     {name: "KEFWI - Lanmou Red", quantity: 10, unit: "bouteilles", supplier: "Distriboissons", alert: 5, lowStock: false, price: 4.5},
                     {name: "KEFWI - Soley Cho", quantity: 10, unit: "bouteilles", supplier: "Distriboissons", alert: 5, lowStock: false, price: 4.5},
                     {name: "KEFWI - Power Flower", quantity: 10, unit: "bouteilles", supplier: "Distriboissons", alert: 5, lowStock: false, price: 4.5},
@@ -1964,21 +1965,33 @@
         
         // Fonction pour afficher une page
         function showPage(pageId) {
-            const pages = document.querySelectorAll('.page');
-            pages.forEach(page => {
-                page.classList.remove('active');
-            });
-            
-            document.getElementById(pageId).classList.add('active');
-            
-            // Actions spécifiques à certaines pages
-            if (pageId === 'alerts-page') {
-                renderAlertsPage();
-            } else if (pageId === 'orders-page') {
-                renderOrdersList();
-            } else if (pageId === 'stats-page') {
-                updateStats();
-                renderHistory('week'); // Par défaut, afficher l'historique de la semaine
+            try {
+                console.log("Affichage de la page:", pageId);
+                
+                const pages = document.querySelectorAll('.page');
+                pages.forEach(page => {
+                    page.classList.remove('active');
+                });
+                
+                const pageToShow = document.getElementById(pageId);
+                if (!pageToShow) {
+                    console.error("Page introuvable:", pageId);
+                    return;
+                }
+                
+                pageToShow.classList.add('active');
+                
+                // Actions spécifiques à certaines pages
+                if (pageId === 'alerts-page') {
+                    renderAlertsPage();
+                } else if (pageId === 'orders-page') {
+                    renderOrdersList();
+                } else if (pageId === 'stats-page') {
+                    updateStats();
+                    renderHistory('week'); // Par défaut, afficher l'historique de la semaine
+                }
+            } catch (error) {
+                console.error("Erreur lors de l'affichage de la page:", error);
             }
         }
         
@@ -2000,17 +2013,9 @@
             try {
                 console.log("Initialisation de l'application...");
                 
-                // Charger les données ou initialiser les données démo
-                if (!StockData.loadData()) {
-                    console.log("Chargement des données impossible, initialisation des données démo");
-                    StockData.resetToDemo();
-                }
-                
-                // Vérifier si les catégories sont chargées correctement
-                if (!StockData.categories || Object.keys(StockData.categories).length === 0) {
-                    console.log("Catégories manquantes, réinitialisation des données démo");
-                    StockData.resetToDemo();
-                }
+                // TOUJOURS réinitialiser aux données démo pour GitHub Pages
+                console.log("Initialisation des données démo");
+                StockData.resetToDemo();
                 
                 // Initialiser le compteur d'alertes
                 updateAlertCount();
@@ -2029,24 +2034,55 @@
             
             // Délégation d'événements pour les catégories sur la page d'accueil
             document.getElementById('categories-container').addEventListener('click', function(event) {
-                const card = event.target.closest('.category-card');
-                if (!card) return;
-                
-                const category = card.dataset.category;
-                if (category === 'commandes') {
-                    showPage('orders-page');
-                    activateTab('orders-page');
-                } else {
-                    const categoryTitle = 
-                        category === 'sec' ? 'Stock Sec' : 
-                        category === 'frais' ? 'Stock Frais' : 
-                        category === 'surgele' ? 'Stock Surgelé' : 
-                        category === 'boissons' ? 'Stock Boissons' : 
-                        'Stock Consommable';
+                try {
+                    const card = event.target.closest('.category-card');
+                    if (!card) return;
                     
-                    document.getElementById('category-title').textContent = categoryTitle;
-                    showPage('products-page');
-                    renderProductsList(categoryTitle);
+                    console.log("Clic sur une catégorie:", card.dataset.category);
+                    
+                    const category = card.dataset.category;
+                    if (category === 'commandes') {
+                        showPage('orders-page');
+                        activateTab('orders-page');
+                    } else {
+                        let categoryTitle;
+                        
+                        switch(category) {
+                            case 'sec':
+                                categoryTitle = 'Stock Sec';
+                                break;
+                            case 'frais':
+                                categoryTitle = 'Stock Frais';
+                                break;
+                            case 'surgele':
+                                categoryTitle = 'Stock Surgelé';
+                                break;
+                            case 'boissons':
+                                categoryTitle = 'Stock Boissons';
+                                break;
+                            case 'consommable':
+                                categoryTitle = 'Stock Consommable';
+                                break;
+                            default:
+                                categoryTitle = 'Stock ' + category.charAt(0).toUpperCase() + category.slice(1);
+                        }
+                        
+                        console.log("Titre de la catégorie:", categoryTitle);
+                        
+                        // Vérifier que la catégorie existe
+                        if (!StockData.categories[categoryTitle]) {
+                            console.log("La catégorie n'existe pas, création de la catégorie vide");
+                            StockData.categories[categoryTitle] = [];
+                            StockData.saveData();
+                        }
+                        
+                        document.getElementById('category-title').textContent = categoryTitle;
+                        showPage('products-page');
+                        renderProductsList(categoryTitle);
+                    }
+                } catch (error) {
+                    console.error("Erreur lors du clic sur une catégorie:", error);
+                    alert("Une erreur est survenue. Veuillez rafraîchir la page.");
                 }
             });
             

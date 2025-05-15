@@ -4,415 +4,1132 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#088F8F">
-    <title>Gestion de Stock - Green Sushi (Version Light)</title>
+    <title>Gestion de Stock - Green Sushi</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.png" type="image/png">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <style>
-        /* Styles basiques */
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
-        body { background-color: #f5f5f5; color: #333; }
+        /* --- STYLES GLOBAUX --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
         
-        /* Header */
-        header { background-color: #088F8F; color: white; padding: 15px; text-align: center; position: fixed; top: 0; left: 0; right: 0; z-index: 100; }
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+        }
         
-        /* Conteneur principal */
-        .container { margin-top: 70px; margin-bottom: 70px; padding: 15px; }
+        /* --- HEADER --- */
+        header {
+            background-color: #088F8F;
+            color: white;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
         
-        /* Cartes et éléments */
-        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
-        .card { background-color: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; }
-        .icon { font-size: 2rem; margin-bottom: 10px; }
+        header h1 {
+            font-size: 1.2rem;
+            text-align: center;
+            margin-bottom: 5px;
+        }
         
-        /* Item de produit */
-        .item { background-color: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .item-name { font-weight: bold; }
-        .item-supplier { font-size: 0.8rem; color: #777; }
-        .low-stock { color: #e74c3c; font-weight: bold; }
+        .alert-badge {
+            background-color: #e74c3c;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
         
-        /* Navigation */
-        nav { background-color: white; display: flex; justify-content: space-around; position: fixed; bottom: 0; left: 0; right: 0; box-shadow: 0 -2px 5px rgba(0,0,0,0.1); }
-        .tab { padding: 10px; text-align: center; flex: 1; }
-        .active { color: #088F8F; border-top: 2px solid #088F8F; }
+        /* --- CONTENEUR PRINCIPAL --- */
+        .container {
+            margin-top: 70px;
+            margin-bottom: 70px;
+            padding: 15px;
+        }
         
-        /* Boutons */
-        button { background: none; border: none; cursor: pointer; }
-        .add-button { background-color: #088F8F; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: fixed; bottom: 80px; right: 20px; font-size: 1.5rem; }
+        /* --- PAGES --- */
+        .page {
+            display: none;
+        }
         
-        /* Notifications */
-        .notification { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background-color: #088F8F; color: white; padding: 10px 20px; border-radius: 5px; text-align: center; display: none; }
+        .page.active {
+            display: block;
+        }
+        
+        /* --- NAVIGATION --- */
+        nav {
+            background-color: white;
+            display: flex;
+            justify-content: space-around;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        
+        .tab {
+            padding: 10px;
+            text-align: center;
+            flex: 1;
+            cursor: pointer;
+        }
+        
+        .tab.active {
+            color: #088F8F;
+            border-top: 2px solid #088F8F;
+        }
+        
+        /* --- CARTES CATÉGORIES --- */
+        .categories-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .category-card {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .category-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .category-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        /* --- LISTE DE PRODUITS --- */
+        .products-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .back-button {
+            background: none;
+            border: none;
+            color: #088F8F;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+        
+        .product-item {
+            background-color: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .product-info {
+            flex: 1;
+        }
+        
+        .product-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .product-supplier {
+            font-size: 0.8rem;
+            color: #777;
+        }
+        
+        .product-controls {
+            display: flex;
+            align-items: center;
+            margin: 0 10px;
+        }
+        
+        .product-quantity {
+            margin-right: 10px;
+            min-width: 80px;
+            text-align: right;
+        }
+        
+        .product-quantity.low-stock {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .stock-input {
+            width: 60px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            text-align: center;
+            display: none;
+        }
+        
+        .product-unit {
+            margin-left: 5px;
+            color: #777;
+            min-width: 20px;
+        }
+        
+        .product-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .product-actions button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+        
+        .order-button.active {
+            color: #088F8F;
+            background-color: rgba(8, 143, 143, 0.1);
+            border-radius: 50%;
+            padding: 5px;
+        }
+        
+        /* Animation pour l'ajout à la commande */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse {
+            animation: pulse 0.5s;
+        }
+        
+        /* --- FORMULAIRE D'AJOUT/ÉDITION --- */
+        .form-container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .form-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        
+        .form-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .cancel-button {
+            background-color: #ddd;
+        }
+        
+        .submit-button {
+            background-color: #088F8F;
+            color: white;
+        }
+        
+        /* --- GROUPES DE CATÉGORIES --- */
+        .category-group {
+            margin-bottom: 15px;
+        }
+        
+        .category-header {
+            background-color: #f9f9f9;
+            padding: 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            margin-bottom: 5px;
+        }
+        
+        .category-content {
+            margin-left: 20px;
+        }
+        
+        /* --- MODAL --- */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 400px;
+        }
+        
+        .modal-title {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+        
+        .modal-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        /* --- POPUP --- */
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(8, 143, 143, 0.9);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            z-index: 1002;
+            display: none;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        @keyframes fadeInOut {
+            0% { opacity: 0; }
+            20% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        
+        .popup-animation {
+            display: block;
+            animation: fadeInOut 1.5s forwards;
+        }
+        
+        /* --- EMAIL FORM --- */
+        .email-form {
+            margin-top: 20px;
+        }
+        
+        .email-form input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .email-submit {
+            background-color: #088F8F;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            width: 100%;
+            cursor: pointer;
+        }
+        
+        /* --- EMPTY STATE --- */
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #777;
+        }
+        
+        .add-button {
+            background-color: #088F8F;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            font-size: 1.5rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            cursor: pointer;
+            border: none;
+            z-index: 99;
+        }
+        
+        /* --- NOTIFICATION --- */
+        .notification {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #088F8F;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 1001;
+        }
+        
+        /* --- STATISTICS PAGE --- */
+        .stats-container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .stats-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .stats-card {
+            background-color: #f9f9f9;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .stats-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #088F8F;
+            margin: 10px 0;
+        }
+        
+        .stats-title {
+            font-size: 1rem;
+            color: #777;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        
+        /* --- HISTORY PAGE --- */
+        .history-filters {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            background-color: #f9f9f9;
+            border-radius: 10px;
+            padding: 10px;
+        }
+        
+        .history-filter {
+            flex: 1;
+            text-align: center;
+            padding: 5px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        
+        .history-filter.active {
+            background-color: #088F8F;
+            color: white;
+        }
+        
+        .history-item {
+            background-color: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .history-date {
+            font-size: 0.8rem;
+            color: #777;
+            margin-bottom: 5px;
+        }
+        
+        .history-action {
+            font-weight: bold;
+            color: #088F8F;
+        }
+        
+        .history-details {
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
+    <!-- HEADER -->
     <header>
         <h1>Gestion de Stock - Green Sushi</h1>
+        <div class="alert-badge" id="alert-count">0</div>
     </header>
     
-    <div class="container" id="content">
-        <!-- Contenu dynamique -->
-        <div class="grid" id="categories">
-            <div class="card" onclick="showCategory('sec')">
-                <div class="icon">🌾</div>
-                <div>Stock Sec</div>
-            </div>
-            <div class="card" onclick="showCategory('frais')">
-                <div class="icon">🧀</div>
-                <div>Stock Frais</div>
-            </div>
-            <div class="card" onclick="showCategory('surgele')">
-                <div class="icon">❄️</div>
-                <div>Stock Surgelé</div>
-            </div>
-            <div class="card" onclick="showCategory('boissons')">
-                <div class="icon">🧃</div>
-                <div>Stock Boissons</div>
-            </div>
-            <div class="card" onclick="showCategory('consommable')">
-                <div class="icon">🥢</div>
-                <div>Stock Consommable</div>
-            </div>
-            <div class="card" onclick="showOrders()">
-                <div class="icon">📋</div>
-                <div>Liste Commandes</div>
+    <!-- CONTENEUR PRINCIPAL -->
+    <div class="container">
+        <!-- PAGE D'ACCUEIL -->
+        <div id="home-page" class="page active">
+            <div class="categories-grid" id="categories-container">
+                <div class="category-card" data-category="sec">
+                    <div class="category-icon">🌾</div>
+                    <div>Stock Sec</div>
+                </div>
+                <div class="category-card" data-category="frais">
+                    <div class="category-icon">🧀</div>
+                    <div>Stock Frais</div>
+                </div>
+                <div class="category-card" data-category="surgele">
+                    <div class="category-icon">❄️</div>
+                    <div>Stock Surgelé</div>
+                </div>
+                <div class="category-card" data-category="boissons">
+                    <div class="category-icon">🧃</div>
+                    <div>Stock Boissons</div>
+                </div>
+                <div class="category-card" data-category="consommable">
+                    <div class="category-icon">🥢</div>
+                    <div>Stock Consommable</div>
+                </div>
+                <div class="category-card" data-category="commandes">
+                    <div class="category-icon">📋</div>
+                    <div>Liste Commandes</div>
+                </div>
             </div>
         </div>
         
-        <!-- Alertes -->
-        <h2 style="margin-top: 30px; margin-bottom: 15px;">Produits en alerte</h2>
-        <div id="alerts">
-            <!-- Rempli par JavaScript -->
+        <!-- PAGE DE PRODUITS -->
+        <div id="products-page" class="page">
+            <div class="products-header">
+                <button id="back-to-home" class="back-button">←</button>
+                <h2 id="category-title">Stock Sec</h2>
+                <div style="width: 20px;"></div>
+            </div>
+            <div id="products-list"></div>
+            <button id="add-product" class="add-button">+</button>
+        </div>
+        
+        <!-- PAGE D'AJOUT/ÉDITION DE PRODUIT -->
+        <div id="add-product-page" class="page">
+            <div class="products-header">
+                <button id="back-to-products" class="back-button">←</button>
+                <h2 id="form-title">Ajouter Produit</h2>
+                <div style="width: 20px;"></div>
+            </div>
+            <div class="form-container">
+                <form id="product-form">
+                    <div class="form-group">
+                        <label for="product-name">Nom du produit</label>
+                        <input type="text" id="product-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-quantity">Quantité</label>
+                        <input type="number" id="product-quantity" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-unit">Unité</label>
+                        <input type="text" id="product-unit" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-alert">Alerte quantité basse</label>
+                        <input type="number" id="product-alert" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-supplier">Fournisseur</label>
+                        <select id="product-supplier" required>
+                            <!-- Options générées par JavaScript -->
+                        </select>
+                    </div>
+                    <input type="hidden" id="product-category">
+                    <input type="hidden" id="product-original-name">
+                    <div class="form-buttons">
+                        <button type="button" id="cancel-add" class="cancel-button">Annuler</button>
+                        <button type="submit" class="submit-button">Sauvegarder</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- PAGE D'ALERTES -->
+        <div id="alerts-page" class="page">
+            <h2>Alertes Stock Bas</h2>
+            <div id="alerts-list"></div>
+        </div>
+        
+        <!-- PAGE DE COMMANDES -->
+        <div id="orders-page" class="page">
+            <h2>Liste de Commandes</h2>
+            <div id="orders-list"></div>
+            <div class="email-form">
+                <h3>Exporter les commandes</h3>
+                <input type="email" id="email-to" placeholder="Email du destinataire" required>
+                <input type="text" id="email-subject" placeholder="Sujet de l'email" value="Commandes Green Sushi" required>
+                <button id="export-orders" class="email-submit">Envoyer par Email</button>
+            </div>
+        </div>
+        
+        <!-- PAGE DE STATISTIQUES -->
+        <div id="stats-page" class="page">
+            <h2>Statistiques</h2>
+            <div class="stats-container">
+                <div class="stats-grid">
+                    <div class="stats-card">
+                        <div class="stats-title">Total Produits</div>
+                        <div class="stats-value" id="stats-total-products">0</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-title">Produits en Alerte</div>
+                        <div class="stats-value" id="stats-low-stock">0</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-title">Commandes en cours</div>
+                        <div class="stats-value" id="stats-orders">0</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-title">Valeur Estimée</div>
+                        <div class="stats-value" id="stats-value">0 €</div>
+                    </div>
+                </div>
+            </div>
+            
+            <h3>Historique des Mouvements</h3>
+            <div class="history-filters">
+                <div class="history-filter active" data-period="week">1 Semaine</div>
+                <div class="history-filter" data-period="month">1 Mois</div>
+                <div class="history-filter" data-period="quarter">3 Mois</div>
+            </div>
+            <div id="history-list"></div>
         </div>
     </div>
     
+    <!-- NAVIGATION -->
     <nav>
-        <div class="tab active" onclick="showHome()">🏠<br>Accueil</div>
-        <div class="tab" onclick="showAlerts()">🔔<br>Alertes</div>
-        <div class="tab" onclick="showOrders()">📋<br>Commandes</div>
-        <div class="tab" onclick="showStats()">📊<br>Stats</div>
+        <div class="tab active" data-page="home-page">🏠<br>Accueil</div>
+        <div class="tab" data-page="alerts-page">🔔<br>Alertes</div>
+        <div class="tab" data-page="orders-page">📋<br>Commandes</div>
+        <div class="tab" data-page="stats-page">📊<br>Stats</div>
     </nav>
     
-    <div class="notification" id="notification">Notification</div>
+    <!-- POPUP -->
+    <div id="popup" class="popup"></div>
+    
+    <!-- NOTIFICATION -->
+    <div id="inventory-notification" class="notification">Stock mis à jour avec succès!</div>
+    
+    <!-- MODAL DE CONFIRMATION -->
+    <div id="confirmation-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Commandes préparées avec succès!</div>
+            <p style="margin-bottom: 10px;">Le contenu de la commande a été copié dans le presse-papier.</p>
+            <div class="modal-buttons">
+                <button id="confirm-modal" class="submit-button">OK</button>
+            </div>
+        </div>
+    </div>
     
     <script>
-        // Données de base
-        const data = {
-            'Stock Sec': [
-                {name: "Riz", quantity: 10, unit: "kg", supplier: "Métro", alert: 5},
-                {name: "Farine", quantity: 8, unit: "kg", supplier: "Promocash", alert: 3},
-                {name: "Huile d'olive", quantity: 2, unit: "L", supplier: "Métro", alert: 3},
-                {name: "Sel", quantity: 4, unit: "kg", supplier: "Promocash", alert: 2}
-            ],
-            'Stock Frais': [
-                {name: "Fromage", quantity: 5, unit: "kg", supplier: "Fromager Local", alert: 3},
-                {name: "Crème fraîche", quantity: 7, unit: "L", supplier: "Métro", alert: 4},
-                {name: "Beurre", quantity: 2, unit: "kg", supplier: "Métro", alert: 4}
-            ],
-            'Stock Surgelé': [
-                {name: "Fruits de mer", quantity: 3, unit: "kg", supplier: "Poissonnerie Maritime", alert: 5},
-                {name: "Frites", quantity: 8, unit: "kg", supplier: "Promocash", alert: 4}
-            ],
-            'Stock Boissons': [
-                {name: "Vin rouge", quantity: 15, unit: "bouteilles", supplier: "Caviste", alert: 5},
-                {name: "Coca-Cola", quantity: 6, unit: "packs", supplier: "Distriboissons", alert: 10}
-            ],
-            'Stock Consommable': [
-                {name: "Serviettes", quantity: 3, unit: "paquets", supplier: "Fournitures Pro", alert: 5},
-                {name: "Film alimentaire", quantity: 4, unit: "rouleaux", supplier: "Métro", alert: 2}
-            ]
-        };
-        
-        const orders = {};
-        
-        // Affichage de la page d'accueil
-        function showHome() {
-            document.getElementById('content').innerHTML = `
-                <div class="grid" id="categories">
-                    <div class="card" onclick="showCategory('sec')">
-                        <div class="icon">🌾</div>
-                        <div>Stock Sec</div>
-                    </div>
-                    <div class="card" onclick="showCategory('frais')">
-                        <div class="icon">🧀</div>
-                        <div>Stock Frais</div>
-                    </div>
-                    <div class="card" onclick="showCategory('surgele')">
-                        <div class="icon">❄️</div>
-                        <div>Stock Surgelé</div>
-                    </div>
-                    <div class="card" onclick="showCategory('boissons')">
-                        <div class="icon">🧃</div>
-                        <div>Stock Boissons</div>
-                    </div>
-                    <div class="card" onclick="showCategory('consommable')">
-                        <div class="icon">🥢</div>
-                        <div>Stock Consommable</div>
-                    </div>
-                    <div class="card" onclick="showOrders()">
-                        <div class="icon">📋</div>
-                        <div>Liste Commandes</div>
-                    </div>
-                </div>
-                
-                <h2 style="margin-top: 30px; margin-bottom: 15px;">Produits en alerte</h2>
-                <div id="alerts"></div>
-            `;
-            updateAlerts();
-            setActiveTab(0);
-        }
-        
-        // Afficher une catégorie
-        function showCategory(category) {
-            const categoryTitle = 
-                category === 'sec' ? 'Stock Sec' : 
-                category === 'frais' ? 'Stock Frais' : 
-                category === 'surgele' ? 'Stock Surgelé' : 
-                category === 'boissons' ? 'Stock Boissons' : 
-                'Stock Consommable';
-                
-            let html = `
-                <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                    <button onclick="showHome()" style="font-size: 1.2rem; color: #088F8F; margin-right: 10px;">←</button>
-                    <h2>${categoryTitle}</h2>
-                </div>
-                <div id="products">`;
-                
-            if (data[categoryTitle] && data[categoryTitle].length > 0) {
-                data[categoryTitle].forEach(product => {
-                    const isLowStock = product.quantity <= product.alert;
-                    html += `
-                        <div class="item">
-                            <div>
-                                <div class="item-name">${product.name}</div>
-                                <div class="item-supplier">${product.supplier}</div>
-                            </div>
-                            <div style="min-width: 80px; text-align: right;" class="${isLowStock ? 'low-stock' : ''}">
-                                ${product.quantity} ${product.unit}
-                            </div>
-                            <button onclick="toggleOrder('${categoryTitle}', '${product.name}')">📋</button>
-                        </div>
-                    `;
-                });
-            } else {
-                html += `<div style="text-align: center; padding: 30px; color: #777;">Aucun produit dans cette catégorie</div>`;
-            }
-            
-            html += `</div>`;
-            
-            document.getElementById('content').innerHTML = html;
-        }
-        
-        // Afficher les alertes
-        function showAlerts() {
-            let alertsHtml = `<h2>Alertes Stock Bas</h2><div id="alerts-list">`;
-            
-            // Collecter toutes les alertes
-            let hasAlerts = false;
-            for (const category in data) {
-                data[category].forEach(product => {
-                    if (product.quantity <= product.alert) {
-                        hasAlerts = true;
-                        alertsHtml += `
-                            <div class="item">
-                                <div>
-                                    <div class="item-name">${product.name}</div>
-                                    <div class="item-supplier">${category} - ${product.supplier}</div>
-                                </div>
-                                <div style="min-width: 80px; text-align: right;" class="low-stock">
-                                    ${product.quantity} ${product.unit}
-                                </div>
-                                <button onclick="toggleOrder('${category}', '${product.name}')">📋</button>
-                            </div>
-                        `;
-                    }
-                });
-            }
-            
-            if (!hasAlerts) {
-                alertsHtml += `<div style="text-align: center; padding: 30px; color: #777;">Aucune alerte de stock bas</div>`;
-            }
-            
-            alertsHtml += `</div>`;
-            document.getElementById('content').innerHTML = alertsHtml;
-            setActiveTab(1);
-        }
-        
-        // Afficher les commandes
-        function showOrders() {
-            let ordersHtml = `<h2>Liste de Commandes</h2><div id="orders-list">`;
-            
-            const categories = Object.keys(orders);
-            if (categories.length === 0) {
-                ordersHtml += `<div style="text-align: center; padding: 30px; color: #777;">Aucune commande en cours</div>`;
-            } else {
-                categories.forEach(category => {
-                    const categoryIcon = 
-                        category === 'Stock Sec' ? '🌾' : 
-                        category === 'Stock Frais' ? '🧀' : 
-                        category === 'Stock Surgelé' ? '❄️' : 
-                        category === 'Stock Boissons' ? '🧃' : '🥢';
-                        
-                    ordersHtml += `
-                        <div style="margin-bottom: 15px;">
-                            <div style="background-color: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 5px;">
-                                ${categoryIcon} ${category} (${orders[category].length})
-                            </div>
-                    `;
-                    
-                    orders[category].forEach(product => {
-                        ordersHtml += `
-                            <div class="item" style="margin-left: 20px;">
-                                <div>
-                                    <div class="item-name">${product.name}</div>
-                                    <div class="item-supplier">${product.supplier}</div>
-                                </div>
-                                <div style="min-width: 80px; text-align: right;">
-                                    ${product.quantity} ${product.unit}
-                                </div>
-                                <button onclick="removeOrder('${category}', '${product.name}')">❌</button>
-                            </div>
-                        `;
-                    });
-                    
-                    ordersHtml += `</div>`;
-                });
-            }
-            
-            ordersHtml += `</div>`;
-            document.getElementById('content').innerHTML = ordersHtml;
-            setActiveTab(2);
-        }
-        
-        // Afficher les statistiques
-        function showStats() {
-            let statsHtml = `
-                <h2>Statistiques</h2>
-                <div style="text-align: center; padding: 30px; color: #777;">Fonctionnalité statistiques en développement</div>
-                <div style="margin-top: 20px;">
-                    <div style="font-weight: bold; margin-bottom: 15px; text-align: center;">Aperçu des stocks par catégorie</div>
-                    <div style="display: flex; flex-direction: column; gap: 10px;">
-            `;
-            
-            for (const category in data) {
-                const categoryIcon = 
-                    category === 'Stock Sec' ? '🌾' : 
-                    category === 'Stock Frais' ? '🧀' : 
-                    category === 'Stock Surgelé' ? '❄️' : 
-                    category === 'Stock Boissons' ? '🧃' : '🥢';
-                    
-                statsHtml += `
-                    <div style="display: flex; justify-content: space-between; padding: 10px; background-color: white; border-radius: 5px;">
-                        <div>${categoryIcon} ${category}</div>
-                        <div>${data[category].length} produits</div>
-                    </div>
-                `;
-            }
-            
-            statsHtml += `</div></div>`;
-            document.getElementById('content').innerHTML = statsHtml;
-            setActiveTab(3);
-        }
-        
-        // Ajouter/Retirer un produit de la commande
-        function toggleOrder(category, productName) {
-            // Vérifier si la catégorie existe dans les commandes
-            if (!orders[category]) {
-                orders[category] = [];
-            }
-            
-            // Vérifier si le produit est déjà dans la commande
-            const index = orders[category].findIndex(p => p.name === productName);
-            
-            if (index === -1) {
-                // Trouver le produit dans les données
-                const product = data[category].find(p => p.name === productName);
-                if (product) {
-                    // Ajouter à la commande
-                    orders[category].push({...product});
-                    showNotification(`${productName} ajouté à la commande`);
-                }
-            } else {
-                // Retirer de la commande
-                orders[category].splice(index, 1);
-                
-                // Supprimer la catégorie si vide
-                if (orders[category].length === 0) {
-                    delete orders[category];
-                }
-                
-                showNotification(`${productName} retiré de la commande`);
-            }
-            
-            // Mettre à jour l'affichage si on est sur la page des commandes
-            if (document.querySelector('.tab.active').textContent.includes('Commandes')) {
-                showOrders();
-            }
-        }
-        
-        // Supprimer une commande
-        function removeOrder(category, productName) {
-            if (orders[category]) {
-                const index = orders[category].findIndex(p => p.name === productName);
-                if (index !== -1) {
-                    orders[category].splice(index, 1);
-                    
-                    // Supprimer la catégorie si vide
-                    if (orders[category].length === 0) {
-                        delete orders[category];
-                    }
-                    
-                    showNotification(`${productName} retiré de la commande`);
-                    showOrders(); // Rafraîchir l'affichage
-                }
-            }
-        }
-        
-        // Afficher les alertes sur la page d'accueil
-        function updateAlerts() {
-            const alertsContainer = document.getElementById('alerts');
-            if (!alertsContainer) return;
-            
-            let alertsHtml = '';
-            let hasAlerts = false;
-            
-            for (const category in data) {
-                data[category].forEach(product => {
-                    if (product.quantity <= product.alert) {
-                        hasAlerts = true;
-                        alertsHtml += `
-                            <div class="item">
-                                <div>
-                                    <div class="item-name">${product.name}</div>
-                                    <div class="item-supplier">${category} - ${product.supplier}</div>
-                                </div>
-                                <div style="min-width: 80px; text-align: right;" class="low-stock">
-                                    ${product.quantity} ${product.unit}
-                                </div>
-                                <button onclick="toggleOrder('${category}', '${product.name}')">📋</button>
-                            </div>
-                        `;
-                    }
-                });
-            }
-            
-            if (!hasAlerts) {
-                alertsHtml = `<div style="text-align: center; padding: 30px; color: #777;">Aucune alerte de stock bas</div>`;
-            }
-            
-            alertsContainer.innerHTML = alertsHtml;
-        }
-        
-        // Définir l'onglet actif
-        function setActiveTab(index) {
-            const tabs = document.querySelectorAll('.tab');
-            tabs.forEach((tab, i) => {
-                if (i === index) {
-                    tab.classList.add('active');
-                } else {
-                    tab.classList.remove('active');
-                }
+        // Enregistrement du service worker pour la PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker enregistré'))
+                    .catch(err => console.error('Erreur lors de l\'enregistrement du Service Worker:', err));
             });
         }
         
-        // Afficher une notification
+        // ------------------------------
+        // MODÈLE DE DONNÉES CENTRALISÉ
+        // ------------------------------
+        const StockData = {
+            // Liste des fournisseurs disponibles
+            suppliers: [
+                "Métro",
+                "Promocash",
+                "Fromager Local",
+                "Poissonnerie Maritime",
+                "Caviste",
+                "Distriboissons",
+                "Fournitures Pro",
+                "Distributeur Asiatique",
+                "Grossiste Bio"
+            ],
+            
+            categories: {
+                'Stock Sec': [
+                    {name: "Riz", quantity: 10, unit: "kg", supplier: "Métro", alert: 5, lowStock: false},
+                    {name: "Farine", quantity: 8, unit: "kg", supplier: "Promocash", alert: 3, lowStock: false},
+                    {name: "Huile d'olive", quantity: 2, unit: "L", supplier: "Métro", alert: 3, lowStock: true},
+                    {name: "Sel", quantity: 4, unit: "kg", supplier: "Promocash", alert: 2, lowStock: false}
+                ],
+                'Stock Frais': [
+                    {name: "Fromage", quantity: 5, unit: "kg", supplier: "Fromager Local", alert: 3, lowStock: false},
+                    {name: "Crème fraîche", quantity: 7, unit: "L", supplier: "Métro", alert: 4, lowStock: false},
+                    {name: "Beurre", quantity: 2, unit: "kg", supplier: "Métro", alert: 4, lowStock: true}
+                ],
+                'Stock Surgelé': [
+                    {name: "Fruits de mer", quantity: 3, unit: "kg", supplier: "Poissonnerie Maritime", alert: 5, lowStock: true},
+                    {name: "Frites", quantity: 8, unit: "kg", supplier: "Promocash", alert: 4, lowStock: false}
+                ],
+                'Stock Boissons': [
+                    {name: "Vin rouge", quantity: 15, unit: "bouteilles", supplier: "Caviste", alert: 5, lowStock: false},
+                    {name: "Coca-Cola", quantity: 6, unit: "packs", supplier: "Distriboissons", alert: 10, lowStock: true}
+                ],
+                'Stock Consommable': [
+                    {name: "Serviettes", quantity: 3, unit: "paquets", supplier: "Fournitures Pro", alert: 5, lowStock: true},
+                    {name: "Film alimentaire", quantity: 4, unit: "rouleaux", supplier: "Métro", alert: 2, lowStock: false}
+                ]
+            },
+            
+            // Commandes en cours
+            orders: {},
+            
+            // Historique des mouvements
+            history: [],
+            
+            // Obtenir tous les produits en alerte de stock bas
+            getLowStockProducts: function() {
+                let alerts = [];
+                for (const category in this.categories) {
+                    const lowStockProducts = this.categories[category].filter(product => 
+                        product.quantity <= product.alert
+                    ).map(product => ({...product, category}));
+                    
+                    alerts = alerts.concat(lowStockProducts);
+                }
+                return alerts;
+            },
+            
+            // Obtenir le nombre total de produits
+            getTotalProducts: function() {
+                let total = 0;
+                for (const category in this.categories) {
+                    total += this.categories[category].length;
+                }
+                return total;
+            },
+            
+            // Obtenir le nombre total de commandes
+            getTotalOrders: function() {
+                let total = 0;
+                for (const category in this.orders) {
+                    total += this.orders[category].length;
+                }
+                return total;
+            },
+            
+            // Mettre à jour un produit existant
+            updateProduct: function(category, productName, updates) {
+                const products = this.categories[category];
+                const index = products.findIndex(p => p.name === productName);
+                
+                if (index !== -1) {
+                    const oldQuantity = products[index].quantity;
+                    products[index] = {...products[index], ...updates};
+                    // Mettre à jour le statut de stock bas
+                    products[index].lowStock = products[index].quantity <= products[index].alert;
+                    
+                    // Ajouter à l'historique si la quantité a changé
+                    if (oldQuantity !== updates.quantity && updates.quantity !== undefined) {
+                        this.addToHistory({
+                            date: new Date(),
+                            product: productName,
+                            category: category,
+                            action: oldQuantity < updates.quantity ? 'ajout' : 'retrait',
+                            quantity: Math.abs(oldQuantity - updates.quantity),
+                            unit: products[index].unit
+                        });
+                    }
+                    
+                    // Sauvegarder les données
+                    this.saveData();
+                    return true;
+                }
+                
+                return false;
+            },
+            
+            // Ajouter un nouveau produit
+            addProduct: function(category, product) {
+                // Vérifier que la catégorie existe
+                if (!this.categories[category]) {
+                    this.categories[category] = [];
+                }
+                
+                // Vérifier si le produit existe déjà
+                const existingIndex = this.categories[category].findIndex(p => p.name === product.name);
+                
+                if (existingIndex !== -1) {
+                    // Si la quantité a changé, ajouter à l'historique
+                    const oldQuantity = this.categories[category][existingIndex].quantity;
+                    if (oldQuantity !== product.quantity) {
+                        this.addToHistory({
+                            date: new Date(),
+                            product: product.name,
+                            category: category,
+                            action: oldQuantity < product.quantity ? 'ajout' : 'retrait',
+                            quantity: Math.abs(oldQuantity - product.quantity),
+                            unit: product.unit
+                        });
+                    }
+                    
+                    // Mettre à jour le produit existant
+                    this.categories[category][existingIndex] = {...product};
+                } else {
+                    // Ajouter un nouveau produit
+                    this.categories[category].push({...product, lowStock: product.quantity <= product.alert});
+                    
+                    // Ajouter à l'historique
+                    this.addToHistory({
+                        date: new Date(),
+                        product: product.name,
+                        category: category,
+                        action: 'création',
+                        quantity: product.quantity,
+                        unit: product.unit
+                    });
+                }
+                
+                // Sauvegarder les données
+                this.saveData();
+                return true;
+            },
+            
+            // Ajouter un produit à la liste de commandes
+            addToOrder: function(category, productName) {
+                const product = this.categories[category].find(p => p.name === productName);
+                
+                if (product) {
+                    if (!this.orders[category]) {
+                        this.orders[category] = [];
+                    }
+                    
+                    // Vérifier si le produit est déjà dans la commande
+                    const existingIndex = this.orders[category].findIndex(p => p.name === productName);
+                    
+                    if (existingIndex === -1) {
+                        this.orders[category].push({...product, category});
+                        
+                        // Ajouter à l'historique
+                        this.addToHistory({
+                            date: new Date(),
+                            product: productName,
+                            category: category,
+                            action: 'commande',
+                            quantity: product.quantity,
+                            unit: product.unit
+                        });
+                        
+                        this.saveData();
+                        return true;
+                    }
+                }
+                
+                return false;
+            },
+            
+            // Supprimer un produit de la liste de commandes
+            removeFromOrder: function(category, productName) {
+                if (this.orders[category]) {
+                    const index = this.orders[category].findIndex(p => p.name === productName);
+                    
+                    if (index !== -1) {
+                        this.orders[category].splice(index, 1);
+                        
+                        // Ajouter à l'historique
+                        this.addToHistory({
+                            date: new Date(),
+                            product: productName,
+                            category: category,
+                            action: 'annulation commande',
+                            quantity: 0,
+                            unit: ''
+                        });
+                        
+                        // Supprimer la catégorie si elle est vide
+                        if (this.orders[category].length === 0) {
+                            delete this.orders[category];
+                        }
+                        
+                        this.saveData();
+                        return true;
+                    }
+                }
+                
+                return false;
+            },
+            
+            // Obtenir toutes les commandes groupées par catégorie
+            getOrdersByCategory: function() {
+                return this.orders;
+            },
+            
+            // Ajouter une entrée à l'historique
+            addToHistory: function(entry) {
+                this.history.push(entry);
+                this.saveData();
+            },
+            
+            // Obtenir l'historique filtré par période
+            getHistory: function(period) {
+                const now = new Date();
+                let startDate;
+                
+                switch(period) {
+                    case 'week':
+                        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                        break;
+                    case 'month':
+                        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                        break;
+                    case 'quarter':
+                        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+                        break;
+                    default:
+                        startDate = new Date(0); // Toute l'histoire
+                }
+                
+                return this.history.filter(entry => new Date(entry.date) >= startDate)
+                                  .sort((a, b) => new Date(b.date) - new Date(a.date));
+            },
+            
+            // Sauvegarder les données dans localStorage
+            saveData: function() {
+                try {
+                    localStorage.setItem('greenSushiStockData', JSON.stringify(this.categories));
+                    localStorage.setItem('greenSushiOrdersData', JSON.stringify(this.orders));
+                    localStorage.setItem('greenSushiHistoryData', JSON.stringify(this.history));
+                    return true;
+                } catch (e) {
+                    console.warn('Erreur lors de la sauvegarde des données', e);
+                    return false;
+                }
+            },
+            
+            // Charger les données depuis localStorage
+            loadData: function() {
+                try {
+                    const stockData = localStorage.getItem('greenSushiStockData');
+                    const ordersData = localStorage.getItem('greenSushiOrdersData');
+                    const historyData = localStorage.getItem('greenSushiHistoryData');
+                    
+                    if (stockData) {
+                        this.categories = JSON.parse(stockData);
+                    }
+                    
+                    if (ordersData) {
+                        this.orders = JSON.parse(ordersData);
+                    }
+                    
+                    if (historyData) {
+                        this.history = JSON.parse(historyData);
+                    } else {
+                        // Initialiser l'historique si c'est la première fois
+                        this.history = [];
+                    }
+                    
+                    return stockData && ordersData;
+                } catch (e) {
+                    console.warn('Erreur lors du chargement des données', e);
+                    return false;
+                }
+            },
+            
+            // Réinitialiser les données démo
+            resetToDemo: function() {
+                // Réinitialisation des données
+                this.categories = {
+                    'Stock Sec': [
+                        {name: "Riz", quantity: 10, unit: "kg", supplier: "Métro", alert: 5, lowStock: false},
+                        {name: "Farine", quantity: 8, unit: "kg", supplier: "Promocash", alert: 3, lowStock: false},
+                        {name: "Huile d'olive", quantity: 2, unit: "L", supplier: "Métro", alert: 3, lowStock: true},
+                        {name: "Sel", quantity: 4, unit: "kg", supplier: "Promocash", alert: 2, lowStock: false}
+                    ],
+                    'Stock Frais': [
+                        {name: "Fromage", quantity: 5, unit: "kg", supplier: "Fromager Local", alert: 3, lowStock: false},
+                        {name: "Crème fraîche", quantity: 7, unit: "L", supplier: "Métro", alert: 4, lowStock: false},
+                        {name: "Beurre", quantity: 2, unit: "kg", supplier: "Métro", alert: 4, lowStock: true}
+                    ],
+                    'Stock Surgelé': [
+                        {name: "Fruits de mer", quantity: 3, unit: "kg", supplier: "Poissonnerie Maritime", alert: 5, lowStock: true},
+                        {name: "Frites", quantity: 8, unit: "kg", supplier: "Promocash", alert: 4, lowStock: false}
+                    ],
+                    'Stock Boissons': [
+                        {name: "Vin rouge", quantity: 15, unit: "bouteilles", supplier: "Caviste", alert: 5, lowStock: false},
+                        {name: "Coca-Cola", quantity: 6, unit: "packs", supplier: "Distriboissons", alert: 10, lowStock: true}
+                    ],
+                    'Stock Consommable': [
+                        {name: "Serviettes", quantity: 3, unit: "paquets", supplier: "Fournitures Pro", alert: 5, lowStock: true},
+                        {name: "Film alimentaire", quantity: 4, unit: "rouleaux", supplier: "Métro", alert: 2, lowStock: false}
+                    ]
+                };
+                
+                // Créer quelques commandes par défaut
+                this.orders = {
+                    'Stock Sec': [
+                        {name: "Huile d'olive", quantity: 2, unit: "L", supplier: "Métro", alert: 3, category: 'Stock Sec'}
+                    ],
+                    'Stock Frais': [
+                        {name: "Beurre", quantity: 2, unit: "kg", supplier: "Métro", alert: 4, category: 'Stock Frais'}
+                    ],
+                    'Stock Surgelé': [
+                        {name: "Fruits de mer", quantity: 3, unit: "kg", supplier: "Poissonnerie Maritime", alert: 5, category: 'Stock Surgelé'}
+                    ]
+                };
+                
+                // Initialiser l'historique avec quelques entrées démo
+                const now = new Date();
+                this.history = [
+                    {
+                        date: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
+                        product: "Riz",
+                        category: "Stock Sec",
+                        action: "ajout",
+                        quantity: 5,
+                        unit: "kg"
+                    },
+                    {
+                        date: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000),
+                        product: "Fromage",
+                        category: "Stock Frais",
+                        action: "retrait",
+                        quantity: 2,
+                        unit: "kg"
+                    },
+                    {
+                        date: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
+                        product: "Coca-Cola",
+                        category: "Stock Boissons",
+                        action: "commande",
+                        quantity: 6,
+                        unit: "packs"
+                    }
+                ];
+                
+                this.saveData();
+            }
+        };
+        
+        // ------------------------------
+        // FONCTIONS DE RENDU DES TEMPLATES
+        // ------------------------------
+        
+        // Initialiser le formulaire de produit
+        function prepareProductForm(product = null) {
+            // Remplir le select des fournisseurs
+            const supplierSelect = document.getElementById('product-supplier');
+            supplierSelect.innerHTML = '';
+            
+            // Option vide
+            const emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = '-- Choisir un fournisseur --';
+            supplierSelect.appendChild(emptyOption);
+            
+            // Ajout des fournisseurs existants
+            StockData.suppliers.forEach(supplier => {
+                const option = document.createElement('option');
+                option.value = supplier;
+                option.textContent = supplier;
+                supplierSelect.appendChild(option);
+            });
+            
+            // Si c'est une édition, sélectionner le fournisseur du produit
+            if (product) {
+                document.getElementById('product-name').value = product.name;
+                document.getElementById('product-quantity').value = product.quantity;
+                document.getElementById('product-unit').value = product.unit;
+                document.getElementById('product-alert').value = product.alert;
+                document.getElementById('product-supplier').value = product.supplier;
+                document.getElementById('product-original-name').value = product.name;
+                document.getElementById('form-title').textContent = 'Modifier Produit';
+            } else {
+                document.getElementById('product-form').reset();
+                document.getElementById('form-title').textContent = 'Ajouter Produit';
+                document.getElementById('product-original-name').value = '';
+            }
+        }
+        
+        // Template pour un produit
+        function createProductTemplate(product, actions) {
+            return `
+                <div class="product-item">
+                    <div class="product-info">
+                        <div class="product-name">${product.name}</div>
+                        <div class="product-supplier">${product.supplier}</div>
+                    </div>
+                    <div class="product-controls">
+                        <div class="product-quantity ${product.quantity <= product.alert ? 'low-stock' : ''}">${product.quantity} ${product.unit}</div>
+                        <input type="number" class="stock-input" value="${product.quantity}" min="0">
+                        <div class="product-unit">${product.unit}</div>
+                    </div>
+                    <div class="product-actions">
+                        ${actions}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Fonction pour afficher une notification
         function showNotification(message, duration = 2000) {
-            const notification = document.getElementById('notification');
+            const notification = document.getElementById('inventory-notification');
             notification.textContent = message;
             notification.style.display = 'block';
             
@@ -421,10 +1138,649 @@
             }, duration);
         }
         
-        // Initialisation
-        document.addEventListener('DOMContentLoaded', function() {
-            showHome();
-        });
+        // Fonction pour afficher un popup au centre de l'écran
+        function showPopup(message, duration = 1500) {
+            const popup = document.getElementById('popup');
+            popup.textContent = message;
+            popup.classList.add('popup-animation');
+            
+            setTimeout(() => {
+                popup.classList.remove('popup-animation');
+            }, duration);
+        }
+        
+        // Fonction pour formater une date
+        function formatDate(date) {
+            const d = new Date(date);
+            return d.toLocaleDateString('fr-FR', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        // Fonction pour attacher les événements aux éléments d'un produit
+        function attachProductEvents(productElement, product, category) {
+            const orderButton = productElement.querySelector('.order-button');
+            const editButton = productElement.querySelector('.edit-button');
+            const stockInput = productElement.querySelector('.stock-input');
+            const quantityDisplay = productElement.querySelector('.product-quantity');
+            
+            // Gérer le bouton de commande
+            orderButton.addEventListener('click', function() {
+                // Animation de l'icône
+                this.classList.add('pulse');
+                setTimeout(() => this.classList.remove('pulse'), 500);
+                
+                // Basculer l'état actif
+                this.classList.toggle('active');
+                
+                if (this.classList.contains('active')) {
+                    // Ajouter à la commande
+                    StockData.addToOrder(category, product.name);
+                    
+                    // Notification plus visible
+                    showPopup(`${product.name} ajouté à la commande`);
+                } else {
+                    // Retirer de la commande
+                    StockData.removeFromOrder(category, product.name);
+                    showNotification('Produit retiré de la commande');
+                }
+                
+                // Mettre à jour les statistiques
+                updateStats();
+            });
+            
+            // Vérifier si le produit est déjà dans la commande
+            if (StockData.orders[category] && StockData.orders[category].some(p => p.name === product.name)) {
+                orderButton.classList.add('active');
+            }
+            
+            // Gérer le bouton d'édition
+            editButton.addEventListener('click', function() {
+                try {
+                    // Préparer le formulaire d'édition avec les données du produit
+                    prepareProductForm(product);
+                    document.getElementById('product-category').value = category;
+                    
+                    showPage('add-product-page');
+                } catch (error) {
+                    console.error('Erreur lors de l\'édition:', error);
+                    showNotification('Erreur lors de l\'édition du produit');
+                }
+            });
+            
+            // Gérer le double-clic sur la quantité pour afficher l'input
+            quantityDisplay.addEventListener('dblclick', function() {
+                this.style.display = 'none';
+                stockInput.style.display = 'inline-block';
+                stockInput.focus();
+                stockInput.select();
+            });
+            
+            // Gérer la mise à jour de la quantité
+            stockInput.addEventListener('change', function() {
+                const newQuantity = parseInt(this.value) || 0;
+                
+                // Mettre à jour dans le modèle de données
+                StockData.updateProduct(category, product.name, {quantity: newQuantity});
+                
+                // Mettre à jour l'affichage
+                quantityDisplay.textContent = newQuantity + ' ' + product.unit;
+                quantityDisplay.classList.toggle('low-stock', newQuantity <= product.alert);
+                
+                // Masquer l'input et afficher la valeur
+                this.style.display = 'none';
+                quantityDisplay.style.display = 'inline-block';
+                
+                // Notification
+                showNotification('Stock mis à jour avec succès!');
+                
+                // Mettre à jour le compteur d'alertes
+                updateAlertCount();
+                
+                // Mettre à jour les statistiques
+                updateStats();
+                
+                // Mettre à jour l'historique
+                renderHistory('week'); // Par défaut, afficher l'historique de la semaine
+            });
+            
+            // Gérer la perte de focus sur l'input
+            stockInput.addEventListener('blur', function() {
+                this.style.display = 'none';
+                quantityDisplay.style.display = 'inline-block';
+            });
+            
+            // Gérer la touche Entrée sur l'input
+            stockInput.addEventListener('keyup', function(e) {
+                if (e.key === 'Enter') {
+                    this.blur();
+                }
+            });
+        }
+        
+        // Fonction pour mettre à jour le compteur d'alertes
+        function updateAlertCount() {
+            const alertCount = StockData.getLowStockProducts().length;
+            document.getElementById('alert-count').textContent = alertCount;
+        }
+        
+        // Fonction pour mettre à jour les statistiques
+        function updateStats() {
+            document.getElementById('stats-total-products').textContent = StockData.getTotalProducts();
+            document.getElementById('stats-low-stock').textContent = StockData.getLowStockProducts().length;
+            document.getElementById('stats-orders').textContent = StockData.getTotalOrders();
+            
+            // Calcul d'une valeur fictive (ceci pourrait être remplacé par un calcul réel basé sur des prix)
+            let totalValue = 0;
+            for (const category in StockData.categories) {
+                StockData.categories[category].forEach(product => {
+                    // Valeur fictive: quantité * (10 + longueur du nom)
+                    totalValue += product.quantity * (10 + product.name.length);
+                });
+            }
+            document.getElementById('stats-value').textContent = totalValue.toFixed(0) + ' €';
+        }
+        
+        // Fonction pour afficher la liste des produits
+        function renderProductsList(categoryTitle) {
+            const productsList = document.getElementById('products-list');
+            productsList.innerHTML = '';
+            
+            if (!StockData.categories[categoryTitle] || StockData.categories[categoryTitle].length === 0) {
+                productsList.innerHTML = '<div class="empty-state">Aucun produit dans cette catégorie</div>';
+                return;
+            }
+            
+            // Créer un fragment pour optimiser le DOM
+            const fragment = document.createDocumentFragment();
+            
+            // Trier les produits (stock bas en premier)
+            const sortedProducts = [...StockData.categories[categoryTitle]].sort((a, b) => {
+                // D'abord par statut de stock bas
+                if (a.quantity <= a.alert && b.quantity > b.alert) return -1;
+                if (a.quantity > a.alert && b.quantity <= b.alert) return 1;
+                // Ensuite par nom
+                return a.name.localeCompare(b.name);
+            });
+            
+            // Créer les éléments pour chaque produit
+            sortedProducts.forEach(product => {
+                const template = document.createElement('template');
+                template.innerHTML = createProductTemplate(
+                    product,
+                    '<button class="order-button">📋</button><button class="edit-button">✏️</button>'
+                );
+                
+                const productElement = template.content.firstElementChild;
+                
+                // Attacher les événements
+                attachProductEvents(productElement, product, categoryTitle);
+                
+                // Ajouter au fragment
+                fragment.appendChild(productElement);
+            });
+            
+            // Ajouter le fragment au DOM
+            productsList.appendChild(fragment);
+        }
+        
+        // Fonction pour afficher les alertes
+        function renderAlertsPage() {
+            const alertsList = document.getElementById('alerts-list');
+            alertsList.innerHTML = '';
+            
+            const alerts = StockData.getLowStockProducts();
+            
+            if (alerts.length === 0) {
+                alertsList.innerHTML = '<div class="empty-state">Aucune alerte de stock bas</div>';
+                return;
+            }
+            
+            const fragment = document.createDocumentFragment();
+            
+            alerts.forEach(product => {
+                const template = document.createElement('template');
+                // Suppression du bouton d'édition, uniquement bouton de commande
+                template.innerHTML = createProductTemplate(
+                    product,
+                    '<button class="order-button">📋</button>'
+                );
+                
+                const alertElement = template.content.firstElementChild;
+                
+                // Modifier l'affichage du fournisseur pour inclure la catégorie
+                const supplierInfo = alertElement.querySelector('.product-supplier');
+                supplierInfo.textContent = `${product.category} - ${product.supplier}`;
+                
+                // Attacher uniquement l'événement pour le bouton de commande
+                const orderButton = alertElement.querySelector('.order-button');
+                orderButton.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    
+                    if (this.classList.contains('active')) {
+                        // Ajouter à la commande
+                        StockData.addToOrder(product.category, product.name);
+                        showNotification('Produit ajouté à la commande');
+                    } else {
+                        // Retirer de la commande
+                        StockData.removeFromOrder(product.category, product.name);
+                        showNotification('Produit retiré de la commande');
+                    }
+                    
+                    // Mettre à jour les statistiques
+                    updateStats();
+                });
+                
+                // Vérifier si le produit est déjà dans la commande
+                if (StockData.orders[product.category] && 
+                    StockData.orders[product.category].some(p => p.name === product.name)) {
+                    orderButton.classList.add('active');
+                }
+                
+                fragment.appendChild(alertElement);
+            });
+            
+            alertsList.appendChild(fragment);
+        }
+        
+        // Fonction pour afficher les commandes
+        function renderOrdersList() {
+            const ordersList = document.getElementById('orders-list');
+            ordersList.innerHTML = '';
+            
+            const orders = StockData.getOrdersByCategory();
+            const categories = Object.keys(orders);
+            
+            if (categories.length === 0) {
+                ordersList.innerHTML = '<div class="empty-state">Aucune commande en cours</div>';
+                return;
+            }
+            
+            const fragment = document.createDocumentFragment();
+            
+            // Créer les groupes de catégories
+            categories.forEach(category => {
+                const categoryGroup = document.createElement('div');
+                categoryGroup.className = 'category-group';
+                
+                // Créer l'en-tête de catégorie
+                const categoryIcon = 
+                    category === 'Stock Sec' ? '🌾' : 
+                    category === 'Stock Frais' ? '🧀' : 
+                    category === 'Stock Surgelé' ? '❄️' : 
+                    category === 'Stock Boissons' ? '🧃' : '🥢';
+                
+                const categoryHeader = document.createElement('div');
+                categoryHeader.className = 'category-header';
+                categoryHeader.innerHTML = `
+                    <div>${categoryIcon} ${category} (${orders[category].length})</div>
+                    <div class="toggle-icon">▼</div>
+                `;
+                
+                // Créer le contenu de la catégorie
+                const categoryContent = document.createElement('div');
+                categoryContent.className = 'category-content';
+                
+                // Ajouter les produits
+                orders[category].forEach(product => {
+                    const template = document.createElement('template');
+                    template.innerHTML = createProductTemplate(
+                        product,
+                        '<button class="order-button active">📋</button><button class="edit-button">✏️</button>'
+                    );
+                    
+                    const orderElement = template.content.firstElementChild;
+                    
+                    // Attacher les événements
+                    const orderButton = orderElement.querySelector('.order-button');
+                    const editButton = orderElement.querySelector('.edit-button');
+                    
+                    // Retirer de la commande
+                    orderButton.addEventListener('click', function() {
+                        this.classList.toggle('active');
+                        
+                        if (!this.classList.contains('active')) {
+                            // Retirer de la commande
+                            StockData.removeFromOrder(category, product.name);
+                            orderElement.remove();
+                            
+                            // Si la catégorie est vide, supprimer le groupe
+                            if (!StockData.orders[category] || StockData.orders[category].length === 0) {
+                                categoryGroup.remove();
+                            } else {
+                                // Mettre à jour le compteur
+                                categoryHeader.querySelector('div').textContent = `${categoryIcon} ${category} (${StockData.orders[category].length})`;
+                            }
+                            
+                            showNotification('Produit retiré de la commande');
+                            
+                            // Mettre à jour les statistiques
+                            updateStats();
+                        }
+                    });
+                    
+                    // Édition du produit
+                    editButton.addEventListener('click', function() {
+                        prepareProductForm(product);
+                        document.getElementById('product-category').value = category;
+                        
+                        showPage('add-product-page');
+                    });
+                    
+                    categoryContent.appendChild(orderElement);
+                });
+                
+                // Ajouter l'événement de toggle à l'en-tête
+                categoryHeader.addEventListener('click', function() {
+                    categoryContent.style.display = categoryContent.style.display === 'none' ? 'block' : 'none';
+                    this.querySelector('.toggle-icon').textContent = categoryContent.style.display === 'none' ? '▶' : '▼';
+                });
+                
+                // Assembler le groupe
+                categoryGroup.appendChild(categoryHeader);
+                categoryGroup.appendChild(categoryContent);
+                fragment.appendChild(categoryGroup);
+            });
+            
+            ordersList.appendChild(fragment);
+        }
+        
+        // Fonction pour afficher l'historique des mouvements
+        function renderHistory(period) {
+            const historyList = document.getElementById('history-list');
+            historyList.innerHTML = '';
+            
+            const history = StockData.getHistory(period);
+            
+            if (history.length === 0) {
+                historyList.innerHTML = '<div class="empty-state">Aucun mouvement dans cette période</div>';
+                return;
+            }
+            
+            const fragment = document.createDocumentFragment();
+            
+            history.forEach(entry => {
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                
+                // Créer l'en-tête avec la date
+                const historyDate = document.createElement('div');
+                historyDate.className = 'history-date';
+                historyDate.textContent = formatDate(entry.date);
+                
+                // Créer le contenu avec l'action
+                const historyContent = document.createElement('div');
+                historyContent.className = 'history-content';
+                
+                const actionText = 
+                    entry.action === 'ajout' ? 'Ajout de' :
+                    entry.action === 'retrait' ? 'Retrait de' :
+                    entry.action === 'création' ? 'Création de' :
+                    entry.action === 'commande' ? 'Commande de' : 
+                    'Action sur';
+                
+                historyContent.innerHTML = `
+                    <span class="history-action">${actionText}</span>
+                    <strong>${entry.product}</strong>
+                    ${entry.quantity ? `(${entry.quantity} ${entry.unit})` : ''}
+                    <div class="history-details">Catégorie: ${entry.category}</div>
+                `;
+                
+                // Assembler l'élément d'historique
+                historyItem.appendChild(historyDate);
+                historyItem.appendChild(historyContent);
+                fragment.appendChild(historyItem);
+            });
+            
+            historyList.appendChild(fragment);
+        }
+        
+        // ------------------------------
+        // FONCTIONS DE NAVIGATION
+        // ------------------------------
+        
+        // Fonction pour afficher une page
+        function showPage(pageId) {
+            const pages = document.querySelectorAll('.page');
+            pages.forEach(page => {
+                page.classList.remove('active');
+            });
+            
+            document.getElementById(pageId).classList.add('active');
+            
+            // Actions spécifiques à certaines pages
+            if (pageId === 'alerts-page') {
+                renderAlertsPage();
+            } else if (pageId === 'orders-page') {
+                renderOrdersList();
+            } else if (pageId === 'stats-page') {
+                updateStats();
+                renderHistory('week'); // Par défaut, afficher l'historique de la semaine
+            }
+        }
+        
+        // Fonction pour activer un onglet
+        function activateTab(pageId) {
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.querySelector(`.tab[data-page="${pageId}"]`).classList.add('active');
+        }
+        
+        // ------------------------------
+        // INITIALISATION DE L'APPLICATION
+        // ------------------------------
+        
+        function initApp() {
+            // Charger les données ou initialiser les données démo
+            if (!StockData.loadData()) {
+                StockData.resetToDemo();
+            }
+            
+            // Initialiser le compteur d'alertes
+            updateAlertCount();
+            
+            // Navigation entre les pages via les onglets
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const pageId = this.dataset.page;
+                    showPage(pageId);
+                    activateTab(pageId);
+                });
+            });
+            
+            // Délégation d'événements pour les catégories sur la page d'accueil
+            document.getElementById('categories-container').addEventListener('click', function(event) {
+                const card = event.target.closest('.category-card');
+                if (!card) return;
+                
+                const category = card.dataset.category;
+                if (category === 'commandes') {
+                    showPage('orders-page');
+                    activateTab('orders-page');
+                } else {
+                    const categoryTitle = 
+                        category === 'sec' ? 'Stock Sec' : 
+                        category === 'frais' ? 'Stock Frais' : 
+                        category === 'surgele' ? 'Stock Surgelé' : 
+                        category === 'boissons' ? 'Stock Boissons' : 
+                        'Stock Consommable';
+                    
+                    document.getElementById('category-title').textContent = categoryTitle;
+                    showPage('products-page');
+                    renderProductsList(categoryTitle);
+                }
+            });
+            
+            // Filtres de l'historique
+            document.querySelector('.history-filters').addEventListener('click', function(event) {
+                if (event.target.classList.contains('history-filter')) {
+                    // Retirer la classe active de tous les filtres
+                    document.querySelectorAll('.history-filter').forEach(filter => {
+                        filter.classList.remove('active');
+                    });
+                    
+                    // Ajouter la classe active au filtre cliqué
+                    event.target.classList.add('active');
+                    
+                    // Afficher l'historique selon la période sélectionnée
+                    renderHistory(event.target.dataset.period);
+                }
+            });
+            
+            // Boutons de retour
+            document.getElementById('back-to-home').addEventListener('click', function() {
+                showPage('home-page');
+                activateTab('home-page');
+            });
+            
+            document.getElementById('back-to-products').addEventListener('click', function() {
+                const category = document.getElementById('product-category').value || document.getElementById('category-title').textContent;
+                showPage('products-page');
+                renderProductsList(category);
+            });
+            
+            // Bouton d'ajout de produit
+            document.getElementById('add-product').addEventListener('click', function() {
+                try {
+                    // Réinitialiser le formulaire
+                    prepareProductForm();
+                    const categoryTitle = document.getElementById('category-title');
+                    if (categoryTitle && document.getElementById('product-category')) {
+                        document.getElementById('product-category').value = categoryTitle.textContent;
+                    }
+                    
+                    showPage('add-product-page');
+                } catch (error) {
+                    console.error('Erreur lors de l\'ajout:', error);
+                    showNotification('Erreur lors de l\'ajout d\'un produit');
+                }
+            });
+            
+            // Annulation du formulaire
+            document.getElementById('cancel-add').addEventListener('click', function() {
+                const category = document.getElementById('product-category').value || document.getElementById('category-title').textContent;
+                showPage('products-page');
+                renderProductsList(category);
+            });
+            
+            // Soumission du formulaire
+            document.getElementById('product-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const name = document.getElementById('product-name').value;
+                const quantity = parseInt(document.getElementById('product-quantity').value);
+                const unit = document.getElementById('product-unit').value;
+                const alert = parseInt(document.getElementById('product-alert').value);
+                const supplier = document.getElementById('product-supplier').value;
+                const category = document.getElementById('product-category').value;
+                const originalName = document.getElementById('product-original-name').value;
+                
+                const product = {
+                    name,
+                    quantity,
+                    unit,
+                    alert,
+                    supplier,
+                    lowStock: quantity <= alert
+                };
+                
+                // Si on modifie un produit existant
+                if (originalName && originalName !== name) {
+                    // Supprimer l'ancien produit
+                    const categoryProducts = StockData.categories[category];
+                    const index = categoryProducts.findIndex(p => p.name === originalName);
+                    if (index !== -1) {
+                        categoryProducts.splice(index, 1);
+                    }
+                }
+                
+                // Ajouter ou mettre à jour le produit
+                StockData.addProduct(category, product);
+                
+                showNotification(originalName ? 'Produit modifié avec succès!' : 'Produit ajouté avec succès!');
+                
+                // Mettre à jour le compteur d'alertes
+                updateAlertCount();
+                
+                // Mettre à jour les statistiques
+                updateStats();
+                
+                // Revenir à la page des produits
+                showPage('products-page');
+                renderProductsList(category);
+            });
+            
+            // Export des commandes par email
+            document.getElementById('export-orders').addEventListener('click', function() {
+                const emailTo = document.getElementById('email-to').value;
+                const emailSubject = document.getElementById('email-subject').value;
+                
+                if (!emailTo || !emailSubject) {
+                    showNotification('Veuillez remplir tous les champs du formulaire d\'email.', 3000);
+                    return;
+                }
+                
+                // Créer le contenu de l'email
+                let emailBody = "Liste de commandes - Green Sushi\n\n";
+                
+                const orders = StockData.getOrdersByCategory();
+                for (const category in orders) {
+                    emailBody += `== ${category} ==\n`;
+                    orders[category].forEach(product => {
+                        emailBody += `- ${product.name}: ${product.quantity} ${product.unit} (${product.supplier})\n`;
+                    });
+                    emailBody += "\n";
+                }
+                
+                // Encoder le corps du message pour mailto
+                const encodedBody = encodeURIComponent(emailBody);
+                const mailtoLink = `mailto:${emailTo}?subject=${encodeURIComponent(emailSubject)}&body=${encodedBody}`;
+                
+                // Ouvrir le client email
+                window.location.href = mailtoLink;
+                
+                // Afficher la modale de confirmation
+                document.getElementById('confirmation-modal').style.display = 'flex';
+                
+                // Copier le texte au presse-papier
+                try {
+                    navigator.clipboard.writeText(emailBody).then(() => {
+                        showPopup('Commande copiée dans le presse-papier!');
+                    });
+                } catch (e) {
+                    console.warn('Copie dans le presse-papier non supportée');
+                    showNotification('Impossible de copier dans le presse-papier', 3000);
+                }
+            });
+            
+            // Fermer la modal de confirmation
+            document.getElementById('confirm-modal').addEventListener('click', function() {
+                document.getElementById('confirmation-modal').style.display = 'none';
+            });
+            
+            // Fermer la modal en cliquant en dehors
+            window.addEventListener('click', function(event) {
+                const modal = document.getElementById('confirmation-modal');
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+            
+            // Initialiser la page d'accueil
+            showPage('home-page');
+            activateTab('home-page');
+        }
+        
+        // Démarrer l'application au chargement du DOM
+        document.addEventListener('DOMContentLoaded', initApp);
     </script>
 </body>
 </html>

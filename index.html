@@ -33,6 +33,7 @@
             left: 0;
             right: 0;
             z-index: 100;
+            height: 60px;
         }
         
         header h1 {
@@ -58,8 +59,8 @@
         
         /* --- CONTENEUR PRINCIPAL --- */
         .container {
-            margin-top: 70px;
-            margin-bottom: 70px;
+            margin-top: 80px;
+            margin-bottom: 80px;
             padding: 15px;
         }
         
@@ -124,12 +125,14 @@
             margin-bottom: 10px;
         }
         
-        /* --- LISTE DE PRODUITS --- */
+        /* --- PRODUCTS HEADER --- */
         .products-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 15px;
+            margin-top: 10px;
+            padding-top: 5px;
         }
         
         .back-button {
@@ -921,9 +924,21 @@
                 return this.orders;
             },
             
-            // Ajouter une entrée à l'historique
+            // Ajouter à l'historique
             addToHistory: function(entry) {
+                // S'assurer que l'historique existe
+                if (!this.history) {
+                    this.history = [];
+                }
+                
+                // Ajouter l'entrée à l'historique
                 this.history.push(entry);
+                
+                // Limiter l'historique à 1000 entrées pour éviter des problèmes de performance
+                if (this.history.length > 1000) {
+                    this.history = this.history.slice(-1000);
+                }
+                
                 this.saveData();
             },
             
@@ -1151,7 +1166,11 @@
         
         // Fonction pour formater une date
         function formatDate(date) {
+            if (!date) return 'Date inconnue';
+            
             const d = new Date(date);
+            if (isNaN(d.getTime())) return 'Date invalide';
+            
             return d.toLocaleDateString('fr-FR', { 
                 day: '2-digit', 
                 month: '2-digit', 
@@ -1516,18 +1535,24 @@
                 const historyContent = document.createElement('div');
                 historyContent.className = 'history-content';
                 
-                const actionText = 
+                    const actionText = 
                     entry.action === 'ajout' ? 'Ajout de' :
                     entry.action === 'retrait' ? 'Retrait de' :
                     entry.action === 'création' ? 'Création de' :
                     entry.action === 'commande' ? 'Commande de' : 
+                    entry.action === 'renommage' ? 'Renommage de' :
+                    entry.action === 'annulation commande' ? 'Annulation de commande de' :
                     'Action sur';
                 
+                // Histoire avec détails additionnels si présents
                 historyContent.innerHTML = `
                     <span class="history-action">${actionText}</span>
                     <strong>${entry.product}</strong>
                     ${entry.quantity ? `(${entry.quantity} ${entry.unit})` : ''}
-                    <div class="history-details">Catégorie: ${entry.category}</div>
+                    <div class="history-details">
+                        Catégorie: ${entry.category}
+                        ${entry.details ? `<br>${entry.details}` : ''}
+                    </div>
                 `;
                 
                 // Assembler l'élément d'historique
@@ -1657,6 +1682,15 @@
                         document.getElementById('product-category').value = categoryTitle.textContent;
                     }
                     
+                    // S'assurer que tous les champs sont vides
+                    document.getElementById('product-name').value = '';
+                    document.getElementById('product-quantity').value = '';
+                    document.getElementById('product-unit').value = '';
+                    document.getElementById('product-alert').value = '';
+                    document.getElementById('product-supplier').value = '';
+                    document.getElementById('product-original-name').value = '';
+                    document.getElementById('form-title').textContent = 'Ajouter Produit';
+                    
                     showPage('add-product-page');
                 } catch (error) {
                     console.error('Erreur lors de l\'ajout:', error);
@@ -1700,6 +1734,17 @@
                     if (index !== -1) {
                         categoryProducts.splice(index, 1);
                     }
+                    
+                    // Ajouter une entrée dans l'historique pour le changement de nom
+                    StockData.addToHistory({
+                        date: new Date(),
+                        product: originalName,
+                        category: category,
+                        action: 'renommage',
+                        quantity: 0,
+                        unit: '',
+                        details: `Renommé en "${name}"`
+                    });
                 }
                 
                 // Ajouter ou mettre à jour le produit

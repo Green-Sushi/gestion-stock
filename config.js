@@ -11,7 +11,7 @@ const ALERT_CONFIG = {
     emailEnabled: false,
     emailRecipient: '',
 
-    // WhatsApp pour les notifications (numéro au format international)
+    // WhatsApp pour les notifications (numéro au format international) ou
     whatsappEnabled: false,
     whatsappNumber: '' // ex: +596696123456
 };
@@ -24,3 +24,4 @@ const CATEGORIES = [
     { id: 'consommable', name: 'Stock Consommable', icon: '🥢' },
     { id: 'boisson', name: 'Stock Boissons', icon: '🧃' }
 ];
+

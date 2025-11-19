@@ -1,8 +1,8 @@
 // Configuration Supabase
 // À REMPLIR après avoir créé votre projet Supabase
 const SUPABASE_CONFIG = {
-    url: 'VOTRE_URL_SUPABASE', // ex: https://xxxxx.supabase.co
-    key: 'VOTRE_CLE_PUBLIQUE_SUPABASE' // Clé publique anon
+    url: 'https://omftmjajbizctzrsxmxu.supabase.co', // ex: https://xxxxx.supabase.co
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tZnRtamFqYml6Y3R6cnN4bXh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM1MTM2MzgsImV4cCI6MjA3OTA4OTYzOH0.yqa454otDNzFAHvm8UIgu6nH1nIl1xNv4j2JCYR3cOg' // Clé publique anon
 };
 
 // Configuration des alertes

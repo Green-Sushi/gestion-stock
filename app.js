@@ -18,6 +18,16 @@ const AppState = {
 // ====================
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Initialiser Supabase dès le démarrage
+    showLoading(true);
+    const initialized = await db.init();
+    showLoading(false);
+
+    if (!initialized) {
+        alert('⚠️ Configuration Supabase manquante. Veuillez configurer SUPABASE_CONFIG dans config.js');
+        return;
+    }
+
     // Vérifier si déjà connecté
     const storedUser = localStorage.getItem('currentUser');
 
@@ -41,16 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function initializeApp() {
     showLoading(true);
 
-    // Initialiser Supabase
-    const initialized = await db.init();
-
-    if (!initialized) {
-        alert('⚠️ Configuration Supabase manquante. Veuillez configurer SUPABASE_CONFIG dans config.js');
-        showLoading(false);
-        return;
-    }
-
-    // Charger les données
+    // Charger les données (Supabase déjà initialisé au démarrage)
     await loadSuppliers();
     await loadProducts();
     await updateAlertCount();

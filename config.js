@@ -22,6 +22,7 @@ const CATEGORIES = [
     { id: 'sec', name: 'Stock Sec', icon: '🌾' },
     { id: 'surgele', name: 'Stock Surgelé', icon: '❄️' },
     { id: 'consommables', name: 'Stock Consommable', icon: '🥢' },
-    { id: 'boissons', name: 'Stock Boissons', icon: '🧃' }
+    { id: 'boissons', name: 'Stock Boissons', icon: '🧃' },
+    { id: 'autre', name: 'Autre', icon: '📦' }
 ];
 

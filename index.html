@@ -1072,6 +1072,7 @@
                         <option value="surgele">Stock Surgelé</option>
                         <option value="consommables">Stock Consommable</option>
                         <option value="boissons">Stock Boissons</option>
+                        <option value="autre">Autre</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1199,10 +1200,12 @@
             <span class="tab-icon">🏠</span>
             Accueil
         </div>
-        <div class="tab" data-page="alerts-page" style="position: relative;">
-            <span class="tab-icon">🔔</span>
+        <div class="tab" data-page="alerts-page">
+            <span class="tab-icon" style="position: relative;">
+                🔔
+                <div class="alert-badge" id="alert-count">0</div>
+            </span>
             Alertes
-            <div class="alert-badge" id="alert-count">0</div>
         </div>
         <div class="tab" data-page="suppliers-page">
             <span class="tab-icon">📦</span>

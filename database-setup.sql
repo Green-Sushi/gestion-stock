@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
 CREATE TABLE IF NOT EXISTS products (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
-    category VARCHAR(50) NOT NULL CHECK (category IN ('frais', 'sec', 'surgele', 'consommables', 'boissons')),
+    category VARCHAR(50) NOT NULL CHECK (category IN ('frais', 'sec', 'surgele', 'consommables', 'boissons', 'autre')),
     quantity DECIMAL(10, 2) NOT NULL DEFAULT 0,
     unit VARCHAR(50) NOT NULL,
     alert_threshold DECIMAL(10, 2) NOT NULL DEFAULT 0,

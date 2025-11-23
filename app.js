@@ -180,49 +180,8 @@ function showLoading(show) {
 // ====================
 
 function setupLoginPage() {
-    const pinKeyboard = document.querySelector('.pin-keyboard');
-    const loginError = document.getElementById('login-error');
-
-    // Utiliser la délégation d'événements pour éviter les listeners multiples
-    if (pinKeyboard && !pinKeyboard.dataset.listenersAttached) {
-        pinKeyboard.dataset.listenersAttached = 'true';
-
-        pinKeyboard.addEventListener('click', async (e) => {
-            const key = e.target.closest('.pin-key');
-            if (!key) return;
-
-            const keyValue = key.dataset.key;
-
-            if (keyValue === 'delete') {
-                AppState.pinCode = '';
-                updatePinDisplay();
-                loginError.textContent = '';
-            } else {
-                if (AppState.pinCode.length < 6) {
-                    AppState.pinCode += keyValue;
-                    updatePinDisplay();
-
-                    if (AppState.pinCode.length === 6) {
-                        // Tenter la connexion
-                        showLoading(true);
-                        const result = await db.authenticateWithPin(AppState.pinCode);
-                        showLoading(false);
-
-                        if (result.success) {
-                            AppState.currentUser = result.user;
-                            AppState.pinCode = '';
-                            updatePinDisplay();
-                            await initializeApp();
-                        } else {
-                            loginError.textContent = '❌ Code PIN invalide';
-                            AppState.pinCode = '';
-                            updatePinDisplay();
-                        }
-                    }
-                }
-            }
-        });
-    }
+    // Cette fonction ne fait plus rien car les listeners sont attachés globalement
+    // Elle est conservée pour compatibilité
 }
 
 function updatePinDisplay() {
@@ -294,6 +253,44 @@ function setupGlobalListeners() {
     // Logout
     document.getElementById('logout-btn')?.addEventListener('click', logout);
 
+    // Clavier PIN (event delegation au niveau document pour fonctionner toujours)
+    document.addEventListener('click', async (e) => {
+        const key = e.target.closest('.pin-key');
+        if (!key) return;
+
+        const keyValue = key.dataset.key;
+        const loginError = document.getElementById('login-error');
+
+        if (keyValue === 'delete') {
+            AppState.pinCode = '';
+            updatePinDisplay();
+            if (loginError) loginError.textContent = '';
+        } else {
+            if (AppState.pinCode.length < 6) {
+                AppState.pinCode += keyValue;
+                updatePinDisplay();
+
+                if (AppState.pinCode.length === 6) {
+                    // Tenter la connexion
+                    showLoading(true);
+                    const result = await db.authenticateWithPin(AppState.pinCode);
+                    showLoading(false);
+
+                    if (result.success) {
+                        AppState.currentUser = result.user;
+                        AppState.pinCode = '';
+                        updatePinDisplay();
+                        await initializeApp();
+                    } else {
+                        if (loginError) loginError.textContent = '❌ Code PIN invalide';
+                        AppState.pinCode = '';
+                        updatePinDisplay();
+                    }
+                }
+            }
+        }
+    });
+
     // Boutons d'ajout
     document.getElementById('add-product-btn').addEventListener('click', () => {
         openProductModal();
@@ -355,7 +352,8 @@ function renderCategories() {
         'sec': 'sec.png',
         'surgele': 'surgelé.png',
         'consommables': 'consommables.png',
-        'boissons': 'boissons.png'
+        'boissons': 'boissons.png',
+        'autre': 'autre.png'
     };
 
     CATEGORIES.forEach(category => {
@@ -840,13 +838,14 @@ function renderAlerts() {
         'sec': '#f39c12',
         'surgele': '#3498db',
         'consommables': '#9b59b6',
-        'boissons': '#e67e22'
+        'boissons': '#e67e22',
+        'autre': '#95a5a6'
     };
 
     // Trier par catégorie puis alphabétique
     const sortedProducts = [...AppState.lowStockProducts].sort((a, b) => {
         // D'abord par catégorie
-        const categoryOrder = ['frais', 'sec', 'surgele', 'consommables', 'boissons'];
+        const categoryOrder = ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'autre'];
         const catIndexA = categoryOrder.indexOf(a.category);
         const catIndexB = categoryOrder.indexOf(b.category);
         if (catIndexA !== catIndexB) {

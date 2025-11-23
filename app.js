@@ -467,7 +467,13 @@ function renderProducts(searchTerm = '') {
 
         const item = document.createElement('div');
         item.className = isLowStock ? 'product-item low-stock-alert' : 'product-item';
+
+        // Bouton supprimer visible uniquement pour le Patron
+        const deleteButton = db.isPatron() ?
+            `<button class="btn-delete-product" data-product-id="${product.id}" title="Supprimer ce produit">🗑️</button>` : '';
+
         item.innerHTML = `
+            ${deleteButton}
             <div class="product-info" data-product-id="${product.id}">
                 <div class="product-name">${product.name}</div>
                 <div class="product-supplier">${supplierName}</div>
@@ -515,6 +521,17 @@ function renderProducts(searchTerm = '') {
             e.stopPropagation();
             adjustProductQuantity(product.id, 10);
         });
+
+        // Bouton supprimer (Patron uniquement)
+        if (db.isPatron()) {
+            const btnDelete = item.querySelector('.btn-delete-product');
+            if (btnDelete) {
+                btnDelete.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteProduct(product.id, product.name);
+                });
+            }
+        }
 
         container.appendChild(item);
     });
@@ -591,6 +608,32 @@ async function adjustProductQuantity(productId, delta) {
     } else {
         // Mettre à jour le compteur d'alertes
         await updateAlertCount();
+    }
+}
+
+// Supprimer un produit (Patron uniquement)
+async function deleteProduct(productId, productName) {
+    if (!db.isPatron()) {
+        alert('⛔ Accès réservé au patron');
+        return;
+    }
+
+    if (!confirm(`⚠️ Êtes-vous sûr de vouloir supprimer "${productName}" ?\n\nCette action est irréversible.`)) {
+        return;
+    }
+
+    showLoading(true);
+    const result = await db.deleteProduct(productId);
+    showLoading(false);
+
+    if (result.success) {
+        // Recharger les produits et mettre à jour l'affichage
+        await loadProducts();
+        renderProducts();
+        await updateAlertCount();
+        renderCategories();
+    } else {
+        alert('❌ Erreur lors de la suppression : ' + result.error);
     }
 }
 

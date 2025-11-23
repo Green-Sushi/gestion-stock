@@ -425,6 +425,7 @@
             gap: 15px;
             transition: all 0.3s ease;
             border-left: 4px solid transparent;
+            position: relative;
         }
 
         .product-item.low-stock-alert {
@@ -434,6 +435,35 @@
 
         .product-item:active {
             transform: scale(0.99);
+        }
+
+        .btn-delete-product {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
+            z-index: 10;
+        }
+
+        .btn-delete-product:hover {
+            background: #c0392b;
+            transform: scale(1.1);
+        }
+
+        .btn-delete-product:active {
+            transform: scale(0.95);
         }
 
         .product-info {

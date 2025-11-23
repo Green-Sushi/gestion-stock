@@ -860,13 +860,21 @@ function renderAlerts() {
         const categoryName = CATEGORIES.find(c => c.id === product.category)?.name || product.category;
         const borderColor = categoryColors[product.category] || '#999';
 
-        // Calculer le pourcentage stock/seuil
-        const percentage = Math.min(100, Math.round((product.quantity / product.alert_threshold) * 100));
+        // Déterminer le niveau de stock avec le système 4 couleurs
+        const { stockLevel } = calculateStockLevel(
+            product.quantity,
+            product.alert_threshold,
+            product.optimal_stock
+        );
 
-        // Couleur de la barre selon le niveau
-        let barColor = '#e74c3c'; // Rouge par défaut
-        if (percentage >= 80) barColor = '#f39c12'; // Jaune
-        else if (percentage >= 50) barColor = '#e67e22'; // Orange
+        // Mapping des couleurs selon le niveau de stock
+        const stockColors = {
+            'stock-ok': '#27ae60',
+            'stock-attention': '#f39c12',
+            'stock-warning': '#e67e22',
+            'stock-critical': '#e74c3c'
+        };
+        const stockColor = stockColors[stockLevel];
 
         const item = document.createElement('div');
         item.className = 'list-item alert-item';
@@ -876,12 +884,14 @@ function renderAlerts() {
                 <div class="list-item-title">${product.name}</div>
                 <span class="category-badge-alert" style="background-color: ${borderColor};">${categoryName}</span>
             </div>
-            <div class="alert-stock-info">
-                <div class="alert-stock-text">Stock: ${product.quantity} ${product.unit} / Seuil: ${product.alert_threshold} ${product.unit}</div>
-                <div class="alert-progress-bar">
-                    <div class="alert-progress-fill" style="width: ${percentage}%; background-color: ${barColor};"></div>
+            <div class="alert-stock-display">
+                <div class="alert-stock-current" style="color: ${stockColor};">
+                    <span class="alert-qty-value">${product.quantity}</span>
+                    <span class="alert-qty-unit">${product.unit}</span>
                 </div>
-                <div class="alert-stock-percentage" style="color: ${barColor};">${percentage}%</div>
+                <div class="alert-stock-threshold">
+                    Seuil: ${product.alert_threshold} ${product.unit}
+                </div>
             </div>
         `;
 

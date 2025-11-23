@@ -739,39 +739,35 @@
             margin-bottom: 4px;
         }
 
-        .alert-stock-info {
+        .alert-stock-display {
             display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .alert-stock-text {
-            font-size: 0.9rem;
-            color: #555;
-        }
-
-        .alert-progress-bar {
-            background: #f0f0f0;
-            border-radius: 10px;
-            height: 20px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .alert-progress-fill {
-            height: 100%;
-            border-radius: 10px;
-            transition: width 0.3s ease;
-            display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: flex-end;
-            padding-right: 8px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #f0f0f0;
         }
 
-        .alert-stock-percentage {
+        .alert-stock-current {
+            display: flex;
+            align-items: baseline;
+            gap: 5px;
+        }
+
+        .alert-qty-value {
+            font-size: 1.8rem;
             font-weight: 700;
-            font-size: 0.95rem;
-            text-align: right;
+        }
+
+        .alert-qty-unit {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .alert-stock-threshold {
+            font-size: 0.9rem;
+            color: #777;
+            font-weight: 500;
         }
 
         /* === EMPTY STATE === */

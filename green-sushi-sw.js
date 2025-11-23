@@ -1,13 +1,15 @@
 // Service Worker pour Green Sushi Stock PWA
-const CACHE_NAME = 'green-sushi-v1';
+const CACHE_NAME = 'green-sushi-v2';
 // Fichiers à mettre en cache pour le fonctionnement hors ligne
 const CACHE_ASSETS = [
   './',
   './index.html',
-  './manifest.json',
-  './icon.png',
+  './green-sushi-manifest.json',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './config.js',
+  './database.js',
+  './app.js'
 ];
 // Installation du service worker
 self.addEventListener('install', (event) => {

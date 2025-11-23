@@ -62,6 +62,9 @@ async function initializeApp() {
     // Appliquer les permissions selon le rôle
     applyPermissions();
 
+    // Afficher l'emoji du rôle
+    updateRoleIcon();
+
     // Afficher la page d'accueil
     showPage('home-page');
     renderCategories();
@@ -105,6 +108,16 @@ function applyPermissions() {
 
     // Si employé, empêcher le clic sur les produits pour éditer (seulement +/-)
     // Cette logique est déjà gérée dans renderProducts car on a séparé les événements
+}
+
+// Afficher l'emoji du rôle dans le header
+function updateRoleIcon() {
+    const roleIcon = document.getElementById('role-icon');
+    if (!roleIcon) return;
+
+    const isPatron = db.isPatron();
+    roleIcon.textContent = isPatron ? '🔑' : '👤';
+    roleIcon.title = isPatron ? 'Patron' : 'Salarié';
 }
 
 // ====================
@@ -281,13 +294,6 @@ function setupGlobalListeners() {
     // Logout
     document.getElementById('logout-btn')?.addEventListener('click', logout);
 
-    // Badge alertes - clic pour afficher la page alertes
-    document.getElementById('alerts-icon')?.addEventListener('click', () => {
-        showPage('alerts-page');
-        renderAlerts();
-        updateActiveTab('alerts-page');
-    });
-
     // Boutons d'ajout
     document.getElementById('add-product-btn').addEventListener('click', () => {
         openProductModal();
@@ -364,7 +370,7 @@ function renderCategories() {
         card.className = 'category-card';
         card.dataset.category = category.id;
         card.innerHTML = `
-            <img src="/images/categories/${categoryImages[category.id]}" alt="${category.name}" class="category-image">
+            <img src="./images/categories/${categoryImages[category.id]}" alt="${category.name}" class="category-image">
             <div class="category-badges">
                 <div class="category-badge total" title="${count} produit${count > 1 ? 's' : ''}">${count}</div>
                 ${alertCount > 0 ? `<div class="category-badge alerts" title="${alertCount} en alerte">${alertCount}</div>` : ''}
@@ -439,18 +445,17 @@ function renderProducts(searchTerm = '') {
         item.innerHTML = `
             <div class="product-info" data-product-id="${product.id}">
                 <div class="product-name">${product.name}</div>
-                <div class="product-supplier">📦 ${supplierName}</div>
+                <div class="product-supplier">${supplierName}</div>
             </div>
-            <div class="product-right">
-                <div class="product-controls-quick">
-                    <button class="btn-quick-adjust btn-minus" data-product-id="${product.id}" title="Retirer 1">−</button>
-                    <div class="product-quantity">
-                        <div class="product-qty-value ${isLowStock ? 'low-stock' : ''}" id="qty-${product.id}">${product.quantity}</div>
-                        <div class="product-unit">${product.unit}</div>
-                    </div>
-                    <button class="btn-quick-adjust btn-plus" data-product-id="${product.id}" title="Ajouter 1">+</button>
-                    <button class="btn-quick-adjust btn-plus-ten" data-product-id="${product.id}" title="Ajouter 10">+10</button>
+            <div class="product-controls">
+                <button class="btn-quick-adjust btn-minus" data-product-id="${product.id}" title="Retirer 1">−</button>
+                <div class="product-quantity">
+                    <div class="product-qty-value ${isLowStock ? 'low-stock' : ''}" id="qty-${product.id}">${product.quantity}</div>
+                    <div class="product-unit">${product.unit}</div>
                 </div>
+                <button class="btn-quick-adjust btn-plus" data-product-id="${product.id}" title="Ajouter 1">+</button>
+                <span class="btn-spacer"></span>
+                <button class="btn-quick-adjust btn-plus-ten" data-product-id="${product.id}" title="Ajouter 10">+10</button>
             </div>
         `;
 
@@ -795,20 +800,54 @@ function renderAlerts() {
         return;
     }
 
-    AppState.lowStockProducts.forEach(product => {
+    // Couleurs par catégorie
+    const categoryColors = {
+        'frais': '#27ae60',
+        'sec': '#f39c12',
+        'surgele': '#3498db',
+        'consommables': '#9b59b6',
+        'boissons': '#e67e22'
+    };
+
+    // Trier par catégorie puis alphabétique
+    const sortedProducts = [...AppState.lowStockProducts].sort((a, b) => {
+        // D'abord par catégorie
+        const categoryOrder = ['frais', 'sec', 'surgele', 'consommables', 'boissons'];
+        const catIndexA = categoryOrder.indexOf(a.category);
+        const catIndexB = categoryOrder.indexOf(b.category);
+        if (catIndexA !== catIndexB) {
+            return catIndexA - catIndexB;
+        }
+        // Puis alphabétique
+        return a.name.localeCompare(b.name);
+    });
+
+    sortedProducts.forEach(product => {
         const categoryName = CATEGORIES.find(c => c.id === product.category)?.name || product.category;
-        const supplierName = product.supplier ? product.supplier.name : 'Sans fournisseur';
+        const borderColor = categoryColors[product.category] || '#999';
+
+        // Calculer le pourcentage stock/seuil
+        const percentage = Math.min(100, Math.round((product.quantity / product.alert_threshold) * 100));
+
+        // Couleur de la barre selon le niveau
+        let barColor = '#e74c3c'; // Rouge par défaut
+        if (percentage >= 80) barColor = '#f39c12'; // Jaune
+        else if (percentage >= 50) barColor = '#e67e22'; // Orange
 
         const item = document.createElement('div');
-        item.className = 'list-item';
+        item.className = 'list-item alert-item';
+        item.style.borderLeftColor = borderColor;
         item.innerHTML = `
             <div class="list-item-header">
                 <div class="list-item-title">${product.name}</div>
+                <div class="list-item-category" style="color: ${borderColor};">${categoryName}</div>
             </div>
-            <div class="list-item-info">📂 ${categoryName}</div>
-            <div class="list-item-info">📦 ${supplierName}</div>
-            <div class="list-item-info" style="color: #e74c3c; font-weight: bold;">
-                Stock: ${product.quantity} ${product.unit} (Seuil: ${product.alert_threshold})
+            <div class="alert-stock-info">
+                <div class="alert-stock-text">Stock: ${product.quantity} ${product.unit} / Seuil: ${product.alert_threshold} ${product.unit}</div>
+                <div class="alert-progress-bar">
+                    <div class="alert-progress-fill" style="width: ${percentage}%; background-color: ${barColor};"></div>
+                </div>
+                <div class="alert-stock-percentage" style="color: ${barColor};">${percentage}%</div>
             </div>
         `;
 

@@ -241,7 +241,7 @@
         /* === CARTES CATÉGORIES === */
         .categories-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: 1fr;
             gap: 15px;
             margin-top: 20px;
         }
@@ -415,11 +415,10 @@
             border-radius: 15px;
             padding: 20px;
             margin-bottom: 15px;
-            min-height: 120px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.06);
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
+            gap: 15px;
             transition: all 0.3s ease;
             border-left: 4px solid transparent;
         }
@@ -434,13 +433,15 @@
         }
 
         .product-info {
-            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
         }
 
         .product-name {
             font-weight: 600;
-            margin-bottom: 8px;
             font-size: 1.15rem;
+            line-height: 1.3;
         }
 
         .product-supplier {
@@ -448,14 +449,16 @@
             color: #777;
         }
 
-        .product-right {
+        .product-controls {
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 15px;
         }
 
         .product-quantity {
-            text-align: right;
+            text-align: center;
+            min-width: 80px;
         }
 
         .product-qty-value {
@@ -544,6 +547,10 @@
         .btn-plus-ten:active {
             background: #3498db !important;
             color: white !important;
+        }
+
+        .btn-spacer {
+            width: 20px;
         }
 
         .product-info {
@@ -654,16 +661,27 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.06);
         }
 
+        .alert-item {
+            border-left: 4px solid #999;
+        }
+
         .list-item-header {
             display: flex;
             justify-content: space-between;
             align-items: start;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
         }
 
         .list-item-title {
             font-weight: 600;
-            font-size: 1rem;
+            font-size: 1.05rem;
+            flex: 1;
+        }
+
+        .list-item-category {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-left: 10px;
         }
 
         .list-item-actions {
@@ -675,6 +693,41 @@
             font-size: 0.85rem;
             color: #777;
             margin-bottom: 4px;
+        }
+
+        .alert-stock-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .alert-stock-text {
+            font-size: 0.9rem;
+            color: #555;
+        }
+
+        .alert-progress-bar {
+            background: #f0f0f0;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .alert-progress-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 8px;
+        }
+
+        .alert-stock-percentage {
+            font-weight: 700;
+            font-size: 0.95rem;
+            text-align: right;
         }
 
         /* === EMPTY STATE === */
@@ -829,10 +882,7 @@
             Se déconnecter
         </button>
         <h1 id="header-title">Green Sushi - Stock</h1>
-        <div class="header-icon" id="alerts-icon" style="position: relative;" title="Voir les alertes">
-            🔔
-            <div class="alert-badge" id="alert-count">0</div>
-        </div>
+        <div class="header-icon" id="role-icon" title="Rôle utilisateur"></div>
     </header>
 
     <!-- LOADING -->
@@ -868,7 +918,7 @@
                         <button class="pin-key" data-key="9">9</button>
                         <span class="pin-key-spacer"></span>
                         <button class="pin-key" data-key="0">0</button>
-                        <button class="pin-key delete" data-key="delete">⌫ Effacer</button>
+                        <button class="pin-key delete" data-key="delete">⌫</button>
                     </div>
                     <div class="error-message" id="login-error"></div>
                 </div>
@@ -1105,9 +1155,10 @@
             <span class="tab-icon">🏠</span>
             Accueil
         </div>
-        <div class="tab" data-page="alerts-page">
+        <div class="tab" data-page="alerts-page" style="position: relative;">
             <span class="tab-icon">🔔</span>
             Alertes
+            <div class="alert-badge" id="alert-count">0</div>
         </div>
         <div class="tab" data-page="suppliers-page">
             <span class="tab-icon">📦</span>

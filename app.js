@@ -268,7 +268,6 @@ function setupGlobalListeners() {
 
     // Logout
     document.getElementById('logout-btn')?.addEventListener('click', logout);
-    document.getElementById('user-icon').addEventListener('click', logout);
 
     // Boutons d'ajout
     document.getElementById('add-product-btn').addEventListener('click', () => {

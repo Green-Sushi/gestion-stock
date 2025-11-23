@@ -225,7 +225,10 @@
         .pin-key.delete {
             background: #e74c3c;
             box-shadow: 0 4px 10px rgba(231, 76, 60, 0.3);
-            grid-column: span 3;
+        }
+
+        .pin-key-spacer {
+            /* Espace vide pour centrer le 0 sous le 8 */
         }
 
         .error-message {
@@ -246,34 +249,57 @@
         .category-card {
             background: white;
             border-radius: 16px;
-            padding: 25px 20px;
+            padding: 20px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-            text-align: center;
             cursor: pointer;
             transition: all 0.3s;
             border: 2px solid transparent;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
         }
 
         .category-card:active {
-            transform: scale(0.97);
+            transform: scale(0.98);
             border-color: #088F8F;
         }
 
-        .category-icon {
-            font-size: 3rem;
-            margin-bottom: 12px;
+        .category-image {
+            width: 140px;
+            height: 140px;
+            object-fit: contain;
+            flex-shrink: 0;
         }
 
-        .category-name {
-            font-weight: 600;
-            color: #333;
-            font-size: 0.95rem;
+        .category-badges {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
         }
 
-        .category-count {
-            font-size: 0.8rem;
-            color: #777;
-            margin-top: 5px;
+        .category-badge {
+            min-width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .category-badge.total {
+            background: white;
+            color: #088F8F;
+            border: 3px solid #088F8F;
+        }
+
+        .category-badge.alerts {
+            background: #e74c3c;
+            color: white;
         }
 
         /* === BOUTONS === */
@@ -386,14 +412,21 @@
 
         .product-item {
             background: white;
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 12px;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            min-height: 120px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.06);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .product-item.low-stock-alert {
+            background: rgba(231, 76, 60, 0.08);
+            border-left-color: #e74c3c;
         }
 
         .product-item:active {
@@ -406,12 +439,12 @@
 
         .product-name {
             font-weight: 600;
-            margin-bottom: 5px;
-            font-size: 1rem;
+            margin-bottom: 8px;
+            font-size: 1.15rem;
         }
 
         .product-supplier {
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             color: #777;
         }
 
@@ -427,50 +460,58 @@
 
         .product-qty-value {
             font-weight: 700;
-            font-size: 1.1rem;
+            font-size: 1.8rem;
             color: #088F8F;
+            transition: all 0.3s ease;
         }
 
         .product-qty-value.low-stock {
             color: #e74c3c;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
 
         .product-unit {
-            font-size: 0.8rem;
+            font-size: 0.9rem;
             color: #777;
+            margin-top: 2px;
         }
 
         .product-controls-quick {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
         }
 
         .btn-quick-adjust {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
             border: 2px solid #088F8F;
             background: white;
             color: #088F8F;
-            font-size: 1.2rem;
+            font-size: 1.5rem;
             font-weight: bold;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
             padding: 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
         .btn-quick-adjust:active {
-            transform: scale(0.9);
-            background: #088F8F;
-            color: white;
+            transform: scale(0.92);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
 
         .btn-quick-adjust:hover {
-            background: #e8f5f5;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
 
         .btn-minus {
@@ -478,13 +519,9 @@
             color: #e74c3c;
         }
 
-        .btn-minus:hover {
-            background: #fee;
-        }
-
         .btn-minus:active {
-            background: #e74c3c;
-            color: white;
+            background: #e74c3c !important;
+            color: white !important;
         }
 
         .btn-plus {
@@ -492,13 +529,21 @@
             color: #27ae60;
         }
 
-        .btn-plus:hover {
-            background: #efe;
+        .btn-plus:active {
+            background: #27ae60 !important;
+            color: white !important;
         }
 
-        .btn-plus:active {
-            background: #27ae60;
-            color: white;
+        .btn-plus-ten {
+            border-color: #3498db;
+            color: #3498db;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .btn-plus-ten:active {
+            background: #3498db !important;
+            color: white !important;
         }
 
         .product-info {
@@ -784,7 +829,7 @@
             Se déconnecter
         </button>
         <h1 id="header-title">Green Sushi - Stock</h1>
-        <div class="header-icon" style="position: relative;">
+        <div class="header-icon" id="alerts-icon" style="position: relative;" title="Voir les alertes">
             🔔
             <div class="alert-badge" id="alert-count">0</div>
         </div>
@@ -821,6 +866,7 @@
                         <button class="pin-key" data-key="7">7</button>
                         <button class="pin-key" data-key="8">8</button>
                         <button class="pin-key" data-key="9">9</button>
+                        <span class="pin-key-spacer"></span>
                         <button class="pin-key" data-key="0">0</button>
                         <button class="pin-key delete" data-key="delete">⌫ Effacer</button>
                     </div>

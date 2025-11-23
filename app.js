@@ -99,7 +99,7 @@ function applyPermissions() {
     patronOnlyTabs.forEach(pageId => {
         const tab = document.querySelector(`.tab[data-page="${pageId}"]`);
         if (tab) {
-            tab.style.display = isPatron ? 'flex' : 'none';
+            tab.style.display = isPatron ? '' : 'none';
         }
     });
 
@@ -167,11 +167,17 @@ function showLoading(show) {
 // ====================
 
 function setupLoginPage() {
-    const pinKeys = document.querySelectorAll('.pin-key');
+    const pinKeyboard = document.querySelector('.pin-keyboard');
     const loginError = document.getElementById('login-error');
 
-    pinKeys.forEach(key => {
-        key.addEventListener('click', async () => {
+    // Utiliser la délégation d'événements pour éviter les listeners multiples
+    if (pinKeyboard && !pinKeyboard.dataset.listenersAttached) {
+        pinKeyboard.dataset.listenersAttached = 'true';
+
+        pinKeyboard.addEventListener('click', async (e) => {
+            const key = e.target.closest('.pin-key');
+            if (!key) return;
+
             const keyValue = key.dataset.key;
 
             if (keyValue === 'delete') {
@@ -203,7 +209,7 @@ function setupLoginPage() {
                 }
             }
         });
-    });
+    }
 }
 
 function updatePinDisplay() {
@@ -224,6 +230,12 @@ function logout() {
         db.logout();
         AppState.currentUser = null;
         AppState.pinCode = '';
+
+        // Réinitialiser l'affichage de la page de login
+        updatePinDisplay();
+        const loginError = document.getElementById('login-error');
+        if (loginError) loginError.textContent = '';
+
         showPage('login-page');
     }
 }
@@ -268,6 +280,13 @@ function setupGlobalListeners() {
 
     // Logout
     document.getElementById('logout-btn')?.addEventListener('click', logout);
+
+    // Badge alertes - clic pour afficher la page alertes
+    document.getElementById('alerts-icon')?.addEventListener('click', () => {
+        showPage('alerts-page');
+        renderAlerts();
+        updateActiveTab('alerts-page');
+    });
 
     // Boutons d'ajout
     document.getElementById('add-product-btn').addEventListener('click', () => {
@@ -324,17 +343,32 @@ function renderCategories() {
     const container = document.getElementById('categories-container');
     container.innerHTML = '';
 
+    // Mapping des catégories vers les noms de fichiers images
+    const categoryImages = {
+        'frais': 'frais.png',
+        'sec': 'sec.png',
+        'surgele': 'surgelé.png',
+        'consommables': 'consommables.png',
+        'boissons': 'boissons.png'
+    };
+
     CATEGORIES.forEach(category => {
         // Compter les produits de cette catégorie
-        const count = AppState.products.filter(p => p.category === category.id).length;
+        const categoryProducts = AppState.products.filter(p => p.category === category.id);
+        const count = categoryProducts.length;
+
+        // Compter les produits en alerte
+        const alertCount = categoryProducts.filter(p => p.quantity <= p.alert_threshold).length;
 
         const card = document.createElement('div');
         card.className = 'category-card';
         card.dataset.category = category.id;
         card.innerHTML = `
-            <div class="category-icon">${category.icon}</div>
-            <div class="category-name">${category.name}</div>
-            <div class="category-count">${count} produit${count > 1 ? 's' : ''}</div>
+            <img src="/images/categories/${categoryImages[category.id]}" alt="${category.name}" class="category-image">
+            <div class="category-badges">
+                <div class="category-badge total" title="${count} produit${count > 1 ? 's' : ''}">${count}</div>
+                ${alertCount > 0 ? `<div class="category-badge alerts" title="${alertCount} en alerte">${alertCount}</div>` : ''}
+            </div>
         `;
 
         card.addEventListener('click', () => {
@@ -401,7 +435,7 @@ function renderProducts(searchTerm = '') {
         const supplierName = product.supplier ? product.supplier.name : 'Sans fournisseur';
 
         const item = document.createElement('div');
-        item.className = 'product-item';
+        item.className = isLowStock ? 'product-item low-stock-alert' : 'product-item';
         item.innerHTML = `
             <div class="product-info" data-product-id="${product.id}">
                 <div class="product-name">${product.name}</div>
@@ -409,12 +443,13 @@ function renderProducts(searchTerm = '') {
             </div>
             <div class="product-right">
                 <div class="product-controls-quick">
-                    <button class="btn-quick-adjust btn-minus" data-product-id="${product.id}" title="Diminuer">−</button>
+                    <button class="btn-quick-adjust btn-minus" data-product-id="${product.id}" title="Retirer 1">−</button>
                     <div class="product-quantity">
                         <div class="product-qty-value ${isLowStock ? 'low-stock' : ''}" id="qty-${product.id}">${product.quantity}</div>
                         <div class="product-unit">${product.unit}</div>
                     </div>
-                    <button class="btn-quick-adjust btn-plus" data-product-id="${product.id}" title="Augmenter">+</button>
+                    <button class="btn-quick-adjust btn-plus" data-product-id="${product.id}" title="Ajouter 1">+</button>
+                    <button class="btn-quick-adjust btn-plus-ten" data-product-id="${product.id}" title="Ajouter 10">+10</button>
                 </div>
             </div>
         `;
@@ -444,6 +479,13 @@ function renderProducts(searchTerm = '') {
             adjustProductQuantity(product.id, 1);
         });
 
+        // Bouton +10
+        const btnPlusTen = item.querySelector('.btn-plus-ten');
+        btnPlusTen.addEventListener('click', (e) => {
+            e.stopPropagation();
+            adjustProductQuantity(product.id, 10);
+        });
+
         container.appendChild(item);
     });
 }
@@ -471,18 +513,30 @@ async function adjustProductQuantity(productId, delta) {
     const qtyElement = document.getElementById(`qty-${productId}`);
     if (qtyElement) {
         qtyElement.textContent = newQuantity;
-        // Animation visuelle
-        qtyElement.style.transform = 'scale(1.2)';
-        qtyElement.style.transition = 'transform 0.2s';
+
+        // Animation visuelle renforcée
+        qtyElement.style.transform = 'scale(1.3)';
+        qtyElement.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
         setTimeout(() => {
             qtyElement.style.transform = 'scale(1)';
-        }, 200);
+        }, 300);
 
         // Mettre à jour la classe low-stock
-        if (newQuantity <= product.alert_threshold) {
+        const isLowStock = newQuantity <= product.alert_threshold;
+        if (isLowStock) {
             qtyElement.classList.add('low-stock');
         } else {
             qtyElement.classList.remove('low-stock');
+        }
+
+        // Mettre à jour le fond de la carte produit
+        const productItem = qtyElement.closest('.product-item');
+        if (productItem) {
+            if (isLowStock) {
+                productItem.classList.add('low-stock-alert');
+            } else {
+                productItem.classList.remove('low-stock-alert');
+            }
         }
     }
 

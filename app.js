@@ -8,8 +8,10 @@ const AppState = {
     products: [],
     suppliers: [],
     lowStockProducts: [],
+    users: [],
     editingProduct: null,
     editingSupplier: null,
+    editingUser: null,
     pinCode: ''
 };
 
@@ -54,13 +56,55 @@ async function initializeApp() {
     // Charger les données (Supabase déjà initialisé au démarrage)
     await loadSuppliers();
     await loadProducts();
+    await loadUsers();
     await updateAlertCount();
+
+    // Appliquer les permissions selon le rôle
+    applyPermissions();
 
     // Afficher la page d'accueil
     showPage('home-page');
     renderCategories();
 
     showLoading(false);
+}
+
+// Appliquer les permissions selon le rôle utilisateur
+function applyPermissions() {
+    const isPatron = db.isPatron();
+
+    // Éléments réservés au patron
+    const patronOnlyElements = [
+        'add-product-btn',          // Bouton ajouter produit
+        'add-supplier-btn',         // Bouton ajouter fournisseur
+        'manage-users-btn',         // Bouton gérer utilisateurs
+        'send-alerts-btn'           // Bouton envoyer alertes
+    ];
+
+    // Onglets réservés au patron
+    const patronOnlyTabs = [
+        'suppliers-page',   // Page fournisseurs
+        'settings-page'     // Page paramètres
+    ];
+
+    // Cacher/afficher les éléments selon le rôle
+    patronOnlyElements.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.style.display = isPatron ? '' : 'none';
+        }
+    });
+
+    // Cacher/afficher les onglets selon le rôle
+    patronOnlyTabs.forEach(pageId => {
+        const tab = document.querySelector(`.tab[data-page="${pageId}"]`);
+        if (tab) {
+            tab.style.display = isPatron ? 'flex' : 'none';
+        }
+    });
+
+    // Si employé, empêcher le clic sur les produits pour éditer (seulement +/-)
+    // Cette logique est déjà gérée dans renderProducts car on a séparé les événements
 }
 
 // ====================
@@ -265,6 +309,11 @@ function setupGlobalListeners() {
     // Inputs paramètres
     document.getElementById('email-input').addEventListener('change', saveSettings);
     document.getElementById('whatsapp-input').addEventListener('change', saveSettings);
+
+    // Gestion des utilisateurs
+    document.getElementById('manage-users-btn').addEventListener('click', openUsersManagement);
+    document.getElementById('add-user-btn').addEventListener('click', () => openUserModal());
+    document.getElementById('user-form').addEventListener('submit', handleUserSubmit);
 }
 
 // ====================
@@ -354,20 +403,45 @@ function renderProducts(searchTerm = '') {
         const item = document.createElement('div');
         item.className = 'product-item';
         item.innerHTML = `
-            <div class="product-info">
+            <div class="product-info" data-product-id="${product.id}">
                 <div class="product-name">${product.name}</div>
                 <div class="product-supplier">📦 ${supplierName}</div>
             </div>
             <div class="product-right">
-                <div class="product-quantity">
-                    <div class="product-qty-value ${isLowStock ? 'low-stock' : ''}">${product.quantity}</div>
-                    <div class="product-unit">${product.unit}</div>
+                <div class="product-controls-quick">
+                    <button class="btn-quick-adjust btn-minus" data-product-id="${product.id}" title="Diminuer">−</button>
+                    <div class="product-quantity">
+                        <div class="product-qty-value ${isLowStock ? 'low-stock' : ''}" id="qty-${product.id}">${product.quantity}</div>
+                        <div class="product-unit">${product.unit}</div>
+                    </div>
+                    <button class="btn-quick-adjust btn-plus" data-product-id="${product.id}" title="Augmenter">+</button>
                 </div>
             </div>
         `;
 
-        item.addEventListener('click', () => {
-            openProductModal(product);
+        // Clic sur le nom/fournisseur pour ouvrir la modale (Patron seulement)
+        const productInfo = item.querySelector('.product-info');
+        if (db.isPatron()) {
+            productInfo.style.cursor = 'pointer';
+            productInfo.addEventListener('click', () => {
+                openProductModal(product);
+            });
+        } else {
+            productInfo.style.cursor = 'default';
+        }
+
+        // Bouton moins
+        const btnMinus = item.querySelector('.btn-minus');
+        btnMinus.addEventListener('click', (e) => {
+            e.stopPropagation();
+            adjustProductQuantity(product.id, -1);
+        });
+
+        // Bouton plus
+        const btnPlus = item.querySelector('.btn-plus');
+        btnPlus.addEventListener('click', (e) => {
+            e.stopPropagation();
+            adjustProductQuantity(product.id, 1);
         });
 
         container.appendChild(item);
@@ -376,6 +450,59 @@ function renderProducts(searchTerm = '') {
 
 function filterProducts(searchTerm) {
     renderProducts(searchTerm);
+}
+
+// Ajustement rapide des quantités
+async function adjustProductQuantity(productId, delta) {
+    // Trouver le produit dans AppState
+    const product = AppState.products.find(p => p.id === productId);
+    if (!product) return;
+
+    // Calculer la nouvelle quantité
+    const oldQuantity = parseFloat(product.quantity);
+    let newQuantity = oldQuantity + delta;
+
+    // Ne pas descendre en dessous de 0
+    if (newQuantity < 0) {
+        newQuantity = 0;
+    }
+
+    // Mettre à jour l'affichage immédiatement (optimistic update)
+    const qtyElement = document.getElementById(`qty-${productId}`);
+    if (qtyElement) {
+        qtyElement.textContent = newQuantity;
+        // Animation visuelle
+        qtyElement.style.transform = 'scale(1.2)';
+        qtyElement.style.transition = 'transform 0.2s';
+        setTimeout(() => {
+            qtyElement.style.transform = 'scale(1)';
+        }, 200);
+
+        // Mettre à jour la classe low-stock
+        if (newQuantity <= product.alert_threshold) {
+            qtyElement.classList.add('low-stock');
+        } else {
+            qtyElement.classList.remove('low-stock');
+        }
+    }
+
+    // Mettre à jour dans AppState
+    product.quantity = newQuantity;
+
+    // Sauvegarder dans la base de données
+    const result = await db.updateProduct(productId, { quantity: newQuantity });
+
+    if (!result.success) {
+        // Si l'update échoue, revenir à l'ancienne valeur
+        product.quantity = oldQuantity;
+        if (qtyElement) {
+            qtyElement.textContent = oldQuantity;
+        }
+        alert('❌ Erreur lors de la mise à jour : ' + result.error);
+    } else {
+        // Mettre à jour le compteur d'alertes
+        await updateAlertCount();
+    }
 }
 
 function openProductModal(product = null) {
@@ -465,6 +592,13 @@ async function loadSuppliers() {
     const result = await db.getSuppliers();
     if (result.success) {
         AppState.suppliers = result.data;
+    }
+}
+
+async function loadUsers() {
+    const result = await db.getUsers();
+    if (result.success) {
+        AppState.users = result.data;
     }
 }
 
@@ -735,6 +869,144 @@ async function saveSettings() {
 }
 
 // ====================
+// GESTION DES UTILISATEURS
+// ====================
+
+async function openUsersManagement() {
+    // Vérifier que l'utilisateur est patron
+    if (!db.isPatron()) {
+        alert('⛔ Accès réservé au patron');
+        return;
+    }
+
+    const modal = document.getElementById('users-management-modal');
+    modal.classList.add('active');
+
+    await renderUsersList();
+}
+
+async function renderUsersList() {
+    const container = document.getElementById('users-list');
+    container.innerHTML = '';
+
+    const result = await db.getUsers();
+    if (!result.success) {
+        container.innerHTML = '<div class="empty-state-text">Erreur de chargement</div>';
+        return;
+    }
+
+    const users = result.data;
+
+    if (users.length === 0) {
+        container.innerHTML = '<div class="empty-state-text">Aucun utilisateur</div>';
+        return;
+    }
+
+    users.forEach(user => {
+        const item = document.createElement('div');
+        item.className = 'list-item';
+
+        const roleText = user.role === 'patron' ? '👑 Patron' : '👤 Employé';
+        const roleBadge = user.role === 'patron'
+            ? '<span style="background: #27ae60; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">ADMIN</span>'
+            : '<span style="background: #3498db; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">STAFF</span>';
+
+        item.innerHTML = `
+            <div class="list-item-header">
+                <div>
+                    <div class="list-item-title">${user.name}</div>
+                    <div class="list-item-info">${roleText} • PIN: ${user.pin_code}</div>
+                </div>
+                <div class="list-item-actions">
+                    ${roleBadge}
+                    <button class="btn btn-small btn-icon" onclick="openUserModal('${user.id}')">✏️</button>
+                    ${user.id !== db.currentUser.id ? `<button class="btn btn-small btn-icon btn-danger" onclick="deleteUser('${user.id}')">🗑️</button>` : ''}
+                </div>
+            </div>
+        `;
+
+        container.appendChild(item);
+    });
+}
+
+function openUserModal(userId = null) {
+    const user = userId ? AppState.users?.find(u => u.id === userId) : null;
+    AppState.editingUser = user;
+
+    const modal = document.getElementById('user-modal');
+    const title = document.getElementById('user-modal-title');
+    const form = document.getElementById('user-form');
+
+    // Réinitialiser le formulaire
+    form.reset();
+
+    if (user) {
+        // Mode édition
+        title.textContent = 'Modifier l\'utilisateur';
+        document.getElementById('user-name').value = user.name;
+        document.getElementById('user-pin').value = user.pin_code;
+        document.getElementById('user-role').value = user.role;
+    } else {
+        // Mode création
+        title.textContent = 'Nouvel utilisateur';
+    }
+
+    modal.classList.add('active');
+}
+
+async function handleUserSubmit(e) {
+    e.preventDefault();
+
+    const userData = {
+        name: document.getElementById('user-name').value,
+        pin_code: document.getElementById('user-pin').value,
+        role: document.getElementById('user-role').value
+    };
+
+    // Validation
+    if (!/^\d{6}$/.test(userData.pin_code)) {
+        alert('❌ Le code PIN doit contenir exactement 6 chiffres');
+        return;
+    }
+
+    showLoading(true);
+
+    let result;
+    if (AppState.editingUser) {
+        // Mise à jour
+        result = await db.updateUser(AppState.editingUser.id, userData);
+    } else {
+        // Création
+        result = await db.createUser(userData);
+    }
+
+    showLoading(false);
+
+    if (result.success) {
+        closeModal('user-modal');
+        await renderUsersList();
+    } else {
+        alert('❌ Erreur: ' + result.error);
+    }
+}
+
+async function deleteUser(userId) {
+    if (!confirm('⚠️ Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) {
+        return;
+    }
+
+    showLoading(true);
+    const result = await db.deleteUser(userId);
+    showLoading(false);
+
+    if (result.success) {
+        await renderUsersList();
+    } else {
+        alert('❌ Erreur: ' + result.error);
+    }
+}
+
+// ====================
 // MODALES
 // ====================
 
@@ -743,6 +1015,7 @@ function closeModal(modalId) {
     modal.classList.remove('active');
     AppState.editingProduct = null;
     AppState.editingSupplier = null;
+    AppState.editingUser = null;
 }
 
 // Fermer les modales en cliquant en dehors
@@ -759,3 +1032,5 @@ document.addEventListener('click', (e) => {
 // ====================
 
 window.openSupplierModal = openSupplierModal;
+window.openUserModal = openUserModal;
+window.deleteUser = deleteUser;

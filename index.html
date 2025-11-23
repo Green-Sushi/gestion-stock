@@ -409,6 +409,71 @@
             color: #777;
         }
 
+        .product-controls-quick {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-quick-adjust {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 2px solid #088F8F;
+            background: white;
+            color: #088F8F;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            padding: 0;
+        }
+
+        .btn-quick-adjust:active {
+            transform: scale(0.9);
+            background: #088F8F;
+            color: white;
+        }
+
+        .btn-quick-adjust:hover {
+            background: #e8f5f5;
+        }
+
+        .btn-minus {
+            border-color: #e74c3c;
+            color: #e74c3c;
+        }
+
+        .btn-minus:hover {
+            background: #fee;
+        }
+
+        .btn-minus:active {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-plus {
+            border-color: #27ae60;
+            color: #27ae60;
+        }
+
+        .btn-plus:hover {
+            background: #efe;
+        }
+
+        .btn-plus:active {
+            background: #27ae60;
+            color: white;
+        }
+
+        .product-info {
+            cursor: pointer;
+        }
+
         /* === FORMULAIRES === */
         .form-group {
             margin-bottom: 20px;
@@ -905,6 +970,51 @@
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary close-modal" data-modal="supplier-modal">Annuler</button>
+                    <button type="submit" class="btn">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- PAGE DE GESTION DES UTILISATEURS -->
+    <div class="modal" id="users-management-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Gestion des Utilisateurs</h3>
+                <button class="close-modal" data-modal="users-management-modal">×</button>
+            </div>
+            <div id="users-list" style="margin-bottom: 20px;"></div>
+            <button class="btn" id="add-user-btn" style="width: 100%;">+ Ajouter un utilisateur</button>
+        </div>
+    </div>
+
+    <!-- MODAL UTILISATEUR (Ajout/Modification) -->
+    <div class="modal" id="user-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="user-modal-title">Nouvel Utilisateur</h3>
+                <button class="close-modal" data-modal="user-modal">×</button>
+            </div>
+            <form id="user-form">
+                <div class="form-group">
+                    <label class="form-label">Nom *</label>
+                    <input type="text" class="form-input" id="user-name" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Code PIN (6 chiffres) *</label>
+                    <input type="text" class="form-input" id="user-pin" maxlength="6" pattern="[0-9]{6}" required placeholder="123456">
+                    <small style="color: #777; font-size: 0.85rem;">6 chiffres uniquement</small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Rôle *</label>
+                    <select class="form-select" id="user-role" required>
+                        <option value="">Sélectionner...</option>
+                        <option value="patron">Patron (accès complet)</option>
+                        <option value="employe">Employé (ajuster quantités)</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary close-modal" data-modal="user-modal">Annuler</button>
                     <button type="submit" class="btn">Enregistrer</button>
                 </div>
             </form>

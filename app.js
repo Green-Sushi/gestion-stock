@@ -396,6 +396,27 @@ function showCategoryProducts(category) {
 // PRODUITS
 // ====================
 
+// Calculer le niveau de stock (système 4 niveaux)
+function calculateStockLevel(quantity, alertThreshold, optimalStock) {
+    let stockLevel = 'stock-ok';
+    let isLowStock = false;
+
+    if (quantity <= alertThreshold) {
+        // ROUGE: stock critique (≤ seuil d'alerte)
+        stockLevel = 'stock-critical';
+        isLowStock = true;
+    } else if (quantity <= alertThreshold * 2) {
+        // ORANGE: stock en limite (≤ seuil × 2)
+        stockLevel = 'stock-warning';
+    } else if (optimalStock && quantity <= optimalStock * 0.5) {
+        // JAUNE: stock attention (≤ optimal × 0.5)
+        stockLevel = 'stock-attention';
+    }
+    // Sinon VERT: stock ok
+
+    return { stockLevel, isLowStock };
+}
+
 async function loadProducts() {
     const result = await db.getProducts();
     if (result.success) {
@@ -437,19 +458,12 @@ function renderProducts(searchTerm = '') {
     }
 
     products.forEach(product => {
-        const threshold = product.alert_threshold;
-        const quantity = product.quantity;
-
-        // Déterminer le niveau de stock
-        let stockLevel = 'stock-ok';
-        let isLowStock = false;
-
-        if (quantity <= threshold) {
-            stockLevel = 'stock-critical';
-            isLowStock = true;
-        } else if (quantity <= threshold * 2) {
-            stockLevel = 'stock-warning';
-        }
+        // Déterminer le niveau de stock avec le système 4 niveaux
+        const { stockLevel, isLowStock } = calculateStockLevel(
+            product.quantity,
+            product.alert_threshold,
+            product.optimal_stock
+        );
 
         const supplierName = product.supplier ? product.supplier.name : 'Sans fournisseur';
 
@@ -539,17 +553,12 @@ async function adjustProductQuantity(productId, delta) {
             qtyElement.style.transform = 'scale(1)';
         }, 300);
 
-        // Déterminer le nouveau niveau de stock
-        const threshold = product.alert_threshold;
-        let stockLevel = 'stock-ok';
-        let isLowStock = false;
-
-        if (newQuantity <= threshold) {
-            stockLevel = 'stock-critical';
-            isLowStock = true;
-        } else if (newQuantity <= threshold * 2) {
-            stockLevel = 'stock-warning';
-        }
+        // Déterminer le nouveau niveau de stock avec le système 4 niveaux
+        const { stockLevel, isLowStock } = calculateStockLevel(
+            newQuantity,
+            product.alert_threshold,
+            product.optimal_stock
+        );
 
         // Mettre à jour la classe du conteneur de quantité
         const qtyContainer = qtyElement.closest('.product-quantity');
@@ -616,6 +625,7 @@ function openProductModal(product = null) {
         document.getElementById('product-quantity').value = product.quantity;
         document.getElementById('product-unit').value = product.unit;
         document.getElementById('product-alert').value = product.alert_threshold;
+        document.getElementById('product-optimal').value = product.optimal_stock || '';
         document.getElementById('product-notes').value = product.notes || '';
     } else {
         // Mode création
@@ -639,6 +649,7 @@ async function handleProductSubmit(e) {
         quantity: parseFloat(document.getElementById('product-quantity').value),
         unit: document.getElementById('product-unit').value,
         alert_threshold: parseFloat(document.getElementById('product-alert').value),
+        optimal_stock: document.getElementById('product-optimal').value ? parseFloat(document.getElementById('product-optimal').value) : null,
         notes: document.getElementById('product-notes').value
     };
 

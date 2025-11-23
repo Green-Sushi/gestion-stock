@@ -472,6 +472,10 @@
             background: rgba(39, 174, 96, 0.15);
         }
 
+        .product-quantity.stock-attention {
+            background: rgba(241, 196, 15, 0.15);
+        }
+
         .product-quantity.stock-warning {
             background: rgba(230, 126, 34, 0.15);
         }
@@ -488,6 +492,10 @@
 
         .stock-ok .product-qty-value {
             color: #27ae60;
+        }
+
+        .stock-attention .product-qty-value {
+            color: #f39c12;
         }
 
         .stock-warning .product-qty-value {
@@ -1066,8 +1074,8 @@
                         <option value="frais">Stock Frais</option>
                         <option value="sec">Stock Sec</option>
                         <option value="surgele">Stock Surgelé</option>
-                        <option value="consommable">Stock Consommable</option>
-                        <option value="boisson">Stock Boissons</option>
+                        <option value="consommables">Stock Consommable</option>
+                        <option value="boissons">Stock Boissons</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1085,8 +1093,12 @@
                     <input type="text" class="form-input" id="product-unit" placeholder="kg, L, pièces, boîtes..." required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Seuil d'alerte *</label>
+                    <label class="form-label">Seuil d'alerte critique (Rouge) *</label>
                     <input type="number" step="0.01" class="form-input" id="product-alert" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Stock optimal (Vert)</label>
+                    <input type="number" step="0.01" class="form-input" id="product-optimal" placeholder="Quantité idéale recommandée">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Notes</label>

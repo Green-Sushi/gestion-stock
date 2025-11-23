@@ -437,7 +437,20 @@ function renderProducts(searchTerm = '') {
     }
 
     products.forEach(product => {
-        const isLowStock = product.quantity <= product.alert_threshold;
+        const threshold = product.alert_threshold;
+        const quantity = product.quantity;
+
+        // Déterminer le niveau de stock
+        let stockLevel = 'stock-ok';
+        let isLowStock = false;
+
+        if (quantity <= threshold) {
+            stockLevel = 'stock-critical';
+            isLowStock = true;
+        } else if (quantity <= threshold * 2) {
+            stockLevel = 'stock-warning';
+        }
+
         const supplierName = product.supplier ? product.supplier.name : 'Sans fournisseur';
 
         const item = document.createElement('div');
@@ -449,8 +462,8 @@ function renderProducts(searchTerm = '') {
             </div>
             <div class="product-controls">
                 <button class="btn-quick-adjust btn-minus" data-product-id="${product.id}" title="Retirer 1">−</button>
-                <div class="product-quantity">
-                    <div class="product-qty-value ${isLowStock ? 'low-stock' : ''}" id="qty-${product.id}">${product.quantity}</div>
+                <div class="product-quantity ${stockLevel}">
+                    <div class="product-qty-value" id="qty-${product.id}">${product.quantity}</div>
                     <div class="product-unit">${product.unit}</div>
                 </div>
                 <button class="btn-quick-adjust btn-plus" data-product-id="${product.id}" title="Ajouter 1">+</button>
@@ -526,12 +539,22 @@ async function adjustProductQuantity(productId, delta) {
             qtyElement.style.transform = 'scale(1)';
         }, 300);
 
-        // Mettre à jour la classe low-stock
-        const isLowStock = newQuantity <= product.alert_threshold;
-        if (isLowStock) {
-            qtyElement.classList.add('low-stock');
-        } else {
-            qtyElement.classList.remove('low-stock');
+        // Déterminer le nouveau niveau de stock
+        const threshold = product.alert_threshold;
+        let stockLevel = 'stock-ok';
+        let isLowStock = false;
+
+        if (newQuantity <= threshold) {
+            stockLevel = 'stock-critical';
+            isLowStock = true;
+        } else if (newQuantity <= threshold * 2) {
+            stockLevel = 'stock-warning';
+        }
+
+        // Mettre à jour la classe du conteneur de quantité
+        const qtyContainer = qtyElement.closest('.product-quantity');
+        if (qtyContainer) {
+            qtyContainer.className = `product-quantity ${stockLevel}`;
         }
 
         // Mettre à jour le fond de la carte produit
@@ -840,7 +863,7 @@ function renderAlerts() {
         item.innerHTML = `
             <div class="list-item-header">
                 <div class="list-item-title">${product.name}</div>
-                <div class="list-item-category" style="color: ${borderColor};">${categoryName}</div>
+                <span class="category-badge-alert" style="background-color: ${borderColor};">${categoryName}</span>
             </div>
             <div class="alert-stock-info">
                 <div class="alert-stock-text">Stock: ${product.quantity} ${product.unit} / Seuil: ${product.alert_threshold} ${product.unit}</div>

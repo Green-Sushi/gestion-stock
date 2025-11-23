@@ -104,17 +104,18 @@
             background-color: #e74c3c;
             color: white;
             border-radius: 50%;
-            min-width: 22px;
-            height: 22px;
+            min-width: 20px;
+            height: 20px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.75rem;
-            padding: 0 6px;
+            font-size: 0.7rem;
+            padding: 0 5px;
             position: absolute;
-            top: 8px;
-            right: 8px;
+            top: -5px;
+            right: -5px;
             font-weight: bold;
+            border: 2px solid white;
         }
 
         /* === CONTENEUR PRINCIPAL === */
@@ -241,7 +242,7 @@
         /* === CARTES CATÉGORIES === */
         .categories-grid {
             display: grid;
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, 1fr);
             gap: 15px;
             margin-top: 20px;
         }
@@ -249,15 +250,16 @@
         .category-card {
             background: white;
             border-radius: 16px;
-            padding: 20px;
+            padding: 15px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
             cursor: pointer;
             transition: all 0.3s;
             border: 2px solid transparent;
+            position: relative;
+            aspect-ratio: 1;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 15px;
+            justify-content: center;
         }
 
         .category-card:active {
@@ -266,29 +268,31 @@
         }
 
         .category-image {
-            width: 140px;
-            height: 140px;
+            width: 100%;
+            height: 100%;
             object-fit: contain;
-            flex-shrink: 0;
         }
 
         .category-badges {
+            position: absolute;
+            top: 10px;
+            right: 10px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
             align-items: center;
         }
 
         .category-badge {
-            min-width: 45px;
-            height: 45px;
+            min-width: 40px;
+            height: 40px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 700;
-            font-size: 1.1rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            font-size: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
         }
 
         .category-badge.total {
@@ -458,17 +462,39 @@
 
         .product-quantity {
             text-align: center;
-            min-width: 80px;
+            min-width: 90px;
+            padding: 10px 15px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .product-quantity.stock-ok {
+            background: rgba(39, 174, 96, 0.15);
+        }
+
+        .product-quantity.stock-warning {
+            background: rgba(230, 126, 34, 0.15);
+        }
+
+        .product-quantity.stock-critical {
+            background: rgba(231, 76, 60, 0.15);
         }
 
         .product-qty-value {
             font-weight: 700;
             font-size: 1.8rem;
-            color: #088F8F;
             transition: all 0.3s ease;
         }
 
-        .product-qty-value.low-stock {
+        .stock-ok .product-qty-value {
+            color: #27ae60;
+        }
+
+        .stock-warning .product-qty-value {
+            color: #e67e22;
+        }
+
+        .stock-critical .product-qty-value {
             color: #e74c3c;
             animation: pulse 2s ease-in-out infinite;
         }
@@ -480,8 +506,9 @@
 
         .product-unit {
             font-size: 0.9rem;
-            color: #777;
+            color: #555;
             margin-top: 2px;
+            font-weight: 600;
         }
 
         .product-controls-quick {
@@ -682,6 +709,15 @@
             font-size: 0.85rem;
             font-weight: 600;
             margin-left: 10px;
+        }
+
+        .category-badge-alert {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            white-space: nowrap;
         }
 
         .list-item-actions {

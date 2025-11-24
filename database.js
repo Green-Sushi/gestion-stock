@@ -411,6 +411,8 @@ class DatabaseManager {
                 .upsert({
                     setting_key: key,
                     setting_value: value
+                }, {
+                    onConflict: 'setting_key'
                 })
                 .select()
                 .single();

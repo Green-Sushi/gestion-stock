@@ -992,26 +992,26 @@ function generateAlertMessage() {
         minute: '2-digit'
     });
 
-    // Indicateurs par niveau de stock (emojis simples et compatibles)
+    // Indicateurs par niveau de stock (codes Unicode pour compatibilité iOS/Android)
     const levelIndicators = {
-        'stock-critical': '❗',
-        'stock-warning': '⚠️',
-        'stock-attention': '⚡',
-        'stock-ok': '✅'
+        'stock-critical': String.fromCodePoint(0x1F534), // 🔴 Cercle rouge
+        'stock-warning': String.fromCodePoint(0x1F7E0),  // 🟠 Cercle orange
+        'stock-attention': String.fromCodePoint(0x1F7E1), // 🟡 Cercle jaune
+        'stock-ok': String.fromCodePoint(0x1F7E2)        // 🟢 Cercle vert
     };
 
-    // Emoji par catégorie (emojis simples et universels)
+    // Emoji par catégorie (codes Unicode)
     const categoryEmojis = {
-        'frais': '🧊',
-        'sec': '📦',
-        'surgele': '❄️',
-        'consommables': '🍴',
-        'boissons': '🥤',
-        'autre': '📦'
+        'frais': String.fromCodePoint(0x1F9C0),      // 🧀 Fromage
+        'sec': String.fromCodePoint(0x1F33E),         // 🌾 Blé
+        'surgele': String.fromCodePoint(0x2744) + String.fromCodePoint(0xFE0F), // ❄️ Flocon
+        'consommables': String.fromCodePoint(0x1F962), // 🥢 Baguettes
+        'boissons': String.fromCodePoint(0x1F9C3),    // 🧃 Jus
+        'autre': String.fromCodePoint(0x1F4E6)        // 📦 Colis
     };
 
-    let message = `🚨 ALERTE STOCK - Green Sushi\n`;
-    message += `📅 ${dateStr} à ${timeStr}\n`;
+    let message = String.fromCodePoint(0x1F6A8) + ` ALERTE STOCK - Green Sushi\n`; // 🚨
+    message += String.fromCodePoint(0x1F4C5) + ` ${dateStr} à ${timeStr}\n`;        // 📅
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
 
     // Regrouper par catégorie
@@ -1051,7 +1051,7 @@ function generateAlertMessage() {
 
     // Total
     message += `━━━━━━━━━━━━━━━━━━━━\n`;
-    message += `📊 TOTAL: ${AppState.lowStockProducts.length} produit${AppState.lowStockProducts.length > 1 ? 's' : ''} en alerte`;
+    message += String.fromCodePoint(0x1F4CA) + ` TOTAL: ${AppState.lowStockProducts.length} produit${AppState.lowStockProducts.length > 1 ? 's' : ''} en alerte`; // 📊
 
     return message;
 }

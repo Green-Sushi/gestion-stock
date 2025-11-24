@@ -1159,20 +1159,12 @@ function sendWhatsAppAlert(number, message) {
     // Nettoyer le numéro (enlever espaces et caractères spéciaux sauf +)
     const cleanNumber = number.replace(/[^\d+]/g, '');
 
-    // Encoder en UTF-8 puis en percent-encoding compatible WhatsApp
-    const encodedMessage = Array.from(message).map(char => {
-        const code = char.codePointAt(0);
-        // Si c'est un emoji (code > 127), encoder en UTF-8 percent
-        if (code > 127) {
-            return Array.from(new TextEncoder().encode(char))
-                .map(byte => '%' + byte.toString(16).toUpperCase().padStart(2, '0'))
-                .join('');
-        }
-        // Sinon utiliser encodeURIComponent pour les caractères spéciaux
-        return encodeURIComponent(char);
-    }).join('');
+    // Encoder le message (encodeURIComponent standard suffit)
+    const encodedMessage = encodeURIComponent(message);
 
-    const whatsappUrl = `https://wa.me/${cleanNumber.replace(/\+/g, '')}?text=${encodedMessage}`;
+    // Utiliser api.whatsapp.com au lieu de wa.me pour meilleur support des emojis
+    // wa.me a des problèmes avec les emojis sur desktop/web mais api.whatsapp.com fonctionne
+    const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanNumber.replace(/\+/g, '')}&text=${encodedMessage}`;
 
     // Ouvrir WhatsApp (utiliser location.href pour une meilleure compatibilité mobile)
     window.location.href = whatsappUrl;

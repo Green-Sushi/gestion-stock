@@ -198,18 +198,25 @@ function updatePinDisplay() {
 }
 
 function logout() {
-    if (confirm('Voulez-vous vraiment vous déconnecter ?')) {
-        db.logout();
-        AppState.currentUser = null;
-        AppState.pinCode = '';
+    // Ouvrir la modale de confirmation
+    const modal = document.getElementById('logout-modal');
+    modal.classList.add('active');
+}
 
-        // Réinitialiser l'affichage de la page de login
-        updatePinDisplay();
-        const loginError = document.getElementById('login-error');
-        if (loginError) loginError.textContent = '';
+function confirmLogout() {
+    db.logout();
+    AppState.currentUser = null;
+    AppState.pinCode = '';
 
-        showPage('login-page');
-    }
+    // Réinitialiser l'affichage de la page de login
+    updatePinDisplay();
+    const loginError = document.getElementById('login-error');
+    if (loginError) loginError.textContent = '';
+
+    // Fermer la modale
+    closeModal('logout-modal');
+
+    showPage('login-page');
 }
 
 // ====================
@@ -252,6 +259,7 @@ function setupGlobalListeners() {
 
     // Logout
     document.getElementById('logout-btn')?.addEventListener('click', logout);
+    document.getElementById('confirm-logout-btn')?.addEventListener('click', confirmLogout);
 
     // Clavier PIN (event delegation au niveau document pour fonctionner toujours)
     document.addEventListener('click', async (e) => {
@@ -468,12 +476,15 @@ function renderProducts(searchTerm = '') {
         const item = document.createElement('div');
         item.className = isLowStock ? 'product-item low-stock-alert' : 'product-item';
 
-        // Bouton supprimer visible uniquement pour le Patron
-        const deleteButton = db.isPatron() ?
-            `<button class="btn-delete-product" data-product-id="${product.id}" title="Supprimer ce produit">🗑️</button>` : '';
+        // Boutons d'action visibles uniquement pour le Patron
+        const actionButtons = db.isPatron() ?
+            `<div class="product-actions">
+                <button class="btn-edit-product" data-product-id="${product.id}" title="Modifier ce produit">✏️</button>
+                <button class="btn-delete-product" data-product-id="${product.id}" title="Supprimer ce produit">🗑️</button>
+            </div>` : '';
 
         item.innerHTML = `
-            ${deleteButton}
+            ${actionButtons}
             <div class="product-info" data-product-id="${product.id}">
                 <div class="product-name">${product.name}</div>
                 <div class="product-supplier">${supplierName}</div>
@@ -522,8 +533,16 @@ function renderProducts(searchTerm = '') {
             adjustProductQuantity(product.id, 10);
         });
 
-        // Bouton supprimer (Patron uniquement)
+        // Boutons d'action (Patron uniquement)
         if (db.isPatron()) {
+            const btnEdit = item.querySelector('.btn-edit-product');
+            if (btnEdit) {
+                btnEdit.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openProductModal(product);
+                });
+            }
+
             const btnDelete = item.querySelector('.btn-delete-product');
             if (btnDelete) {
                 btnDelete.addEventListener('click', (e) => {

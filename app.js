@@ -1166,18 +1166,29 @@ function sendWhatsAppAlert(number, message) {
     // Encoder le message (encodeURIComponent standard suffit)
     const encodedMessage = encodeURIComponent(message);
 
-    // Utiliser le protocole whatsapp:// direct pour ouvrir l'app sans passer par le web
-    // Fallback sur api.whatsapp.com si whatsapp:// ne fonctionne pas
-    const whatsappUrl = `whatsapp://send?phone=${cleanNumber.replace(/\+/g, '')}&text=${encodedMessage}`;
+    // Construire les URLs pour les différents protocoles
+    const phone = cleanNumber.replace(/\+/g, '');
+    const params = `phone=${phone}&text=${encodedMessage}`;
 
-    // Créer un lien temporaire et le cliquer (meilleure compatibilité mobile)
+    // Tenter d'ouvrir avec les protocoles app en premier (WhatsApp et WhatsApp Business)
+    const whatsappUrl = `whatsapp://send?${params}`;
+    const whatsappBusinessUrl = `whatsapp-business://send?${params}`;
+
+    // Créer un lien avec le protocole WhatsApp standard
     const link = document.createElement('a');
     link.href = whatsappUrl;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
+    link.style.display = 'none';
     document.body.appendChild(link);
+
+    // Essayer d'ouvrir WhatsApp
     link.click();
-    document.body.removeChild(link);
+
+    // Après un court délai, essayer WhatsApp Business si WhatsApp standard n'a pas fonctionné
+    setTimeout(() => {
+        link.href = whatsappBusinessUrl;
+        link.click();
+        document.body.removeChild(link);
+    }, 100);
 }
 
 async function handleSendConfirmed() {

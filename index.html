@@ -1172,18 +1172,12 @@
 
     <!-- MODAL DÉCONNEXION -->
     <div class="modal" id="logout-modal">
-        <div class="modal-content" style="max-width: 400px;">
-            <div class="modal-header" style="border-bottom: none; padding-bottom: 0;">
-                <h3 class="modal-title">🚪 Déconnexion</h3>
-                <button class="close-modal" data-modal="logout-modal">×</button>
-            </div>
-            <div style="padding: 20px 0; text-align: center;">
-                <p style="font-size: 1rem; color: #555; margin-bottom: 25px;">
-                    Voulez-vous vraiment vous déconnecter ?
-                </p>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary close-modal" data-modal="logout-modal">Annuler</button>
-                    <button type="button" class="btn" id="confirm-logout-btn" style="background: #e74c3c;">Se déconnecter</button>
+        <div class="modal-content" style="max-width: 320px;">
+            <div style="padding: 30px 20px; text-align: center;">
+                <h3 style="font-size: 1.25rem; color: #333; margin: 0 0 30px 0;">Se déconnecter ?</h3>
+                <div class="modal-actions" style="gap: 15px;">
+                    <button type="button" class="btn btn-secondary close-modal" data-modal="logout-modal" style="flex: 1; font-weight: 600;">NON</button>
+                    <button type="button" class="btn" id="confirm-logout-btn" style="background: #e74c3c; flex: 1; font-weight: 600;">OUI</button>
                 </div>
             </div>
         </div>

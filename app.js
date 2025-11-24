@@ -325,20 +325,17 @@ function setupGlobalListeners() {
     // Envoi d'alertes
     document.getElementById('send-alerts-btn').addEventListener('click', sendAlerts);
 
-    // Toggles paramètres
+    // Toggles paramètres (juste toggle visuel, pas de sauvegarde auto)
     document.getElementById('email-toggle').addEventListener('click', function() {
         this.classList.toggle('active');
-        saveSettings();
     });
 
     document.getElementById('whatsapp-toggle').addEventListener('click', function() {
         this.classList.toggle('active');
-        saveSettings();
     });
 
-    // Inputs paramètres
-    document.getElementById('email-input').addEventListener('change', saveSettings);
-    document.getElementById('whatsapp-input').addEventListener('change', saveSettings);
+    // Bouton sauvegarder paramètres
+    document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
 
     // Gestion des utilisateurs
     document.getElementById('manage-users-btn').addEventListener('click', openUsersManagement);
@@ -1164,10 +1161,14 @@ async function saveSettings() {
     const whatsappEnabled = document.getElementById('whatsapp-toggle').classList.contains('active');
     const whatsappNumber = document.getElementById('whatsapp-input').value;
 
+    showLoading(true);
     await db.updateSetting('email_notifications', emailEnabled.toString());
     await db.updateSetting('email_recipient', emailRecipient);
     await db.updateSetting('whatsapp_notifications', whatsappEnabled.toString());
     await db.updateSetting('whatsapp_number', whatsappNumber);
+    showLoading(false);
+
+    alert('✅ Paramètres sauvegardés !');
 }
 
 // ====================

@@ -12,7 +12,8 @@ const AppState = {
     editingProduct: null,
     editingSupplier: null,
     editingUser: null,
-    pinCode: ''
+    pinCode: '',
+    pendingSendConfirmation: false
 };
 
 // ====================
@@ -343,6 +344,21 @@ function setupGlobalListeners() {
     document.getElementById('manage-users-btn').addEventListener('click', openUsersManagement);
     document.getElementById('add-user-btn').addEventListener('click', () => openUserModal());
     document.getElementById('user-form').addEventListener('submit', handleUserSubmit);
+
+    // Confirmation d'envoi
+    document.getElementById('send-confirmed-btn').addEventListener('click', handleSendConfirmed);
+    document.getElementById('send-not-confirmed-btn').addEventListener('click', handleSendNotConfirmed);
+
+    // Détecter le retour sur l'application après envoi
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && AppState.pendingSendConfirmation) {
+            // L'utilisateur revient sur l'application
+            setTimeout(() => {
+                const modal = document.getElementById('send-confirmation-modal');
+                modal.classList.add('active');
+            }, 500); // Petit délai pour une transition plus naturelle
+        }
+    });
 }
 
 // ====================
@@ -1093,7 +1109,8 @@ async function sendViaWhatsApp() {
     // Fermer la modale
     closeModal('send-choice-modal');
 
-    alert('✅ Récapitulatif envoyé via WhatsApp !');
+    // Marquer qu'un envoi est en attente de confirmation
+    AppState.pendingSendConfirmation = true;
 }
 
 async function sendViaEmail() {
@@ -1119,7 +1136,8 @@ async function sendViaEmail() {
     // Fermer la modale
     closeModal('send-choice-modal');
 
-    alert('✅ Récapitulatif envoyé via Email !');
+    // Marquer qu'un envoi est en attente de confirmation
+    AppState.pendingSendConfirmation = true;
 }
 
 async function sendEmailAlert(email, message) {
@@ -1144,6 +1162,27 @@ function sendWhatsAppAlert(number, message) {
 
     // Ouvrir dans un nouvel onglet
     window.open(whatsappUrl, '_blank');
+}
+
+function handleSendConfirmed() {
+    // Fermer la modale
+    closeModal('send-confirmation-modal');
+
+    // Réinitialiser l'état
+    AppState.pendingSendConfirmation = false;
+
+    // Afficher le message de succès
+    alert('✅ Merci ! Le récapitulatif a bien été envoyé.');
+}
+
+function handleSendNotConfirmed() {
+    // Fermer la modale
+    closeModal('send-confirmation-modal');
+
+    // Réinitialiser l'état
+    AppState.pendingSendConfirmation = false;
+
+    // Pas de message, l'utilisateur peut réessayer
 }
 
 // ====================

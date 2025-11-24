@@ -324,11 +324,13 @@ class DatabaseManager {
             if (!currentProduct.success) return currentProduct;
 
             const currentOrder = currentProduct.data.display_order;
+            const currentCategory = currentProduct.data.category;
 
-            // Trouver le produit juste au-dessus
+            // Trouver le produit juste au-dessus DANS LA MÊME CATÉGORIE
             const { data: prevProducts, error: prevError } = await this.supabase
                 .from('products')
                 .select('id, display_order')
+                .eq('category', currentCategory)
                 .lt('display_order', currentOrder)
                 .order('display_order', { ascending: false })
                 .limit(1);
@@ -365,11 +367,13 @@ class DatabaseManager {
             if (!currentProduct.success) return currentProduct;
 
             const currentOrder = currentProduct.data.display_order;
+            const currentCategory = currentProduct.data.category;
 
-            // Trouver le produit juste en dessous
+            // Trouver le produit juste en dessous DANS LA MÊME CATÉGORIE
             const { data: nextProducts, error: nextError } = await this.supabase
                 .from('products')
                 .select('id, display_order')
+                .eq('category', currentCategory)
                 .gt('display_order', currentOrder)
                 .order('display_order', { ascending: true })
                 .limit(1);

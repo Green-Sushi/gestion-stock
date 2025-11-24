@@ -1187,6 +1187,27 @@
         </div>
     </div>
 
+    <!-- MODAL CHOIX ENVOI RÉCAPITULATIF -->
+    <div class="modal" id="send-choice-modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div style="padding: 30px 20px;">
+                <h3 style="font-size: 1.25rem; color: #333; margin: 0 0 10px 0; text-align: center;">Envoyer le récapitulatif</h3>
+                <p style="color: #666; font-size: 0.9rem; text-align: center; margin-bottom: 30px;">Choisissez votre méthode d'envoi</p>
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <button type="button" class="btn" id="send-whatsapp-btn" style="width: 100%; background: #25D366; font-size: 1.1rem;">
+                        💬 WhatsApp
+                    </button>
+                    <button type="button" class="btn" id="send-email-btn" style="width: 100%; background: #3498db; font-size: 1.1rem;">
+                        ✉️ Email
+                    </button>
+                    <button type="button" class="btn btn-secondary close-modal" data-modal="send-choice-modal" style="width: 100%; margin-top: 10px;">
+                        Annuler
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL FOURNISSEUR -->
     <div class="modal" id="supplier-modal">
         <div class="modal-content">

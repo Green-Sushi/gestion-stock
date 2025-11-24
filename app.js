@@ -324,6 +324,8 @@ function setupGlobalListeners() {
 
     // Envoi d'alertes
     document.getElementById('send-alerts-btn').addEventListener('click', sendAlerts);
+    document.getElementById('send-whatsapp-btn').addEventListener('click', sendViaWhatsApp);
+    document.getElementById('send-email-btn').addEventListener('click', sendViaEmail);
 
     // Toggles paramètres (juste toggle visuel, pas de sauvegarde auto)
     document.getElementById('email-toggle').addEventListener('click', function() {
@@ -1063,6 +1065,12 @@ async function sendAlerts() {
         return;
     }
 
+    // Ouvrir la modale de choix
+    const modal = document.getElementById('send-choice-modal');
+    modal.classList.add('active');
+}
+
+async function sendViaWhatsApp() {
     // Récupérer les paramètres
     const settings = await db.getSettings();
     if (!settings.success) {
@@ -1070,34 +1078,48 @@ async function sendAlerts() {
         return;
     }
 
-    const emailEnabled = settings.data.email_notifications === 'true';
-    const whatsappEnabled = settings.data.whatsapp_notifications === 'true';
-
-    if (!emailEnabled && !whatsappEnabled) {
-        alert('⚠️ Aucun moyen de notification activé. Veuillez configurer les paramètres.');
+    const whatsappNumber = settings.data.whatsapp_number;
+    if (!whatsappNumber) {
+        alert('⚠️ Aucun numéro WhatsApp configuré. Veuillez configurer les paramètres.');
         return;
     }
 
     // Générer le message formaté
     const message = generateAlertMessage();
 
-    let sent = false;
-
     // Envoyer par WhatsApp
-    if (whatsappEnabled && settings.data.whatsapp_number) {
-        sendWhatsAppAlert(settings.data.whatsapp_number, message);
-        sent = true;
+    sendWhatsAppAlert(whatsappNumber, message);
+
+    // Fermer la modale
+    closeModal('send-choice-modal');
+
+    alert('✅ Récapitulatif envoyé via WhatsApp !');
+}
+
+async function sendViaEmail() {
+    // Récupérer les paramètres
+    const settings = await db.getSettings();
+    if (!settings.success) {
+        alert('❌ Erreur de récupération des paramètres');
+        return;
     }
+
+    const emailRecipient = settings.data.email_recipient;
+    if (!emailRecipient) {
+        alert('⚠️ Aucun email configuré. Veuillez configurer les paramètres.');
+        return;
+    }
+
+    // Générer le message formaté
+    const message = generateAlertMessage();
 
     // Envoyer par email
-    if (emailEnabled && settings.data.email_recipient) {
-        await sendEmailAlert(settings.data.email_recipient, message);
-        sent = true;
-    }
+    await sendEmailAlert(emailRecipient, message);
 
-    if (sent) {
-        alert('✅ Récapitulatif envoyé !');
-    }
+    // Fermer la modale
+    closeModal('send-choice-modal');
+
+    alert('✅ Récapitulatif envoyé via Email !');
 }
 
 async function sendEmailAlert(email, message) {

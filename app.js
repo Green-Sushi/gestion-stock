@@ -80,8 +80,8 @@ function applyPermissions() {
     const patronOnlyElements = [
         'add-product-btn',          // Bouton ajouter produit
         'add-supplier-btn',         // Bouton ajouter fournisseur
-        'manage-users-btn',         // Bouton gérer utilisateurs
-        'send-alerts-btn'           // Bouton envoyer alertes
+        'manage-users-btn'          // Bouton gérer utilisateurs
+        // 'send-alerts-btn' supprimé - accessible à tous
     ];
 
     // Onglets réservés au patron

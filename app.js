@@ -1005,17 +1005,9 @@ function generateAlertMessage() {
                 product.optimal_stock
             );
             const levelEmoji = levelEmojis[stockLevel] || '⚪';
-            const supplierName = product.supplier ? product.supplier.name : 'Sans fournisseur';
 
             message += `${levelEmoji} ${product.name}\n`;
-            message += `   Stock: ${product.quantity} ${product.unit} / Seuil: ${product.alert_threshold} ${product.unit}\n`;
-            message += `   Fournisseur: ${supplierName}\n`;
-
-            // Ajouter contact fournisseur si disponible
-            if (product.supplier && product.supplier.phone) {
-                message += `   📞 ${product.supplier.phone}\n`;
-            }
-            message += `\n`;
+            message += `   Stock: ${product.quantity} ${product.unit}\n\n`;
         });
         message += `\n`;
     });

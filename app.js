@@ -1166,11 +1166,18 @@ function sendWhatsAppAlert(number, message) {
     // Encoder le message (encodeURIComponent standard suffit)
     const encodedMessage = encodeURIComponent(message);
 
-    // Utiliser api.whatsapp.com au lieu de wa.me pour meilleur support des emojis
-    const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanNumber.replace(/\+/g, '')}&text=${encodedMessage}`;
+    // Utiliser le protocole whatsapp:// direct pour ouvrir l'app sans passer par le web
+    // Fallback sur api.whatsapp.com si whatsapp:// ne fonctionne pas
+    const whatsappUrl = `whatsapp://send?phone=${cleanNumber.replace(/\+/g, '')}&text=${encodedMessage}`;
 
-    // Ouvrir WhatsApp dans un nouvel onglet pour ne pas quitter l'application
-    window.open(whatsappUrl, '_blank');
+    // Créer un lien temporaire et le cliquer (meilleure compatibilité mobile)
+    const link = document.createElement('a');
+    link.href = whatsappUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 async function handleSendConfirmed() {

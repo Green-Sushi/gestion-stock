@@ -992,26 +992,26 @@ function generateAlertMessage() {
         minute: '2-digit'
     });
 
-    // Indicateurs par niveau de stock (emojis universels Unicode 6.0+)
+    // Indicateurs par niveau de stock
     const levelIndicators = {
-        'stock-critical': '\u{1F534}', // 🔴 Cercle rouge
-        'stock-warning': '\u{1F536}',  // 🔶 Losange orange
-        'stock-attention': '\u{1F7E1}', // 🟡 Cercle jaune (ou utiliser ⚠️ si problème)
-        'stock-ok': '\u{2705}'         // ✅ Coche verte
+        'stock-critical': '🔴',
+        'stock-warning': '🟠',
+        'stock-attention': '🟡',
+        'stock-ok': '🟢'
     };
 
-    // Emoji par catégorie (emojis universels)
+    // Emoji par catégorie
     const categoryEmojis = {
-        'frais': '\u{1F9C0}',      // 🧀 Fromage
-        'sec': '\u{1F33E}',        // 🌾 Blé
-        'surgele': '\u{2744}\u{FE0F}', // ❄️ Flocon
-        'consommables': '\u{1F374}', // 🍴 Couvert
-        'boissons': '\u{1F964}',   // 🥤 Gobelet
-        'autre': '\u{1F4E6}'       // 📦 Colis
+        'frais': '🧀',
+        'sec': '🌾',
+        'surgele': '❄️',
+        'consommables': '🥢',
+        'boissons': '🧃',
+        'autre': '📦'
     };
 
-    let message = '\u{1F6A8} ALERTE STOCK - Green Sushi\n'; // 🚨
-    message += '\u{1F4C5} ' + dateStr + ' à ' + timeStr + '\n'; // 📅
+    let message = '🚨 ALERTE STOCK - Green Sushi\n';
+    message += '📅 ' + dateStr + ' à ' + timeStr + '\n';
     message += '━━━━━━━━━━━━━━━━━━━━\n\n';
 
     // Regrouper par catégorie
@@ -1051,7 +1051,7 @@ function generateAlertMessage() {
 
     // Total
     message += '━━━━━━━━━━━━━━━━━━━━\n';
-    message += '\u{1F4CA} TOTAL: ' + AppState.lowStockProducts.length + ' produit' + (AppState.lowStockProducts.length > 1 ? 's' : '') + ' en alerte'; // 📊
+    message += '📊 TOTAL: ' + AppState.lowStockProducts.length + ' produit' + (AppState.lowStockProducts.length > 1 ? 's' : '') + ' en alerte';
 
     return message;
 }
@@ -1061,6 +1061,12 @@ async function sendAlerts() {
         alert('ℹ️ Aucune alerte à envoyer');
         return;
     }
+
+    // DEBUG: Afficher le message généré dans la console
+    const testMessage = generateAlertMessage();
+    console.log('=== MESSAGE GÉNÉRÉ ===');
+    console.log(testMessage);
+    console.log('=== FIN MESSAGE ===');
 
     // Ouvrir la modale de choix
     const modal = document.getElementById('send-choice-modal');

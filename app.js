@@ -992,27 +992,27 @@ function generateAlertMessage() {
         minute: '2-digit'
     });
 
-    // Indicateurs par niveau de stock
+    // Indicateurs par niveau de stock (paires de substitution UTF-16)
     const levelIndicators = {
-        'stock-critical': '🔴',
-        'stock-warning': '🟠',
-        'stock-attention': '🟡',
-        'stock-ok': '🟢'
+        'stock-critical': '\uD83D\uDD34', // 🔴
+        'stock-warning': '\uD83D\uDFE0',  // 🟠
+        'stock-attention': '\uD83D\uDFE1', // 🟡
+        'stock-ok': '\uD83D\uDFE2'        // 🟢
     };
 
-    // Emoji par catégorie
+    // Emoji par catégorie (paires de substitution UTF-16)
     const categoryEmojis = {
-        'frais': '🧀',
-        'sec': '🌾',
-        'surgele': '❄️',
-        'consommables': '🥢',
-        'boissons': '🧃',
-        'autre': '📦'
+        'frais': '\uD83E\uDDC0',      // 🧀
+        'sec': '\uD83C\uDF3E',         // 🌾
+        'surgele': '\u2744\uFE0F',     // ❄️
+        'consommables': '\uD83E\uDD62', // 🥢
+        'boissons': '\uD83E\uDDC3',    // 🧃
+        'autre': '\uD83D\uDCE6'        // 📦
     };
 
-    let message = '🚨 ALERTE STOCK - Green Sushi\n';
-    message += '📅 ' + dateStr + ' à ' + timeStr + '\n';
-    message += '━━━━━━━━━━━━━━━━━━━━\n\n';
+    let message = '\uD83D\uDEA8 ALERTE STOCK - Green Sushi\n'; // 🚨
+    message += '\uD83D\uDCC5 ' + dateStr + ' \u00E0 ' + timeStr + '\n'; // 📅 à
+    message += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n';
 
     // Regrouper par catégorie
     const byCategory = {};
@@ -1032,8 +1032,8 @@ function generateAlertMessage() {
         const category = CATEGORIES.find(c => c.id === catId);
         const catLabel = categoryEmojis[catId] || '[AUTRE]';
 
-        message += `${catLabel} ${category.name.toUpperCase()}\n`;
-        message += `${'-'.repeat(30)}\n`;
+        message += catLabel + ' ' + category.name.toUpperCase() + '\n';
+        message += '\u2500'.repeat(30) + '\n';
 
         byCategory[catId].forEach(product => {
             const { stockLevel } = calculateStockLevel(
@@ -1043,15 +1043,15 @@ function generateAlertMessage() {
             );
             const levelIndicator = levelIndicators[stockLevel] || '[OK]';
 
-            message += `${levelIndicator} ${product.name}\n`;
-            message += `   Stock: ${product.quantity} ${product.unit}\n\n`;
+            message += levelIndicator + ' ' + product.name + '\n';
+            message += '   Stock: ' + product.quantity + ' ' + product.unit + '\n\n';
         });
-        message += `\n`;
+        message += '\n';
     });
 
     // Total
-    message += '━━━━━━━━━━━━━━━━━━━━\n';
-    message += '📊 TOTAL: ' + AppState.lowStockProducts.length + ' produit' + (AppState.lowStockProducts.length > 1 ? 's' : '') + ' en alerte';
+    message += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
+    message += '\uD83D\uDCCA TOTAL: ' + AppState.lowStockProducts.length + ' produit' + (AppState.lowStockProducts.length > 1 ? 's' : '') + ' en alerte'; // 📊
 
     return message;
 }

@@ -1159,8 +1159,19 @@ function sendWhatsAppAlert(number, message) {
     // Nettoyer le numéro (enlever espaces et caractères spéciaux sauf +)
     const cleanNumber = number.replace(/[^\d+]/g, '');
 
-    // Ouvrir WhatsApp avec le message pré-rempli
-    const encodedMessage = encodeURIComponent(message);
+    // Encoder en UTF-8 puis en percent-encoding compatible WhatsApp
+    const encodedMessage = Array.from(message).map(char => {
+        const code = char.codePointAt(0);
+        // Si c'est un emoji (code > 127), encoder en UTF-8 percent
+        if (code > 127) {
+            return Array.from(new TextEncoder().encode(char))
+                .map(byte => '%' + byte.toString(16).toUpperCase().padStart(2, '0'))
+                .join('');
+        }
+        // Sinon utiliser encodeURIComponent pour les caractères spéciaux
+        return encodeURIComponent(char);
+    }).join('');
+
     const whatsappUrl = `https://wa.me/${cleanNumber.replace(/\+/g, '')}?text=${encodedMessage}`;
 
     // Ouvrir WhatsApp (utiliser location.href pour une meilleure compatibilité mobile)

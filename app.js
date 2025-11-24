@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!initialized) {
         alert('⚠️ Configuration Supabase manquante. Veuillez configurer SUPABASE_CONFIG dans config.js');
+        hideSplashScreen();
         return;
     }
 
@@ -38,13 +39,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             AppState.currentUser = JSON.parse(storedUser);
             await initializeApp();
+            hideSplashScreen();
         } catch (e) {
             // Session invalide, afficher login
             showPage('login-page');
             setupLoginPage();
+            hideSplashScreen();
         }
     } else {
         setupLoginPage();
+        hideSplashScreen();
     }
 
     // Setup des event listeners globaux
@@ -173,6 +177,17 @@ function showLoading(show) {
         loading.classList.add('active');
     } else {
         loading.classList.remove('active');
+    }
+}
+
+function hideSplashScreen() {
+    const splashScreen = document.getElementById('splash-screen');
+    if (splashScreen) {
+        splashScreen.classList.add('hidden');
+        // Retirer complètement après l'animation
+        setTimeout(() => {
+            splashScreen.remove();
+        }, 500);
     }
 }
 

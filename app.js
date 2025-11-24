@@ -1160,8 +1160,8 @@ function sendWhatsAppAlert(number, message) {
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/${cleanNumber.replace(/\+/g, '')}?text=${encodedMessage}`;
 
-    // Ouvrir dans un nouvel onglet
-    window.open(whatsappUrl, '_blank');
+    // Ouvrir WhatsApp (utiliser location.href pour une meilleure compatibilité mobile)
+    window.location.href = whatsappUrl;
 }
 
 function handleSendConfirmed() {

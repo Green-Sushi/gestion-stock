@@ -1170,22 +1170,22 @@ function sendWhatsAppAlert(number, message) {
     const phone = cleanNumber.replace(/\+/g, '');
     const params = `phone=${phone}&text=${encodedMessage}`;
 
-    // Tenter d'ouvrir avec les protocoles app en premier (WhatsApp et WhatsApp Business)
-    const whatsappUrl = `whatsapp://send?${params}`;
+    // Tenter d'ouvrir avec les protocoles app (WhatsApp Business en premier, puis WhatsApp)
     const whatsappBusinessUrl = `whatsapp-business://send?${params}`;
+    const whatsappUrl = `whatsapp://send?${params}`;
 
-    // Créer un lien avec le protocole WhatsApp standard
+    // Créer un lien avec le protocole WhatsApp Business en premier
     const link = document.createElement('a');
-    link.href = whatsappUrl;
+    link.href = whatsappBusinessUrl;
     link.style.display = 'none';
     document.body.appendChild(link);
 
-    // Essayer d'ouvrir WhatsApp
+    // Essayer d'ouvrir WhatsApp Business
     link.click();
 
-    // Après un court délai, essayer WhatsApp Business si WhatsApp standard n'a pas fonctionné
+    // Après un court délai, essayer WhatsApp standard si WhatsApp Business n'a pas fonctionné
     setTimeout(() => {
-        link.href = whatsappBusinessUrl;
+        link.href = whatsappUrl;
         link.click();
         document.body.removeChild(link);
     }, 100);

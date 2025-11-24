@@ -398,7 +398,7 @@ function renderCategories() {
         'surgele': 'surgelé.png',
         'consommables': 'consommables.png',
         'boissons': 'boissons.png',
-        'autre': 'autres.png'
+        'legumes': 'legumes.png'
     };
 
     CATEGORIES.forEach(category => {
@@ -1000,13 +1000,13 @@ function renderAlerts() {
         'surgele': '#3498db',
         'consommables': '#9b59b6',
         'boissons': '#e67e22',
-        'autre': '#95a5a6'
+        'legumes': '#27ae60'
     };
 
     // Trier par catégorie puis alphabétique
     const sortedProducts = [...AppState.lowStockProducts].sort((a, b) => {
         // D'abord par catégorie
-        const categoryOrder = ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'autre'];
+        const categoryOrder = ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'legumes'];
         const catIndexA = categoryOrder.indexOf(a.category);
         const catIndexB = categoryOrder.indexOf(b.category);
         if (catIndexA !== catIndexB) {
@@ -1088,7 +1088,7 @@ function generateAlertMessage() {
         'surgele': '\u2744\uFE0F',     // ❄️
         'consommables': '\uD83E\uDD62', // 🥢
         'boissons': '\uD83E\uDDC3',    // 🧃
-        'autre': '\uD83D\uDCE6'        // 📦
+        'legumes': '\uD83E\uDD6C'      // 🥬
     };
 
     let message = '\uD83D\uDEA8 ALERTE STOCK - Green Sushi\n'; // 🚨
@@ -1105,13 +1105,13 @@ function generateAlertMessage() {
     });
 
     // Ordre des catégories
-    const categoryOrder = ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'autre'];
+    const categoryOrder = ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'legumes'];
 
     categoryOrder.forEach(catId => {
         if (!byCategory[catId] || byCategory[catId].length === 0) return;
 
         const category = CATEGORIES.find(c => c.id === catId);
-        const catLabel = categoryEmojis[catId] || '[AUTRE]';
+        const catLabel = categoryEmojis[catId] || '[LEGUMES]';
 
         message += catLabel + ' ' + category.name.toUpperCase() + '\n';
         message += '\u2500'.repeat(30) + '\n';

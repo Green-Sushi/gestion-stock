@@ -23,6 +23,6 @@ const CATEGORIES = [
     { id: 'surgele', name: 'Stock Surgelé', icon: '❄️' },
     { id: 'consommables', name: 'Stock Consommable', icon: '🥢' },
     { id: 'boissons', name: 'Stock Boissons', icon: '🧃' },
-    { id: 'autre', name: 'Autre', icon: '📦' }
+    { id: 'legumes', name: 'Légumes', icon: '🥬' }
 ];
 

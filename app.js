@@ -992,27 +992,27 @@ function generateAlertMessage() {
         minute: '2-digit'
     });
 
-    // Indicateurs par niveau de stock (codes Unicode pour compatibilité iOS/Android)
+    // Indicateurs par niveau de stock (emojis universels Unicode 6.0+)
     const levelIndicators = {
-        'stock-critical': String.fromCodePoint(0x1F534), // 🔴 Cercle rouge
-        'stock-warning': String.fromCodePoint(0x1F7E0),  // 🟠 Cercle orange
-        'stock-attention': String.fromCodePoint(0x1F7E1), // 🟡 Cercle jaune
-        'stock-ok': String.fromCodePoint(0x1F7E2)        // 🟢 Cercle vert
+        'stock-critical': '\u{1F534}', // 🔴 Cercle rouge
+        'stock-warning': '\u{1F536}',  // 🔶 Losange orange
+        'stock-attention': '\u{1F7E1}', // 🟡 Cercle jaune (ou utiliser ⚠️ si problème)
+        'stock-ok': '\u{2705}'         // ✅ Coche verte
     };
 
-    // Emoji par catégorie (codes Unicode)
+    // Emoji par catégorie (emojis universels)
     const categoryEmojis = {
-        'frais': String.fromCodePoint(0x1F9C0),      // 🧀 Fromage
-        'sec': String.fromCodePoint(0x1F33E),         // 🌾 Blé
-        'surgele': String.fromCodePoint(0x2744) + String.fromCodePoint(0xFE0F), // ❄️ Flocon
-        'consommables': String.fromCodePoint(0x1F962), // 🥢 Baguettes
-        'boissons': String.fromCodePoint(0x1F9C3),    // 🧃 Jus
-        'autre': String.fromCodePoint(0x1F4E6)        // 📦 Colis
+        'frais': '\u{1F9C0}',      // 🧀 Fromage
+        'sec': '\u{1F33E}',        // 🌾 Blé
+        'surgele': '\u{2744}\u{FE0F}', // ❄️ Flocon
+        'consommables': '\u{1F374}', // 🍴 Couvert
+        'boissons': '\u{1F964}',   // 🥤 Gobelet
+        'autre': '\u{1F4E6}'       // 📦 Colis
     };
 
-    let message = String.fromCodePoint(0x1F6A8) + ` ALERTE STOCK - Green Sushi\n`; // 🚨
-    message += String.fromCodePoint(0x1F4C5) + ` ${dateStr} à ${timeStr}\n`;        // 📅
-    message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    let message = '\u{1F6A8} ALERTE STOCK - Green Sushi\n'; // 🚨
+    message += '\u{1F4C5} ' + dateStr + ' à ' + timeStr + '\n'; // 📅
+    message += '━━━━━━━━━━━━━━━━━━━━\n\n';
 
     // Regrouper par catégorie
     const byCategory = {};
@@ -1050,8 +1050,8 @@ function generateAlertMessage() {
     });
 
     // Total
-    message += `━━━━━━━━━━━━━━━━━━━━\n`;
-    message += String.fromCodePoint(0x1F4CA) + ` TOTAL: ${AppState.lowStockProducts.length} produit${AppState.lowStockProducts.length > 1 ? 's' : ''} en alerte`; // 📊
+    message += '━━━━━━━━━━━━━━━━━━━━\n';
+    message += '\u{1F4CA} TOTAL: ' + AppState.lowStockProducts.length + ' produit' + (AppState.lowStockProducts.length > 1 ? 's' : '') + ' en alerte'; // 📊
 
     return message;
 }

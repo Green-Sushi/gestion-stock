@@ -357,9 +357,13 @@ function setupGlobalListeners() {
         if (!document.hidden && AppState.pendingSendConfirmation) {
             // L'utilisateur revient sur l'application
             setTimeout(() => {
+                // S'assurer que la page est scrollée en haut
+                window.scrollTo(0, 0);
+
+                // Ouvrir la modale de confirmation
                 const modal = document.getElementById('send-confirmation-modal');
                 modal.classList.add('active');
-            }, 500); // Petit délai pour une transition plus naturelle
+            }, 300); // Délai réduit pour meilleure réactivité
         }
     });
 }
@@ -1163,11 +1167,10 @@ function sendWhatsAppAlert(number, message) {
     const encodedMessage = encodeURIComponent(message);
 
     // Utiliser api.whatsapp.com au lieu de wa.me pour meilleur support des emojis
-    // wa.me a des problèmes avec les emojis sur desktop/web mais api.whatsapp.com fonctionne
     const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanNumber.replace(/\+/g, '')}&text=${encodedMessage}`;
 
-    // Ouvrir WhatsApp (utiliser location.href pour une meilleure compatibilité mobile)
-    window.location.href = whatsappUrl;
+    // Ouvrir WhatsApp dans un nouvel onglet pour ne pas quitter l'application
+    window.open(whatsappUrl, '_blank');
 }
 
 async function handleSendConfirmed() {

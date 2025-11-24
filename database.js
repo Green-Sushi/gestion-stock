@@ -205,7 +205,8 @@ class DatabaseManager {
                     *,
                     supplier:suppliers(id, name, phone, email)
                 `)
-                .order('name');
+                .order('display_order', { ascending: true })
+                .order('name', { ascending: true });
 
             if (category) {
                 query = query.eq('category', category);
@@ -312,6 +313,88 @@ class DatabaseManager {
             return { success: true };
         } catch (error) {
             console.error('Erreur suppression produit:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async moveProductUp(productId) {
+        try {
+            // Récupérer le produit actuel
+            const currentProduct = await this.getProductById(productId);
+            if (!currentProduct.success) return currentProduct;
+
+            const currentOrder = currentProduct.data.display_order;
+
+            // Trouver le produit juste au-dessus
+            const { data: prevProducts, error: prevError } = await this.supabase
+                .from('products')
+                .select('id, display_order')
+                .lt('display_order', currentOrder)
+                .order('display_order', { ascending: false })
+                .limit(1);
+
+            if (prevError) throw prevError;
+            if (!prevProducts || prevProducts.length === 0) {
+                return { success: false, error: 'Déjà en première position' };
+            }
+
+            const prevProduct = prevProducts[0];
+
+            // Échanger les ordres
+            await this.supabase
+                .from('products')
+                .update({ display_order: prevProduct.display_order })
+                .eq('id', productId);
+
+            await this.supabase
+                .from('products')
+                .update({ display_order: currentOrder })
+                .eq('id', prevProduct.id);
+
+            return { success: true };
+        } catch (error) {
+            console.error('Erreur déplacement produit vers le haut:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async moveProductDown(productId) {
+        try {
+            // Récupérer le produit actuel
+            const currentProduct = await this.getProductById(productId);
+            if (!currentProduct.success) return currentProduct;
+
+            const currentOrder = currentProduct.data.display_order;
+
+            // Trouver le produit juste en dessous
+            const { data: nextProducts, error: nextError } = await this.supabase
+                .from('products')
+                .select('id, display_order')
+                .gt('display_order', currentOrder)
+                .order('display_order', { ascending: true })
+                .limit(1);
+
+            if (nextError) throw nextError;
+            if (!nextProducts || nextProducts.length === 0) {
+                return { success: false, error: 'Déjà en dernière position' };
+            }
+
+            const nextProduct = nextProducts[0];
+
+            // Échanger les ordres
+            await this.supabase
+                .from('products')
+                .update({ display_order: nextProduct.display_order })
+                .eq('id', productId);
+
+            await this.supabase
+                .from('products')
+                .update({ display_order: currentOrder })
+                .eq('id', nextProduct.id);
+
+            return { success: true };
+        } catch (error) {
+            console.error('Erreur déplacement produit vers le bas:', error);
             return { success: false, error: error.message };
         }
     }

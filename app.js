@@ -501,6 +501,8 @@ function renderProducts(searchTerm = '') {
         // Boutons d'action visibles uniquement pour le Patron
         const actionButtons = db.isPatron() ?
             `<div class="product-actions">
+                <button class="btn-move-up" data-product-id="${product.id}" title="Déplacer vers le haut">↑</button>
+                <button class="btn-move-down" data-product-id="${product.id}" title="Déplacer vers le bas">↓</button>
                 <button class="btn-edit-product" data-product-id="${product.id}" title="Modifier ce produit">✏️</button>
                 <button class="btn-delete-product" data-product-id="${product.id}" title="Supprimer ce produit">🗑️</button>
             </div>` : '';
@@ -557,6 +559,22 @@ function renderProducts(searchTerm = '') {
 
         // Boutons d'action (Patron uniquement)
         if (db.isPatron()) {
+            const btnMoveUp = item.querySelector('.btn-move-up');
+            if (btnMoveUp) {
+                btnMoveUp.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    await moveProductUp(product.id);
+                });
+            }
+
+            const btnMoveDown = item.querySelector('.btn-move-down');
+            if (btnMoveDown) {
+                btnMoveDown.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    await moveProductDown(product.id);
+                });
+            }
+
             const btnEdit = item.querySelector('.btn-edit-product');
             if (btnEdit) {
                 btnEdit.addEventListener('click', (e) => {
@@ -649,6 +667,50 @@ async function adjustProductQuantity(productId, delta) {
     } else {
         // Mettre à jour le compteur d'alertes
         await updateAlertCount();
+    }
+}
+
+// Déplacer un produit vers le haut (Patron uniquement)
+async function moveProductUp(productId) {
+    if (!db.isPatron()) {
+        alert('⛔ Accès réservé au patron');
+        return;
+    }
+
+    showLoading(true);
+    const result = await db.moveProductUp(productId);
+    showLoading(false);
+
+    if (result.success) {
+        // Recharger les produits
+        await loadProducts();
+        renderProducts();
+    } else if (result.error === 'Déjà en première position') {
+        // Ne rien faire, c'est déjà en haut
+    } else {
+        alert('❌ Erreur lors du déplacement: ' + result.error);
+    }
+}
+
+// Déplacer un produit vers le bas (Patron uniquement)
+async function moveProductDown(productId) {
+    if (!db.isPatron()) {
+        alert('⛔ Accès réservé au patron');
+        return;
+    }
+
+    showLoading(true);
+    const result = await db.moveProductDown(productId);
+    showLoading(false);
+
+    if (result.success) {
+        // Recharger les produits
+        await loadProducts();
+        renderProducts();
+    } else if (result.error === 'Déjà en dernière position') {
+        // Ne rien faire, c'est déjà en bas
+    } else {
+        alert('❌ Erreur lors du déplacement: ' + result.error);
     }
 }
 

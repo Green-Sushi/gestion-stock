@@ -1,5 +1,9 @@
 // Application principale de gestion de stock Green Sushi
 
+// Timestamp de démarrage pour le splash screen
+const SPLASH_START_TIME = Date.now();
+const SPLASH_MIN_DURATION = 3000; // 3 secondes
+
 // État global de l'application
 const AppState = {
     currentUser: null,
@@ -182,13 +186,20 @@ function showLoading(show) {
 
 function hideSplashScreen() {
     const splashScreen = document.getElementById('splash-screen');
-    if (splashScreen) {
+    if (!splashScreen) return;
+
+    // Calculer le temps écoulé depuis le début
+    const elapsed = Date.now() - SPLASH_START_TIME;
+    const remainingTime = Math.max(0, SPLASH_MIN_DURATION - elapsed);
+
+    // Attendre le temps restant avant de cacher le splash screen
+    setTimeout(() => {
         splashScreen.classList.add('hidden');
         // Retirer complètement après l'animation
         setTimeout(() => {
             splashScreen.remove();
         }, 500);
-    }
+    }, remainingTime);
 }
 
 // ====================

@@ -941,6 +941,114 @@ function renderAlerts() {
     });
 }
 
+// Générer le message récapitulatif formaté
+function generateAlertMessage() {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('fr-FR', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    const timeStr = now.toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+
+    // Emoji par niveau de stock
+    const levelEmojis = {
+        'stock-critical': '🔴',
+        'stock-warning': '🟠',
+        'stock-attention': '🟡',
+        'stock-ok': '🟢'
+    };
+
+    // Emoji par catégorie
+    const categoryEmojis = {
+        'frais': '🧀',
+        'sec': '🌾',
+        'surgele': '❄️',
+        'consommables': '🥢',
+        'boissons': '🧃',
+        'autre': '📦'
+    };
+
+    let message = `🚨 ALERTE STOCK - Green Sushi\n`;
+    message += `📅 ${dateStr} à ${timeStr}\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    // Regrouper par catégorie
+    const byCategory = {};
+    AppState.lowStockProducts.forEach(product => {
+        if (!byCategory[product.category]) {
+            byCategory[product.category] = [];
+        }
+        byCategory[product.category].push(product);
+    });
+
+    // Ordre des catégories
+    const categoryOrder = ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'autre'];
+
+    categoryOrder.forEach(catId => {
+        if (!byCategory[catId] || byCategory[catId].length === 0) return;
+
+        const category = CATEGORIES.find(c => c.id === catId);
+        const emoji = categoryEmojis[catId] || '📦';
+
+        message += `${emoji} ${category.name.toUpperCase()}\n`;
+        message += `${'─'.repeat(25)}\n`;
+
+        byCategory[catId].forEach(product => {
+            const { stockLevel } = calculateStockLevel(
+                product.quantity,
+                product.alert_threshold,
+                product.optimal_stock
+            );
+            const levelEmoji = levelEmojis[stockLevel] || '⚪';
+            const supplierName = product.supplier ? product.supplier.name : 'Sans fournisseur';
+
+            message += `${levelEmoji} ${product.name}\n`;
+            message += `   Stock: ${product.quantity} ${product.unit} / Seuil: ${product.alert_threshold} ${product.unit}\n`;
+            message += `   Fournisseur: ${supplierName}\n`;
+
+            // Ajouter contact fournisseur si disponible
+            if (product.supplier && product.supplier.phone) {
+                message += `   📞 ${product.supplier.phone}\n`;
+            }
+            message += `\n`;
+        });
+        message += `\n`;
+    });
+
+    // Statistiques
+    message += `━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `📊 STATISTIQUES\n`;
+
+    const critical = AppState.lowStockProducts.filter(p => {
+        const { stockLevel } = calculateStockLevel(p.quantity, p.alert_threshold, p.optimal_stock);
+        return stockLevel === 'stock-critical';
+    }).length;
+
+    const warning = AppState.lowStockProducts.filter(p => {
+        const { stockLevel } = calculateStockLevel(p.quantity, p.alert_threshold, p.optimal_stock);
+        return stockLevel === 'stock-warning';
+    }).length;
+
+    const attention = AppState.lowStockProducts.filter(p => {
+        const { stockLevel } = calculateStockLevel(p.quantity, p.alert_threshold, p.optimal_stock);
+        return stockLevel === 'stock-attention';
+    }).length;
+
+    message += `🔴 Critique: ${critical} produit${critical > 1 ? 's' : ''}\n`;
+    message += `🟠 Limite: ${warning} produit${warning > 1 ? 's' : ''}\n`;
+    if (attention > 0) {
+        message += `🟡 Attention: ${attention} produit${attention > 1 ? 's' : ''}\n`;
+    }
+    message += `\n📦 Total: ${AppState.lowStockProducts.length} produit${AppState.lowStockProducts.length > 1 ? 's' : ''} en alerte`;
+
+    return message;
+}
+
 async function sendAlerts() {
     if (AppState.lowStockProducts.length === 0) {
         alert('ℹ️ Aucune alerte à envoyer');
@@ -962,45 +1070,49 @@ async function sendAlerts() {
         return;
     }
 
-    // Créer le message
-    let message = '🚨 ALERTE STOCK BAS - Green Sushi\n\n';
-    AppState.lowStockProducts.forEach(product => {
-        const supplierName = product.supplier ? product.supplier.name : 'Sans fournisseur';
-        message += `• ${product.name}\n`;
-        message += `  Stock: ${product.quantity} ${product.unit} (Seuil: ${product.alert_threshold})\n`;
-        message += `  Fournisseur: ${supplierName}\n\n`;
-    });
+    // Générer le message formaté
+    const message = generateAlertMessage();
 
-    // Envoyer par email
-    if (emailEnabled && settings.data.email_recipient) {
-        const emailSent = await sendEmailAlert(settings.data.email_recipient, message);
-        if (emailSent) {
-            alert('✅ Alerte envoyée par email');
-        }
-    }
+    let sent = false;
 
     // Envoyer par WhatsApp
     if (whatsappEnabled && settings.data.whatsapp_number) {
         sendWhatsAppAlert(settings.data.whatsapp_number, message);
+        sent = true;
+    }
+
+    // Envoyer par email
+    if (emailEnabled && settings.data.email_recipient) {
+        await sendEmailAlert(settings.data.email_recipient, message);
+        sent = true;
+    }
+
+    if (sent) {
+        alert('✅ Récapitulatif envoyé !');
     }
 }
 
 async function sendEmailAlert(email, message) {
-    // Pour l'envoi d'email, on utiliserait Supabase Edge Functions
-    // Ou un service tiers comme Resend, SendGrid, etc.
-    // Pour l'instant, on affiche juste le message
-    console.log('Email à envoyer à:', email);
-    console.log('Message:', message);
+    // Créer un mailto link avec le message
+    const subject = encodeURIComponent('🚨 Alerte Stock - Green Sushi');
+    const body = encodeURIComponent(message);
+    const mailtoUrl = `mailto:${email}?subject=${subject}&body=${body}`;
 
-    // TODO: Implémenter l'envoi réel d'email via Supabase Edge Function
-    alert(`📧 Email préparé pour ${email}\n\n${message}\n\n⚠️ Fonctionnalité à configurer dans Supabase`);
+    // Ouvrir le client email par défaut
+    window.location.href = mailtoUrl;
+
     return true;
 }
 
 function sendWhatsAppAlert(number, message) {
+    // Nettoyer le numéro (enlever espaces et caractères spéciaux sauf +)
+    const cleanNumber = number.replace(/[^\d+]/g, '');
+
     // Ouvrir WhatsApp avec le message pré-rempli
     const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/${number.replace(/\+/g, '')}?text=${encodedMessage}`;
+    const whatsappUrl = `https://wa.me/${cleanNumber.replace(/\+/g, '')}?text=${encodedMessage}`;
+
+    // Ouvrir dans un nouvel onglet
     window.open(whatsappUrl, '_blank');
 }
 

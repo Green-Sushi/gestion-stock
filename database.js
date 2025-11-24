@@ -467,6 +467,68 @@ class DatabaseManager {
             return { success: false, error: error.message };
         }
     }
+
+    // ===== HISTORIQUE DES MESSAGES =====
+
+    async createMessageHistory(messageData) {
+        try {
+            const { data, error } = await this.supabase
+                .from('message_history')
+                .insert([{
+                    user_id: this.currentUser?.id,
+                    send_method: messageData.send_method,
+                    recipient: messageData.recipient,
+                    message_content: messageData.message_content,
+                    product_count: messageData.product_count
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Erreur enregistrement message:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getMessageHistory(limit = 50) {
+        try {
+            const { data, error } = await this.supabase
+                .from('message_history')
+                .select(`
+                    *,
+                    user:users(name, role)
+                `)
+                .order('sent_at', { ascending: false })
+                .limit(limit);
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Erreur récupération historique messages:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getMessageById(messageId) {
+        try {
+            const { data, error } = await this.supabase
+                .from('message_history')
+                .select(`
+                    *,
+                    user:users(name, role)
+                `)
+                .eq('id', messageId)
+                .single();
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Erreur récupération message:', error);
+            return { success: false, error: error.message };
+        }
+    }
 }
 
 // Instance globale

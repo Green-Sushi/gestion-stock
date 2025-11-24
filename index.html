@@ -1111,6 +1111,13 @@
             </div>
 
             <div class="setting-item">
+                <div class="setting-header">
+                    <div class="setting-title">Historique des envois</div>
+                    <button class="btn btn-small" id="view-history-btn">Consulter</button>
+                </div>
+            </div>
+
+            <div class="setting-item">
                 <button class="btn btn-danger" style="width: 100%;" id="logout-btn">🚪 Déconnexion</button>
             </div>
         </div>
@@ -1216,6 +1223,39 @@
                 <div class="modal-actions" style="gap: 15px;">
                     <button type="button" class="btn btn-secondary" id="send-not-confirmed-btn" style="flex: 1; font-weight: 600;">NON</button>
                     <button type="button" class="btn" id="send-confirmed-btn" style="background: #27ae60; flex: 1; font-weight: 600;">OUI</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL HISTORIQUE DES MESSAGES -->
+    <div class="modal" id="message-history-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Historique des envois</h3>
+                <button class="close-modal" data-modal="message-history-modal">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="message-history-list" style="max-height: 500px; overflow-y: auto;">
+                    <!-- Liste chargée dynamiquement -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DÉTAIL MESSAGE -->
+    <div class="modal" id="message-detail-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Détail du message</h3>
+                <button class="close-modal" data-modal="message-detail-modal">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="message-detail-content" style="white-space: pre-wrap; font-family: monospace; background: #f5f5f5; padding: 20px; border-radius: 8px; font-size: 0.9rem;">
+                    <!-- Contenu chargé dynamiquement -->
+                </div>
+                <div id="message-detail-info" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 0.9rem;">
+                    <!-- Infos chargées dynamiquement -->
                 </div>
             </div>
         </div>

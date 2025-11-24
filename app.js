@@ -345,6 +345,9 @@ function setupGlobalListeners() {
     document.getElementById('add-user-btn').addEventListener('click', () => openUserModal());
     document.getElementById('user-form').addEventListener('submit', handleUserSubmit);
 
+    // Historique des messages
+    document.getElementById('view-history-btn').addEventListener('click', openMessageHistory);
+
     // Confirmation d'envoi
     document.getElementById('send-confirmed-btn').addEventListener('click', handleSendConfirmed);
     document.getElementById('send-not-confirmed-btn').addEventListener('click', handleSendNotConfirmed);
@@ -989,27 +992,27 @@ function generateAlertMessage() {
         minute: '2-digit'
     });
 
-    // Emoji par niveau de stock
-    const levelEmojis = {
-        'stock-critical': '🔴',
-        'stock-warning': '🟠',
-        'stock-attention': '🟡',
-        'stock-ok': '🟢'
+    // Indicateurs par niveau de stock (utiliser des caractères simples)
+    const levelIndicators = {
+        'stock-critical': '[CRITIQUE]',
+        'stock-warning': '[LIMITE]',
+        'stock-attention': '[ATTENTION]',
+        'stock-ok': '[OK]'
     };
 
-    // Emoji par catégorie
+    // Emoji par catégorie (emojis simples et universels)
     const categoryEmojis = {
-        'frais': '🧀',
-        'sec': '🌾',
-        'surgele': '❄️',
-        'consommables': '🥢',
-        'boissons': '🧃',
-        'autre': '📦'
+        'frais': '[FRAIS]',
+        'sec': '[SEC]',
+        'surgele': '[SURGELE]',
+        'consommables': '[CONSOMMABLES]',
+        'boissons': '[BOISSONS]',
+        'autre': '[AUTRE]'
     };
 
-    let message = `🚨 ALERTE STOCK - Green Sushi\n`;
-    message += `📅 ${dateStr} à ${timeStr}\n`;
-    message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    let message = `*** ALERTE STOCK - Green Sushi ***\n`;
+    message += `Date: ${dateStr} a ${timeStr}\n`;
+    message += `================================\n\n`;
 
     // Regrouper par catégorie
     const byCategory = {};
@@ -1027,10 +1030,10 @@ function generateAlertMessage() {
         if (!byCategory[catId] || byCategory[catId].length === 0) return;
 
         const category = CATEGORIES.find(c => c.id === catId);
-        const emoji = categoryEmojis[catId] || '📦';
+        const catLabel = categoryEmojis[catId] || '[AUTRE]';
 
-        message += `${emoji} ${category.name.toUpperCase()}\n`;
-        message += `${'─'.repeat(25)}\n`;
+        message += `${catLabel} ${category.name.toUpperCase()}\n`;
+        message += `${'-'.repeat(30)}\n`;
 
         byCategory[catId].forEach(product => {
             const { stockLevel } = calculateStockLevel(
@@ -1038,39 +1041,17 @@ function generateAlertMessage() {
                 product.alert_threshold,
                 product.optimal_stock
             );
-            const levelEmoji = levelEmojis[stockLevel] || '⚪';
+            const levelIndicator = levelIndicators[stockLevel] || '[OK]';
 
-            message += `${levelEmoji} ${product.name}\n`;
+            message += `${levelIndicator} ${product.name}\n`;
             message += `   Stock: ${product.quantity} ${product.unit}\n\n`;
         });
         message += `\n`;
     });
 
-    // Statistiques
-    message += `━━━━━━━━━━━━━━━━━━━━\n`;
-    message += `📊 STATISTIQUES\n`;
-
-    const critical = AppState.lowStockProducts.filter(p => {
-        const { stockLevel } = calculateStockLevel(p.quantity, p.alert_threshold, p.optimal_stock);
-        return stockLevel === 'stock-critical';
-    }).length;
-
-    const warning = AppState.lowStockProducts.filter(p => {
-        const { stockLevel } = calculateStockLevel(p.quantity, p.alert_threshold, p.optimal_stock);
-        return stockLevel === 'stock-warning';
-    }).length;
-
-    const attention = AppState.lowStockProducts.filter(p => {
-        const { stockLevel } = calculateStockLevel(p.quantity, p.alert_threshold, p.optimal_stock);
-        return stockLevel === 'stock-attention';
-    }).length;
-
-    message += `🔴 Critique: ${critical} produit${critical > 1 ? 's' : ''}\n`;
-    message += `🟠 Limite: ${warning} produit${warning > 1 ? 's' : ''}\n`;
-    if (attention > 0) {
-        message += `🟡 Attention: ${attention} produit${attention > 1 ? 's' : ''}\n`;
-    }
-    message += `\n📦 Total: ${AppState.lowStockProducts.length} produit${AppState.lowStockProducts.length > 1 ? 's' : ''} en alerte`;
+    // Total
+    message += `================================\n`;
+    message += `TOTAL: ${AppState.lowStockProducts.length} produit${AppState.lowStockProducts.length > 1 ? 's' : ''} en alerte`;
 
     return message;
 }
@@ -1109,6 +1090,14 @@ async function sendViaWhatsApp() {
     // Fermer la modale
     closeModal('send-choice-modal');
 
+    // Stocker les informations pour l'historique
+    AppState.pendingSendData = {
+        send_method: 'whatsapp',
+        recipient: whatsappNumber,
+        message_content: message,
+        product_count: AppState.lowStockProducts.length
+    };
+
     // Marquer qu'un envoi est en attente de confirmation
     AppState.pendingSendConfirmation = true;
 }
@@ -1135,6 +1124,14 @@ async function sendViaEmail() {
 
     // Fermer la modale
     closeModal('send-choice-modal');
+
+    // Stocker les informations pour l'historique
+    AppState.pendingSendData = {
+        send_method: 'email',
+        recipient: emailRecipient,
+        message_content: message,
+        product_count: AppState.lowStockProducts.length
+    };
 
     // Marquer qu'un envoi est en attente de confirmation
     AppState.pendingSendConfirmation = true;
@@ -1164,7 +1161,13 @@ function sendWhatsAppAlert(number, message) {
     window.location.href = whatsappUrl;
 }
 
-function handleSendConfirmed() {
+async function handleSendConfirmed() {
+    // Sauvegarder dans l'historique
+    if (AppState.pendingSendData) {
+        await db.createMessageHistory(AppState.pendingSendData);
+        AppState.pendingSendData = null;
+    }
+
     // Fermer la modale
     closeModal('send-confirmation-modal');
 
@@ -1176,6 +1179,9 @@ function handleSendConfirmed() {
 }
 
 function handleSendNotConfirmed() {
+    // Nettoyer les données en attente
+    AppState.pendingSendData = null;
+
     // Fermer la modale
     closeModal('send-confirmation-modal');
 
@@ -1230,6 +1236,124 @@ async function saveSettings() {
     showLoading(false);
 
     alert('✅ Paramètres sauvegardés !');
+}
+
+// ====================
+// HISTORIQUE DES MESSAGES
+// ====================
+
+async function openMessageHistory() {
+    const modal = document.getElementById('message-history-modal');
+    const listContainer = document.getElementById('message-history-list');
+
+    // Afficher la modale
+    modal.classList.add('active');
+
+    // Afficher un loader
+    listContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Chargement...</div>';
+
+    // Charger l'historique
+    const result = await db.getMessageHistory(100);
+
+    if (!result.success || result.data.length === 0) {
+        listContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Aucun message dans l\'historique</div>';
+        return;
+    }
+
+    // Afficher la liste
+    listContainer.innerHTML = result.data.map(message => {
+        const date = new Date(message.sent_at);
+        const dateStr = date.toLocaleDateString('fr-FR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+        const timeStr = date.toLocaleTimeString('fr-FR', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        const methodBadge = message.send_method === 'whatsapp'
+            ? '<span style="background: #25D366; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">WhatsApp</span>'
+            : '<span style="background: #3498db; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">Email</span>';
+
+        return `
+            <div class="history-item" data-message-id="${message.id}" style="
+                padding: 15px;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                margin-bottom: 10px;
+                cursor: pointer;
+                transition: all 0.2s;
+            " onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                    <div>
+                        <div style="font-weight: 600; color: #333; margin-bottom: 4px;">${dateStr} à ${timeStr}</div>
+                        <div style="color: #666; font-size: 0.9rem;">${message.user ? message.user.name : 'Utilisateur inconnu'}</div>
+                    </div>
+                    ${methodBadge}
+                </div>
+                <div style="color: #666; font-size: 0.85rem;">
+                    ${message.product_count} produit${message.product_count > 1 ? 's' : ''} • ${message.recipient}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Ajouter les event listeners
+    document.querySelectorAll('.history-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const messageId = item.getAttribute('data-message-id');
+            openMessageDetail(messageId);
+        });
+    });
+}
+
+async function openMessageDetail(messageId) {
+    const modal = document.getElementById('message-detail-modal');
+    const contentContainer = document.getElementById('message-detail-content');
+    const infoContainer = document.getElementById('message-detail-info');
+
+    // Afficher la modale
+    modal.classList.add('active');
+
+    // Afficher un loader
+    contentContainer.innerHTML = 'Chargement...';
+    infoContainer.innerHTML = '';
+
+    // Charger le message
+    const result = await db.getMessageById(messageId);
+
+    if (!result.success) {
+        contentContainer.innerHTML = 'Erreur de chargement';
+        return;
+    }
+
+    const message = result.data;
+    const date = new Date(message.sent_at);
+    const dateStr = date.toLocaleDateString('fr-FR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    });
+    const timeStr = date.toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+
+    // Afficher le contenu
+    contentContainer.textContent = message.message_content;
+
+    // Afficher les infos
+    const methodLabel = message.send_method === 'whatsapp' ? 'WhatsApp' : 'Email';
+    infoContainer.innerHTML = `
+        <div style="margin-bottom: 8px;"><strong>Date :</strong> ${dateStr} à ${timeStr}</div>
+        <div style="margin-bottom: 8px;"><strong>Envoyé par :</strong> ${message.user ? message.user.name : 'Utilisateur inconnu'}</div>
+        <div style="margin-bottom: 8px;"><strong>Méthode :</strong> ${methodLabel}</div>
+        <div style="margin-bottom: 8px;"><strong>Destinataire :</strong> ${message.recipient}</div>
+        <div><strong>Produits en alerte :</strong> ${message.product_count}</div>
+    `;
 }
 
 // ====================

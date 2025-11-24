@@ -992,27 +992,27 @@ function generateAlertMessage() {
         minute: '2-digit'
     });
 
-    // Indicateurs par niveau de stock (utiliser des caractères simples)
+    // Indicateurs par niveau de stock (emojis simples et compatibles)
     const levelIndicators = {
-        'stock-critical': '[CRITIQUE]',
-        'stock-warning': '[LIMITE]',
-        'stock-attention': '[ATTENTION]',
-        'stock-ok': '[OK]'
+        'stock-critical': '❗',
+        'stock-warning': '⚠️',
+        'stock-attention': '⚡',
+        'stock-ok': '✅'
     };
 
     // Emoji par catégorie (emojis simples et universels)
     const categoryEmojis = {
-        'frais': '[FRAIS]',
-        'sec': '[SEC]',
-        'surgele': '[SURGELE]',
-        'consommables': '[CONSOMMABLES]',
-        'boissons': '[BOISSONS]',
-        'autre': '[AUTRE]'
+        'frais': '🧊',
+        'sec': '📦',
+        'surgele': '❄️',
+        'consommables': '🍴',
+        'boissons': '🥤',
+        'autre': '📦'
     };
 
-    let message = `*** ALERTE STOCK - Green Sushi ***\n`;
-    message += `Date: ${dateStr} a ${timeStr}\n`;
-    message += `================================\n\n`;
+    let message = `🚨 ALERTE STOCK - Green Sushi\n`;
+    message += `📅 ${dateStr} à ${timeStr}\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
 
     // Regrouper par catégorie
     const byCategory = {};
@@ -1050,8 +1050,8 @@ function generateAlertMessage() {
     });
 
     // Total
-    message += `================================\n`;
-    message += `TOTAL: ${AppState.lowStockProducts.length} produit${AppState.lowStockProducts.length > 1 ? 's' : ''} en alerte`;
+    message += `━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `📊 TOTAL: ${AppState.lowStockProducts.length} produit${AppState.lowStockProducts.length > 1 ? 's' : ''} en alerte`;
 
     return message;
 }

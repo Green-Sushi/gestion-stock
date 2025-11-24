@@ -353,7 +353,7 @@ function renderCategories() {
         'surgele': 'surgelé.png',
         'consommables': 'consommables.png',
         'boissons': 'boissons.png',
-        'autre': 'autre.png'
+        'autre': 'autres.png'
     };
 
     CATEGORIES.forEach(category => {

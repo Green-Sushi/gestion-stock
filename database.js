@@ -616,6 +616,145 @@ class DatabaseManager {
             return { success: false, error: error.message };
         }
     }
+
+    // ===== GESTION DES TYPES DE SUSHIS =====
+
+    async getSushiTypes() {
+        try {
+            const { data, error } = await this.supabase
+                .from('sushi_types')
+                .select('*')
+                .order('display_order', { ascending: true });
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Erreur récupération types de sushis:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // ===== GESTION DES CONGÉLATIONS =====
+
+    async getFrozenSushi(filters = {}) {
+        try {
+            let query = this.supabase
+                .from('frozen_sushi')
+                .select(`
+                    id,
+                    fish_type,
+                    quantity,
+                    frozen_at,
+                    expiry_date,
+                    sushi_type:sushi_types(id, name, category),
+                    user:users(id, name)
+                `)
+                .order('frozen_at', { ascending: false });
+
+            // Appliquer les filtres si fournis
+            if (filters.month && filters.year) {
+                // Filtrer par mois et année
+                const startDate = `${filters.year}-${filters.month.padStart(2, '0')}-01`;
+                const endMonth = parseInt(filters.month) === 12 ? 1 : parseInt(filters.month) + 1;
+                const endYear = parseInt(filters.month) === 12 ? parseInt(filters.year) + 1 : filters.year;
+                const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+                query = query
+                    .gte('frozen_at', startDate)
+                    .lt('frozen_at', endDate);
+            }
+
+            const { data, error } = await query;
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Erreur récupération sushis congelés:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async createFrozenSushi(data) {
+        try {
+            const insertData = {
+                sushi_type_id: data.sushi_type_id,
+                fish_type: data.fish_type || null,
+                quantity: data.quantity,
+                user_id: data.user_id
+            };
+
+            // Ajouter frozen_at si fourni, sinon NOW() sera utilisé par défaut
+            if (data.frozen_at) {
+                insertData.frozen_at = data.frozen_at;
+            }
+
+            const { data: result, error } = await this.supabase
+                .from('frozen_sushi')
+                .insert([insertData])
+                .select(`
+                    id,
+                    fish_type,
+                    quantity,
+                    frozen_at,
+                    expiry_date,
+                    sushi_type:sushi_types(id, name, category),
+                    user:users(id, name)
+                `)
+                .single();
+
+            if (error) throw error;
+            return { success: true, data: result };
+        } catch (error) {
+            console.error('Erreur création sushi congelé:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async deleteFrozenSushi(id) {
+        try {
+            const { error } = await this.supabase
+                .from('frozen_sushi')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            return { success: true };
+        } catch (error) {
+            console.error('Erreur suppression sushi congelé:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getFrozenSushiForExport(month, year) {
+        try {
+            // Utiliser la même logique que getFrozenSushi mais avec filtres obligatoires
+            const startDate = `${year}-${month.padStart(2, '0')}-01`;
+            const endMonth = parseInt(month) === 12 ? 1 : parseInt(month) + 1;
+            const endYear = parseInt(month) === 12 ? parseInt(year) + 1 : year;
+            const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+            const { data, error } = await this.supabase
+                .from('frozen_sushi')
+                .select(`
+                    id,
+                    fish_type,
+                    quantity,
+                    frozen_at,
+                    expiry_date,
+                    sushi_type:sushi_types(id, name, category),
+                    user:users(id, name)
+                `)
+                .gte('frozen_at', startDate)
+                .lt('frozen_at', endDate)
+                .order('frozen_at', { ascending: false });
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Erreur récupération sushis congelés pour export:', error);
+            return { success: false, error: error.message };
+        }
+    }
 }
 
 // Instance globale

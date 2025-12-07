@@ -17,7 +17,10 @@ const AppState = {
     editingSupplier: null,
     editingUser: null,
     pinCode: '',
-    pendingSendConfirmation: false
+    pendingSendConfirmation: false,
+    sushiTypes: [],
+    frozenSushi: [],
+    editingFrozen: null
 };
 
 // ====================
@@ -66,6 +69,7 @@ async function initializeApp() {
     await loadSuppliers();
     await loadProducts();
     await loadUsers();
+    await loadSushiTypes();
     await updateAlertCount();
 
     // Appliquer les permissions selon le rôle
@@ -161,6 +165,10 @@ function showPage(pageId) {
     } else {
         header.style.display = 'flex';
         nav.style.display = 'flex';
+    }
+
+    if (pageId === 'frozen-page') {
+        loadFrozenSushi().then(() => renderFrozenList());
     }
 }
 
@@ -392,6 +400,21 @@ function setupGlobalListeners() {
             }, 300); // Délai réduit pour meilleure réactivité
         }
     });
+
+    // Congélation
+    document.getElementById('back-to-home-frozen').addEventListener('click', () => {
+        showPage('home-page');
+        updateActiveTab('home-page');
+    });
+
+    document.getElementById('add-frozen-btn').addEventListener('click', openFrozenModal);
+    document.getElementById('frozen-form').addEventListener('submit', handleFrozenSubmit);
+    document.getElementById('frozen-sushi-type').addEventListener('change', handleSushiTypeChange);
+    document.getElementById('frozen-qty-minus').addEventListener('click', () => adjustFrozenQty(-1));
+    document.getElementById('frozen-qty-plus').addEventListener('click', () => adjustFrozenQty(1));
+    document.getElementById('export-frozen-btn').addEventListener('click', exportFrozenList);
+    document.getElementById('frozen-filter-month').addEventListener('change', renderFrozenList);
+    document.getElementById('frozen-filter-year').addEventListener('change', renderFrozenList);
 }
 
 // ====================
@@ -438,6 +461,18 @@ function renderCategories() {
 
         container.appendChild(card);
     });
+
+    // Carte Congélation
+    const frozenCard = document.createElement('div');
+    frozenCard.className = 'frozen-card';
+    frozenCard.innerHTML = `
+        <div class="frozen-card-icon">🧊</div>
+        <div class="frozen-card-label">Congélation</div>
+    `;
+    frozenCard.addEventListener('click', () => {
+        showPage('frozen-page');
+    });
+    container.appendChild(frozenCard);
 }
 
 function showCategoryProducts(category) {
@@ -1632,6 +1667,248 @@ document.addEventListener('click', (e) => {
         AppState.editingSupplier = null;
     }
 });
+
+// ====================
+// CONGÉLATION
+// ====================
+
+async function loadSushiTypes() {
+    const result = await db.getSushiTypes();
+    if (result.success) {
+        AppState.sushiTypes = result.data;
+    }
+}
+
+async function loadFrozenSushi() {
+    const result = await db.getFrozenSushi();
+    if (result.success) {
+        AppState.frozenSushi = result.data;
+    }
+}
+
+function renderFrozenList() {
+    const container = document.getElementById('frozen-list');
+    const monthFilter = document.getElementById('frozen-filter-month').value;
+    const yearFilter = document.getElementById('frozen-filter-year').value;
+
+    // Initialiser le select année si vide
+    const yearSelect = document.getElementById('frozen-filter-year');
+    if (yearSelect.options.length <= 1) {
+        const currentYear = new Date().getFullYear();
+        yearSelect.innerHTML = '<option value="">Toutes années</option>';
+        for (let y = currentYear; y >= currentYear - 3; y--) {
+            yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
+        }
+    }
+
+    // Filtrer les données
+    let filtered = [...AppState.frozenSushi];
+
+    if (monthFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
+        });
+    }
+
+    if (yearFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getFullYear()) === yearFilter;
+        });
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🧊</div>
+                <div class="empty-state-text">Aucune congélation enregistrée</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = filtered.map(item => {
+        const sushiType = item.sushi_type || {};
+        const category = sushiType.category || 'frit';
+        const categoryLabels = { frit: 'Frit', vegi: 'Végi', duo: 'Duo', noel: 'Noël' };
+        const date = new Date(item.frozen_at);
+        const dateStr = date.toLocaleDateString('fr-FR');
+        const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const userName = item.user?.name || 'Inconnu';
+
+        return `
+            <div class="frozen-item category-${category}">
+                <div class="frozen-item-info">
+                    <div class="frozen-item-name">
+                        ${sushiType.name || 'Sushi'}
+                        <span class="frozen-category-badge ${category}">${categoryLabels[category]}</span>
+                    </div>
+                    <div class="frozen-item-details">
+                        ${item.fish_type ? `🐟 ${item.fish_type} • ` : ''}
+                        📅 ${dateStr} à ${timeStr} • 👤 ${userName}
+                    </div>
+                </div>
+                <div class="frozen-item-qty">
+                    <div class="frozen-item-qty-value">${item.quantity}</div>
+                    <div class="frozen-item-qty-label">pièces</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function openFrozenModal() {
+    const modal = document.getElementById('frozen-modal');
+    const form = document.getElementById('frozen-form');
+    const sushiSelect = document.getElementById('frozen-sushi-type');
+    const datetimeInput = document.getElementById('frozen-datetime');
+    const qtyInput = document.getElementById('frozen-quantity');
+
+    // Reset form
+    form.reset();
+    qtyInput.value = 1;
+    document.getElementById('fish-type-group').style.display = 'none';
+
+    // Remplir le select des sushis
+    sushiSelect.innerHTML = '<option value="">Sélectionner...</option>';
+    AppState.sushiTypes.forEach(sushi => {
+        const categoryLabels = { frit: 'Frit', vegi: 'Végi', duo: 'Duo', noel: 'Noël' };
+        sushiSelect.innerHTML += `<option value="${sushi.id}">${sushi.name} (${categoryLabels[sushi.category]})</option>`;
+    });
+
+    // Pré-remplir date/heure avec maintenant
+    const now = new Date();
+    const localDatetime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    datetimeInput.value = localDatetime;
+
+    modal.classList.add('active');
+}
+
+function handleSushiTypeChange() {
+    const sushiId = document.getElementById('frozen-sushi-type').value;
+    const fishGroup = document.getElementById('fish-type-group');
+    const fishSelect = document.getElementById('frozen-fish-type');
+
+    const sushiType = AppState.sushiTypes.find(s => s.id === sushiId);
+
+    if (sushiType && sushiType.requires_fish_selection && sushiType.available_fish) {
+        fishSelect.innerHTML = '<option value="">Sélectionner...</option>';
+        sushiType.available_fish.forEach(fish => {
+            fishSelect.innerHTML += `<option value="${fish}">${fish}</option>`;
+        });
+        fishGroup.style.display = 'block';
+        fishSelect.required = true;
+    } else {
+        fishGroup.style.display = 'none';
+        fishSelect.required = false;
+        fishSelect.value = '';
+    }
+}
+
+function adjustFrozenQty(delta) {
+    const input = document.getElementById('frozen-quantity');
+    let value = parseInt(input.value) || 1;
+    value = Math.max(1, value + delta);
+    input.value = value;
+}
+
+async function handleFrozenSubmit(e) {
+    e.preventDefault();
+
+    const sushiTypeId = document.getElementById('frozen-sushi-type').value;
+    const fishType = document.getElementById('frozen-fish-type').value || null;
+    const quantity = parseInt(document.getElementById('frozen-quantity').value) || 1;
+    const datetime = document.getElementById('frozen-datetime').value;
+
+    if (!sushiTypeId) {
+        alert('❌ Veuillez sélectionner un sushi');
+        return;
+    }
+
+    const sushiType = AppState.sushiTypes.find(s => s.id === sushiTypeId);
+    if (sushiType?.requires_fish_selection && !fishType) {
+        alert('❌ Veuillez sélectionner un type de poisson');
+        return;
+    }
+
+    const frozenData = {
+        sushi_type_id: sushiTypeId,
+        fish_type: fishType,
+        quantity: quantity,
+        frozen_at: datetime ? new Date(datetime).toISOString() : new Date().toISOString(),
+        user_id: db.currentUser?.id
+    };
+
+    showLoading(true);
+    const result = await db.createFrozenSushi(frozenData);
+    showLoading(false);
+
+    if (result.success) {
+        closeModal('frozen-modal');
+        await loadFrozenSushi();
+        renderFrozenList();
+    } else {
+        alert('❌ Erreur: ' + result.error);
+    }
+}
+
+function exportFrozenList() {
+    const monthFilter = document.getElementById('frozen-filter-month').value;
+    const yearFilter = document.getElementById('frozen-filter-year').value;
+
+    // Filtrer les données
+    let filtered = [...AppState.frozenSushi];
+
+    if (monthFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
+        });
+    }
+
+    if (yearFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getFullYear()) === yearFilter;
+        });
+    }
+
+    if (filtered.length === 0) {
+        alert('ℹ️ Aucune donnée à exporter');
+        return;
+    }
+
+    // Générer le texte d'export
+    const monthNames = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    const periodLabel = monthFilter ? `${monthNames[parseInt(monthFilter)]} ${yearFilter || ''}` : (yearFilter || 'Tout');
+
+    let exportText = `🧊 HISTORIQUE CONGÉLATION - Green Sushi\n`;
+    exportText += `📅 Période: ${periodLabel}\n`;
+    exportText += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    filtered.forEach(item => {
+        const sushiType = item.sushi_type || {};
+        const date = new Date(item.frozen_at);
+        const dateStr = date.toLocaleDateString('fr-FR');
+        const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+        exportText += `• ${sushiType.name || 'Sushi'}`;
+        if (item.fish_type) exportText += ` (${item.fish_type})`;
+        exportText += `\n  Qté: ${item.quantity} | ${dateStr} ${timeStr}\n\n`;
+    });
+
+    exportText += `━━━━━━━━━━━━━━━━━━━━\n`;
+    exportText += `📊 Total: ${filtered.length} entrée(s)`;
+
+    // Envoyer par email
+    const emailRecipient = 'greensushi.mq@gmail.com';
+    const subject = encodeURIComponent(`🧊 Historique Congélation - ${periodLabel}`);
+    const body = encodeURIComponent(exportText);
+    const mailtoUrl = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
+
+    window.location.href = mailtoUrl;
+}
 
 // ====================
 // FONCTIONS GLOBALES (appelées depuis HTML onclick)

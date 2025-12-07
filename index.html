@@ -1080,6 +1080,122 @@
                 grid-template-columns: repeat(3, 1fr);
             }
         }
+
+        /* === CONGÉLATION === */
+        .frozen-filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .frozen-filters .form-select {
+            flex: 1;
+        }
+
+        .frozen-item {
+            background: white;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+            border-left: 4px solid #ccc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .frozen-item.category-frit { border-left-color: #e67e22; }
+        .frozen-item.category-vegi { border-left-color: #1abc9c; }
+        .frozen-item.category-duo { border-left-color: #e91e63; }
+        .frozen-item.category-noel { border-left-color: #e74c3c; }
+
+        .frozen-item-info {
+            flex: 1;
+        }
+
+        .frozen-item-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+        }
+
+        .frozen-item-details {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .frozen-item-qty {
+            text-align: right;
+        }
+
+        .frozen-item-qty-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #088F8F;
+        }
+
+        .frozen-item-qty-label {
+            font-size: 0.75rem;
+            color: #888;
+        }
+
+        .frozen-category-badge {
+            display: inline-block;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+        }
+
+        .frozen-category-badge.frit { background: #e67e22; }
+        .frozen-category-badge.vegi { background: #1abc9c; }
+        .frozen-category-badge.duo { background: #e91e63; }
+        .frozen-category-badge.noel { background: #e74c3c; }
+
+        .quantity-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .quantity-input {
+            width: 80px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .frozen-card {
+            background: white;
+            border-radius: 16px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 3px solid #06b6d4;
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .frozen-card:active {
+            transform: scale(0.98);
+        }
+
+        .frozen-card-icon {
+            font-size: 3rem;
+            margin-bottom: 8px;
+        }
+
+        .frozen-card-label {
+            font-weight: 700;
+            color: #06b6d4;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -1173,6 +1289,40 @@
                 <button class="btn btn-small" id="send-alerts-btn">📤 Envoyer</button>
             </div>
             <div id="alerts-list"></div>
+        </div>
+
+        <!-- PAGE CONGÉLATION -->
+        <div id="frozen-page" class="page">
+            <div class="page-header">
+                <button id="back-to-home-frozen" class="back-button">←</button>
+                <h2 class="page-title">🧊 Congélation</h2>
+                <button class="btn btn-small" id="export-frozen-btn">📤</button>
+            </div>
+
+            <!-- Filtres -->
+            <div class="frozen-filters">
+                <select class="form-select" id="frozen-filter-month">
+                    <option value="">Tous les mois</option>
+                    <option value="01">Janvier</option>
+                    <option value="02">Février</option>
+                    <option value="03">Mars</option>
+                    <option value="04">Avril</option>
+                    <option value="05">Mai</option>
+                    <option value="06">Juin</option>
+                    <option value="07">Juillet</option>
+                    <option value="08">Août</option>
+                    <option value="09">Septembre</option>
+                    <option value="10">Octobre</option>
+                    <option value="11">Novembre</option>
+                    <option value="12">Décembre</option>
+                </select>
+                <select class="form-select" id="frozen-filter-year">
+                    <!-- Sera rempli dynamiquement -->
+                </select>
+            </div>
+
+            <div id="frozen-list"></div>
+            <button class="fab" id="add-frozen-btn">+</button>
         </div>
 
         <!-- PAGE DES FOURNISSEURS -->
@@ -1459,6 +1609,46 @@
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary close-modal" data-modal="user-modal">Annuler</button>
                     <button type="submit" class="btn">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL CONGÉLATION -->
+    <div class="modal" id="frozen-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">🧊 Nouvelle Congélation</h3>
+                <button class="close-modal" data-modal="frozen-modal">×</button>
+            </div>
+            <form id="frozen-form">
+                <div class="form-group">
+                    <label class="form-label">Nom du sushi *</label>
+                    <select class="form-select" id="frozen-sushi-type" required>
+                        <option value="">Sélectionner...</option>
+                    </select>
+                </div>
+                <div class="form-group" id="fish-type-group" style="display: none;">
+                    <label class="form-label">Type de poisson *</label>
+                    <select class="form-select" id="frozen-fish-type">
+                        <option value="">Sélectionner...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Quantité</label>
+                    <div class="quantity-controls">
+                        <button type="button" class="btn-quick-adjust btn-minus" id="frozen-qty-minus">−</button>
+                        <input type="number" class="form-input quantity-input" id="frozen-quantity" value="1" min="1">
+                        <button type="button" class="btn-quick-adjust btn-plus" id="frozen-qty-plus">+</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date et heure</label>
+                    <input type="datetime-local" class="form-input" id="frozen-datetime">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary close-modal" data-modal="frozen-modal">Annuler</button>
+                    <button type="submit" class="btn">✅ Valider</button>
                 </div>
             </form>
         </div>

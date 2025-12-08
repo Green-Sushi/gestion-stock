@@ -1657,7 +1657,6 @@ function closeModal(modalId) {
     AppState.editingProduct = null;
     AppState.editingSupplier = null;
     AppState.editingUser = null;
-    AppState.editingFrozen = null;
 }
 
 // Fermer les modales en cliquant en dehors
@@ -1666,7 +1665,6 @@ document.addEventListener('click', (e) => {
         e.target.classList.remove('active');
         AppState.editingProduct = null;
         AppState.editingSupplier = null;
-        AppState.editingFrozen = null;
     }
 });
 
@@ -1730,9 +1728,7 @@ function renderFrozenList() {
         return;
     }
 
-    container.innerHTML = '';
-
-    filtered.forEach(item => {
+    container.innerHTML = filtered.map(item => {
         const sushiType = item.sushi_type || {};
         const category = sushiType.category || 'frit';
         const categoryLabels = { frit: 'Frit', vegi: 'Végi', duo: 'Duo', noel: 'Noël' };
@@ -1741,40 +1737,29 @@ function renderFrozenList() {
         const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
         const userName = item.user?.name || 'Inconnu';
 
-        const itemElement = document.createElement('div');
-        itemElement.className = `frozen-item category-${category}`;
-        itemElement.style.cursor = 'pointer';
-        itemElement.innerHTML = `
-            <div class="frozen-item-info">
-                <div class="frozen-item-name">
-                    ${sushiType.name || 'Sushi'}
-                    <span class="frozen-category-badge ${category}">${categoryLabels[category]}</span>
+        return `
+            <div class="frozen-item category-${category}">
+                <div class="frozen-item-info">
+                    <div class="frozen-item-name">
+                        ${sushiType.name || 'Sushi'}
+                        <span class="frozen-category-badge ${category}">${categoryLabels[category]}</span>
+                    </div>
+                    <div class="frozen-item-details">
+                        ${item.fish_type ? `🐟 ${item.fish_type} • ` : ''}
+                        📅 ${dateStr} à ${timeStr} • 👤 ${userName}
+                    </div>
                 </div>
-                <div class="frozen-item-details">
-                    ${item.fish_type ? `🐟 ${item.fish_type} • ` : ''}
-                    📅 ${dateStr} à ${timeStr} • 👤 ${userName}
+                <div class="frozen-item-qty">
+                    <div class="frozen-item-qty-value">${item.quantity}</div>
+                    <div class="frozen-item-qty-label">pièces</div>
                 </div>
-            </div>
-            <div class="frozen-item-qty">
-                <div class="frozen-item-qty-value">${item.quantity}</div>
-                <div class="frozen-item-qty-label">pièces</div>
             </div>
         `;
-
-        // Clic sur l'item pour éditer
-        itemElement.addEventListener('click', () => {
-            openFrozenModal(item);
-        });
-
-        container.appendChild(itemElement);
-    });
+    }).join('');
 }
 
-function openFrozenModal(frozenItem = null) {
-    AppState.editingFrozen = frozenItem;
-
+function openFrozenModal() {
     const modal = document.getElementById('frozen-modal');
-    const title = document.getElementById('frozen-modal-title');
     const form = document.getElementById('frozen-form');
     const sushiSelect = document.getElementById('frozen-sushi-type');
     const datetimeInput = document.getElementById('frozen-datetime');
@@ -1782,6 +1767,7 @@ function openFrozenModal(frozenItem = null) {
 
     // Reset form
     form.reset();
+    qtyInput.value = 1;
     document.getElementById('fish-type-group').style.display = 'none';
 
     // Remplir le select des sushis
@@ -1791,27 +1777,10 @@ function openFrozenModal(frozenItem = null) {
         sushiSelect.innerHTML += `<option value="${sushi.id}">${sushi.name} (${categoryLabels[sushi.category]})</option>`;
     });
 
-    if (frozenItem) {
-        // Mode édition
-        title.textContent = '🧊 Modifier la congélation';
-        sushiSelect.value = frozenItem.sushi_type_id;
-        handleSushiTypeChange(); // Afficher le select poisson si nécessaire
-        document.getElementById('frozen-fish-type').value = frozenItem.fish_type || '';
-        qtyInput.value = frozenItem.quantity;
-
-        const date = new Date(frozenItem.frozen_at);
-        const localDatetime = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-        datetimeInput.value = localDatetime;
-    } else {
-        // Mode création
-        title.textContent = '🧊 Nouvelle congélation';
-        qtyInput.value = 1;
-
-        // Pré-remplir date/heure avec maintenant
-        const now = new Date();
-        const localDatetime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-        datetimeInput.value = localDatetime;
-    }
+    // Pré-remplir date/heure avec maintenant
+    const now = new Date();
+    const localDatetime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    datetimeInput.value = localDatetime;
 
     modal.classList.add('active');
 }
@@ -1867,25 +1836,12 @@ async function handleFrozenSubmit(e) {
         sushi_type_id: sushiTypeId,
         fish_type: fishType,
         quantity: quantity,
-        frozen_at: datetime ? new Date(datetime).toISOString() : new Date().toISOString()
+        frozen_at: datetime ? new Date(datetime).toISOString() : new Date().toISOString(),
+        user_id: db.currentUser?.id
     };
 
-    // Ajouter user_id seulement en création
-    if (!AppState.editingFrozen) {
-        frozenData.user_id = db.currentUser?.id;
-    }
-
     showLoading(true);
-
-    let result;
-    if (AppState.editingFrozen) {
-        // Mise à jour
-        result = await db.updateFrozenSushi(AppState.editingFrozen.id, frozenData);
-    } else {
-        // Création
-        result = await db.createFrozenSushi(frozenData);
-    }
-
+    const result = await db.createFrozenSushi(frozenData);
     showLoading(false);
 
     if (result.success) {

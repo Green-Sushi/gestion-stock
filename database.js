@@ -710,41 +710,6 @@ class DatabaseManager {
         }
     }
 
-    async updateFrozenSushi(id, data) {
-        try {
-            const updateData = {
-                sushi_type_id: data.sushi_type_id,
-                fish_type: data.fish_type || null,
-                quantity: data.quantity,
-                frozen_at: data.frozen_at,
-                updated_at: new Date().toISOString(),
-                updated_by: this.currentUser?.id
-            };
-
-            const { data: result, error } = await this.supabase
-                .from('frozen_sushi')
-                .update(updateData)
-                .eq('id', id)
-                .select(`
-                    id,
-                    sushi_type_id,
-                    fish_type,
-                    quantity,
-                    frozen_at,
-                    expiry_date,
-                    sushi_type:sushi_types(id, name, category, requires_fish_selection, available_fish),
-                    user:users(id, name)
-                `)
-                .single();
-
-            if (error) throw error;
-            return { success: true, data: result };
-        } catch (error) {
-            console.error('Erreur mise à jour sushi congelé:', error);
-            return { success: false, error: error.message };
-        }
-    }
-
     async deleteFrozenSushi(id) {
         try {
             const { error } = await this.supabase

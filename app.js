@@ -1873,10 +1873,6 @@ async function handleFrozenSubmit(e) {
     // Ajouter user_id seulement en création
     if (!AppState.editingFrozen) {
         frozenData.user_id = db.currentUser?.id;
-    } else {
-        // En édition, ajouter les champs de traçabilité
-        frozenData.updated_at = new Date().toISOString();
-        frozenData.updated_by = db.currentUser?.id;
     }
 
     showLoading(true);

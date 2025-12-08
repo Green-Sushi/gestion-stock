@@ -647,7 +647,6 @@ class DatabaseManager {
                     quantity,
                     frozen_at,
                     expiry_date,
-                    updated_at,
                     sushi_type:sushi_types(id, name, category, requires_fish_selection, available_fish),
                     user:users(id, name)
                 `)
@@ -721,28 +720,19 @@ class DatabaseManager {
                 frozen_at: data.frozen_at
             };
 
-            // Ajouter les champs de traçabilité si fournis
-            if (data.updated_at) {
-                updateData.updated_at = data.updated_at;
-            }
-            if (data.updated_by) {
-                updateData.updated_by = data.updated_by;
-            }
-
             const { data: result, error } = await this.supabase
                 .from('frozen_sushi')
                 .update(updateData)
                 .eq('id', id)
                 .select(`
                     id,
+                    sushi_type_id,
                     fish_type,
                     quantity,
                     frozen_at,
                     expiry_date,
-                    updated_at,
-                    sushi_type:sushi_types(id, name, category),
-                    user:users(id, name),
-                    updated_by_user:users!frozen_sushi_updated_by_fkey(id, name)
+                    sushi_type:sushi_types(id, name, category, requires_fish_selection, available_fish),
+                    user:users(id, name)
                 `)
                 .single();
 

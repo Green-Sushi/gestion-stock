@@ -642,11 +642,13 @@ class DatabaseManager {
                 .from('frozen_sushi')
                 .select(`
                     id,
+                    sushi_type_id,
                     fish_type,
                     quantity,
                     frozen_at,
                     expiry_date,
-                    sushi_type:sushi_types(id, name, category),
+                    updated_at,
+                    sushi_type:sushi_types(id, name, category, requires_fish_selection, available_fish),
                     user:users(id, name)
                 `)
                 .order('frozen_at', { ascending: false });
@@ -706,6 +708,48 @@ class DatabaseManager {
             return { success: true, data: result };
         } catch (error) {
             console.error('Erreur création sushi congelé:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async updateFrozenSushi(id, data) {
+        try {
+            const updateData = {
+                sushi_type_id: data.sushi_type_id,
+                fish_type: data.fish_type || null,
+                quantity: data.quantity,
+                frozen_at: data.frozen_at
+            };
+
+            // Ajouter les champs de traçabilité si fournis
+            if (data.updated_at) {
+                updateData.updated_at = data.updated_at;
+            }
+            if (data.updated_by) {
+                updateData.updated_by = data.updated_by;
+            }
+
+            const { data: result, error } = await this.supabase
+                .from('frozen_sushi')
+                .update(updateData)
+                .eq('id', id)
+                .select(`
+                    id,
+                    fish_type,
+                    quantity,
+                    frozen_at,
+                    expiry_date,
+                    updated_at,
+                    sushi_type:sushi_types(id, name, category),
+                    user:users(id, name),
+                    updated_by_user:users!frozen_sushi_updated_by_fkey(id, name)
+                `)
+                .single();
+
+            if (error) throw error;
+            return { success: true, data: result };
+        } catch (error) {
+            console.error('Erreur mise à jour sushi congelé:', error);
             return { success: false, error: error.message };
         }
     }

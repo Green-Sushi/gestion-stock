@@ -1,5 +1,9 @@
 // Application principale de gestion de stock Green Sushi
 
+// Timestamp de démarrage pour le splash screen
+const SPLASH_START_TIME = Date.now();
+const SPLASH_MIN_DURATION = 3000; // 3 secondes
+
 // État global de l'application
 const AppState = {
     currentUser: null,
@@ -12,7 +16,11 @@ const AppState = {
     editingProduct: null,
     editingSupplier: null,
     editingUser: null,
-    pinCode: ''
+    pinCode: '',
+    pendingSendConfirmation: false,
+    sushiTypes: [],
+    frozenSushi: [],
+    editingFrozen: null
 };
 
 // ====================
@@ -27,6 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!initialized) {
         alert('⚠️ Configuration Supabase manquante. Veuillez configurer SUPABASE_CONFIG dans config.js');
+        hideSplashScreen();
         return;
     }
 
@@ -37,13 +46,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             AppState.currentUser = JSON.parse(storedUser);
             await initializeApp();
+            hideSplashScreen();
         } catch (e) {
             // Session invalide, afficher login
             showPage('login-page');
             setupLoginPage();
+            hideSplashScreen();
         }
     } else {
         setupLoginPage();
+        hideSplashScreen();
     }
 
     // Setup des event listeners globaux
@@ -57,10 +69,14 @@ async function initializeApp() {
     await loadSuppliers();
     await loadProducts();
     await loadUsers();
+    await loadSushiTypes();
     await updateAlertCount();
 
     // Appliquer les permissions selon le rôle
     applyPermissions();
+
+    // Afficher l'emoji du rôle
+    updateRoleIcon();
 
     // Afficher la page d'accueil
     showPage('home-page');
@@ -77,8 +93,8 @@ function applyPermissions() {
     const patronOnlyElements = [
         'add-product-btn',          // Bouton ajouter produit
         'add-supplier-btn',         // Bouton ajouter fournisseur
-        'manage-users-btn',         // Bouton gérer utilisateurs
-        'send-alerts-btn'           // Bouton envoyer alertes
+        'manage-users-btn'          // Bouton gérer utilisateurs
+        // 'send-alerts-btn' supprimé - accessible à tous
     ];
 
     // Onglets réservés au patron
@@ -99,12 +115,22 @@ function applyPermissions() {
     patronOnlyTabs.forEach(pageId => {
         const tab = document.querySelector(`.tab[data-page="${pageId}"]`);
         if (tab) {
-            tab.style.display = isPatron ? 'flex' : 'none';
+            tab.style.display = isPatron ? '' : 'none';
         }
     });
 
     // Si employé, empêcher le clic sur les produits pour éditer (seulement +/-)
     // Cette logique est déjà gérée dans renderProducts car on a séparé les événements
+}
+
+// Afficher l'emoji du rôle dans le header
+function updateRoleIcon() {
+    const roleIcon = document.getElementById('role-icon');
+    if (!roleIcon) return;
+
+    const isPatron = db.isPatron();
+    roleIcon.textContent = isPatron ? '🔑' : '👤';
+    roleIcon.title = isPatron ? 'Patron' : 'Salarié';
 }
 
 // ====================
@@ -140,6 +166,10 @@ function showPage(pageId) {
         header.style.display = 'flex';
         nav.style.display = 'flex';
     }
+
+    if (pageId === 'frozen-page') {
+        loadFrozenSushi().then(() => renderFrozenList());
+    }
 }
 
 function updateActiveTab(pageId) {
@@ -162,48 +192,31 @@ function showLoading(show) {
     }
 }
 
+function hideSplashScreen() {
+    const splashScreen = document.getElementById('splash-screen');
+    if (!splashScreen) return;
+
+    // Calculer le temps écoulé depuis le début
+    const elapsed = Date.now() - SPLASH_START_TIME;
+    const remainingTime = Math.max(0, SPLASH_MIN_DURATION - elapsed);
+
+    // Attendre le temps restant avant de cacher le splash screen
+    setTimeout(() => {
+        splashScreen.classList.add('hidden');
+        // Retirer complètement après l'animation
+        setTimeout(() => {
+            splashScreen.remove();
+        }, 500);
+    }, remainingTime);
+}
+
 // ====================
 // AUTHENTIFICATION
 // ====================
 
 function setupLoginPage() {
-    const pinKeys = document.querySelectorAll('.pin-key');
-    const loginError = document.getElementById('login-error');
-
-    pinKeys.forEach(key => {
-        key.addEventListener('click', async () => {
-            const keyValue = key.dataset.key;
-
-            if (keyValue === 'delete') {
-                AppState.pinCode = '';
-                updatePinDisplay();
-                loginError.textContent = '';
-            } else {
-                if (AppState.pinCode.length < 6) {
-                    AppState.pinCode += keyValue;
-                    updatePinDisplay();
-
-                    if (AppState.pinCode.length === 6) {
-                        // Tenter la connexion
-                        showLoading(true);
-                        const result = await db.authenticateWithPin(AppState.pinCode);
-                        showLoading(false);
-
-                        if (result.success) {
-                            AppState.currentUser = result.user;
-                            AppState.pinCode = '';
-                            updatePinDisplay();
-                            await initializeApp();
-                        } else {
-                            loginError.textContent = '❌ Code PIN invalide';
-                            AppState.pinCode = '';
-                            updatePinDisplay();
-                        }
-                    }
-                }
-            }
-        });
-    });
+    // Cette fonction ne fait plus rien car les listeners sont attachés globalement
+    // Elle est conservée pour compatibilité
 }
 
 function updatePinDisplay() {
@@ -220,12 +233,25 @@ function updatePinDisplay() {
 }
 
 function logout() {
-    if (confirm('Voulez-vous vraiment vous déconnecter ?')) {
-        db.logout();
-        AppState.currentUser = null;
-        AppState.pinCode = '';
-        showPage('login-page');
-    }
+    // Ouvrir la modale de confirmation
+    const modal = document.getElementById('logout-modal');
+    modal.classList.add('active');
+}
+
+function confirmLogout() {
+    db.logout();
+    AppState.currentUser = null;
+    AppState.pinCode = '';
+
+    // Réinitialiser l'affichage de la page de login
+    updatePinDisplay();
+    const loginError = document.getElementById('login-error');
+    if (loginError) loginError.textContent = '';
+
+    // Fermer la modale
+    closeModal('logout-modal');
+
+    showPage('login-page');
 }
 
 // ====================
@@ -268,6 +294,45 @@ function setupGlobalListeners() {
 
     // Logout
     document.getElementById('logout-btn')?.addEventListener('click', logout);
+    document.getElementById('confirm-logout-btn')?.addEventListener('click', confirmLogout);
+
+    // Clavier PIN (event delegation au niveau document pour fonctionner toujours)
+    document.addEventListener('click', async (e) => {
+        const key = e.target.closest('.pin-key');
+        if (!key) return;
+
+        const keyValue = key.dataset.key;
+        const loginError = document.getElementById('login-error');
+
+        if (keyValue === 'delete') {
+            AppState.pinCode = '';
+            updatePinDisplay();
+            if (loginError) loginError.textContent = '';
+        } else {
+            if (AppState.pinCode.length < 6) {
+                AppState.pinCode += keyValue;
+                updatePinDisplay();
+
+                if (AppState.pinCode.length === 6) {
+                    // Tenter la connexion
+                    showLoading(true);
+                    const result = await db.authenticateWithPin(AppState.pinCode);
+                    showLoading(false);
+
+                    if (result.success) {
+                        AppState.currentUser = result.user;
+                        AppState.pinCode = '';
+                        updatePinDisplay();
+                        await initializeApp();
+                    } else {
+                        if (loginError) loginError.textContent = '❌ Code PIN invalide';
+                        AppState.pinCode = '';
+                        updatePinDisplay();
+                    }
+                }
+            }
+        }
+    });
 
     // Boutons d'ajout
     document.getElementById('add-product-btn').addEventListener('click', () => {
@@ -294,26 +359,62 @@ function setupGlobalListeners() {
 
     // Envoi d'alertes
     document.getElementById('send-alerts-btn').addEventListener('click', sendAlerts);
+    document.getElementById('send-whatsapp-btn').addEventListener('click', sendViaWhatsApp);
+    document.getElementById('send-email-btn').addEventListener('click', sendViaEmail);
 
-    // Toggles paramètres
+    // Toggles paramètres (juste toggle visuel, pas de sauvegarde auto)
     document.getElementById('email-toggle').addEventListener('click', function() {
         this.classList.toggle('active');
-        saveSettings();
     });
 
     document.getElementById('whatsapp-toggle').addEventListener('click', function() {
         this.classList.toggle('active');
-        saveSettings();
     });
 
-    // Inputs paramètres
-    document.getElementById('email-input').addEventListener('change', saveSettings);
-    document.getElementById('whatsapp-input').addEventListener('change', saveSettings);
+    // Bouton sauvegarder paramètres
+    document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
 
     // Gestion des utilisateurs
     document.getElementById('manage-users-btn').addEventListener('click', openUsersManagement);
     document.getElementById('add-user-btn').addEventListener('click', () => openUserModal());
     document.getElementById('user-form').addEventListener('submit', handleUserSubmit);
+
+    // Historique des messages
+    document.getElementById('view-history-btn').addEventListener('click', openMessageHistory);
+
+    // Confirmation d'envoi
+    document.getElementById('send-confirmed-btn').addEventListener('click', handleSendConfirmed);
+    document.getElementById('send-not-confirmed-btn').addEventListener('click', handleSendNotConfirmed);
+
+    // Détecter le retour sur l'application après envoi
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && AppState.pendingSendConfirmation) {
+            // L'utilisateur revient sur l'application
+            setTimeout(() => {
+                // S'assurer que la page est scrollée en haut
+                window.scrollTo(0, 0);
+
+                // Ouvrir la modale de confirmation
+                const modal = document.getElementById('send-confirmation-modal');
+                modal.classList.add('active');
+            }, 300); // Délai réduit pour meilleure réactivité
+        }
+    });
+
+    // Congélation
+    document.getElementById('back-to-home-frozen').addEventListener('click', () => {
+        showPage('home-page');
+        updateActiveTab('home-page');
+    });
+
+    document.getElementById('add-frozen-btn').addEventListener('click', openFrozenModal);
+    document.getElementById('frozen-form').addEventListener('submit', handleFrozenSubmit);
+    document.getElementById('frozen-sushi-type').addEventListener('change', handleSushiTypeChange);
+    document.getElementById('frozen-qty-minus').addEventListener('click', () => adjustFrozenQty(-1));
+    document.getElementById('frozen-qty-plus').addEventListener('click', () => adjustFrozenQty(1));
+    document.getElementById('export-frozen-btn').addEventListener('click', exportFrozenList);
+    document.getElementById('frozen-filter-month').addEventListener('change', renderFrozenList);
+    document.getElementById('frozen-filter-year').addEventListener('change', renderFrozenList);
 }
 
 // ====================
@@ -324,17 +425,33 @@ function renderCategories() {
     const container = document.getElementById('categories-container');
     container.innerHTML = '';
 
+    // Mapping des catégories vers les noms de fichiers images
+    const categoryImages = {
+        'frais': 'frais.png',
+        'sec': 'sec.png',
+        'surgele': 'surgelé.png',
+        'consommables': 'consommables.png',
+        'boissons': 'boissons.png',
+        'legumes': 'legumes.png'
+    };
+
     CATEGORIES.forEach(category => {
         // Compter les produits de cette catégorie
-        const count = AppState.products.filter(p => p.category === category.id).length;
+        const categoryProducts = AppState.products.filter(p => p.category === category.id);
+        const count = categoryProducts.length;
+
+        // Compter les produits en alerte
+        const alertCount = categoryProducts.filter(p => p.quantity <= p.alert_threshold).length;
 
         const card = document.createElement('div');
         card.className = 'category-card';
         card.dataset.category = category.id;
         card.innerHTML = `
-            <div class="category-icon">${category.icon}</div>
-            <div class="category-name">${category.name}</div>
-            <div class="category-count">${count} produit${count > 1 ? 's' : ''}</div>
+            <img src="./images/categories/${categoryImages[category.id]}" alt="${category.name}" class="category-image">
+            <div class="category-badges">
+                <div class="category-badge total" title="${count} produit${count > 1 ? 's' : ''}">${count}</div>
+                ${alertCount > 0 ? `<div class="category-badge alerts" title="${alertCount} en alerte">${alertCount}</div>` : ''}
+            </div>
         `;
 
         card.addEventListener('click', () => {
@@ -344,6 +461,18 @@ function renderCategories() {
 
         container.appendChild(card);
     });
+
+    // Carte Congélation
+    const frozenCard = document.createElement('div');
+    frozenCard.className = 'frozen-card';
+    frozenCard.innerHTML = `
+        <div class="frozen-card-icon">🧊</div>
+        <div class="frozen-card-label">Congélation</div>
+    `;
+    frozenCard.addEventListener('click', () => {
+        showPage('frozen-page');
+    });
+    container.appendChild(frozenCard);
 }
 
 function showCategoryProducts(category) {
@@ -355,6 +484,27 @@ function showCategoryProducts(category) {
 // ====================
 // PRODUITS
 // ====================
+
+// Calculer le niveau de stock (système 4 niveaux)
+function calculateStockLevel(quantity, alertThreshold, optimalStock) {
+    let stockLevel = 'stock-ok';
+    let isLowStock = false;
+
+    if (quantity <= alertThreshold) {
+        // ROUGE: stock critique (≤ seuil d'alerte)
+        stockLevel = 'stock-critical';
+        isLowStock = true;
+    } else if (quantity <= alertThreshold * 2) {
+        // ORANGE: stock en limite (≤ seuil × 2)
+        stockLevel = 'stock-warning';
+    } else if (optimalStock && quantity <= optimalStock * 0.5) {
+        // JAUNE: stock attention (≤ optimal × 0.5)
+        stockLevel = 'stock-attention';
+    }
+    // Sinon VERT: stock ok
+
+    return { stockLevel, isLowStock };
+}
 
 async function loadProducts() {
     const result = await db.getProducts();
@@ -397,25 +547,42 @@ function renderProducts(searchTerm = '') {
     }
 
     products.forEach(product => {
-        const isLowStock = product.quantity <= product.alert_threshold;
+        // Déterminer le niveau de stock avec le système 4 niveaux
+        const { stockLevel, isLowStock } = calculateStockLevel(
+            product.quantity,
+            product.alert_threshold,
+            product.optimal_stock
+        );
+
         const supplierName = product.supplier ? product.supplier.name : 'Sans fournisseur';
 
         const item = document.createElement('div');
-        item.className = 'product-item';
+        item.className = isLowStock ? 'product-item low-stock-alert' : 'product-item';
+
+        // Boutons d'action visibles uniquement pour le Patron
+        const actionButtons = db.isPatron() ?
+            `<div class="product-actions">
+                <button class="btn-move-up" data-product-id="${product.id}" title="Déplacer vers le haut">↑</button>
+                <button class="btn-move-down" data-product-id="${product.id}" title="Déplacer vers le bas">↓</button>
+                <button class="btn-edit-product" data-product-id="${product.id}" title="Modifier ce produit">✏️</button>
+                <button class="btn-delete-product" data-product-id="${product.id}" title="Supprimer ce produit">🗑️</button>
+            </div>` : '';
+
         item.innerHTML = `
+            ${actionButtons}
             <div class="product-info" data-product-id="${product.id}">
                 <div class="product-name">${product.name}</div>
-                <div class="product-supplier">📦 ${supplierName}</div>
+                <div class="product-supplier">${supplierName}</div>
             </div>
-            <div class="product-right">
-                <div class="product-controls-quick">
-                    <button class="btn-quick-adjust btn-minus" data-product-id="${product.id}" title="Diminuer">−</button>
-                    <div class="product-quantity">
-                        <div class="product-qty-value ${isLowStock ? 'low-stock' : ''}" id="qty-${product.id}">${product.quantity}</div>
-                        <div class="product-unit">${product.unit}</div>
-                    </div>
-                    <button class="btn-quick-adjust btn-plus" data-product-id="${product.id}" title="Augmenter">+</button>
+            <div class="product-controls">
+                <button class="btn-quick-adjust btn-minus" data-product-id="${product.id}" title="Retirer 1">−</button>
+                <div class="product-quantity ${stockLevel}">
+                    <div class="product-qty-value" id="qty-${product.id}">${product.quantity}</div>
+                    <div class="product-unit">${product.unit}</div>
                 </div>
+                <button class="btn-quick-adjust btn-plus" data-product-id="${product.id}" title="Ajouter 1">+</button>
+                <span class="btn-spacer"></span>
+                <button class="btn-quick-adjust btn-plus-ten" data-product-id="${product.id}" title="Ajouter 10">+10</button>
             </div>
         `;
 
@@ -444,6 +611,48 @@ function renderProducts(searchTerm = '') {
             adjustProductQuantity(product.id, 1);
         });
 
+        // Bouton +10
+        const btnPlusTen = item.querySelector('.btn-plus-ten');
+        btnPlusTen.addEventListener('click', (e) => {
+            e.stopPropagation();
+            adjustProductQuantity(product.id, 10);
+        });
+
+        // Boutons d'action (Patron uniquement)
+        if (db.isPatron()) {
+            const btnMoveUp = item.querySelector('.btn-move-up');
+            if (btnMoveUp) {
+                btnMoveUp.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    await moveProductUp(product.id);
+                });
+            }
+
+            const btnMoveDown = item.querySelector('.btn-move-down');
+            if (btnMoveDown) {
+                btnMoveDown.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    await moveProductDown(product.id);
+                });
+            }
+
+            const btnEdit = item.querySelector('.btn-edit-product');
+            if (btnEdit) {
+                btnEdit.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openProductModal(product);
+                });
+            }
+
+            const btnDelete = item.querySelector('.btn-delete-product');
+            if (btnDelete) {
+                btnDelete.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteProduct(product.id, product.name);
+                });
+            }
+        }
+
         container.appendChild(item);
     });
 }
@@ -471,18 +680,35 @@ async function adjustProductQuantity(productId, delta) {
     const qtyElement = document.getElementById(`qty-${productId}`);
     if (qtyElement) {
         qtyElement.textContent = newQuantity;
-        // Animation visuelle
-        qtyElement.style.transform = 'scale(1.2)';
-        qtyElement.style.transition = 'transform 0.2s';
+
+        // Animation visuelle renforcée
+        qtyElement.style.transform = 'scale(1.3)';
+        qtyElement.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
         setTimeout(() => {
             qtyElement.style.transform = 'scale(1)';
-        }, 200);
+        }, 300);
 
-        // Mettre à jour la classe low-stock
-        if (newQuantity <= product.alert_threshold) {
-            qtyElement.classList.add('low-stock');
-        } else {
-            qtyElement.classList.remove('low-stock');
+        // Déterminer le nouveau niveau de stock avec le système 4 niveaux
+        const { stockLevel, isLowStock } = calculateStockLevel(
+            newQuantity,
+            product.alert_threshold,
+            product.optimal_stock
+        );
+
+        // Mettre à jour la classe du conteneur de quantité
+        const qtyContainer = qtyElement.closest('.product-quantity');
+        if (qtyContainer) {
+            qtyContainer.className = `product-quantity ${stockLevel}`;
+        }
+
+        // Mettre à jour le fond de la carte produit
+        const productItem = qtyElement.closest('.product-item');
+        if (productItem) {
+            if (isLowStock) {
+                productItem.classList.add('low-stock-alert');
+            } else {
+                productItem.classList.remove('low-stock-alert');
+            }
         }
     }
 
@@ -502,6 +728,76 @@ async function adjustProductQuantity(productId, delta) {
     } else {
         // Mettre à jour le compteur d'alertes
         await updateAlertCount();
+    }
+}
+
+// Déplacer un produit vers le haut (Patron uniquement)
+async function moveProductUp(productId) {
+    if (!db.isPatron()) {
+        alert('⛔ Accès réservé au patron');
+        return;
+    }
+
+    showLoading(true);
+    const result = await db.moveProductUp(productId);
+    showLoading(false);
+
+    if (result.success) {
+        // Recharger les produits
+        await loadProducts();
+        renderProducts();
+    } else if (result.error === 'Déjà en première position') {
+        // Ne rien faire, c'est déjà en haut
+    } else {
+        alert('❌ Erreur lors du déplacement: ' + result.error);
+    }
+}
+
+// Déplacer un produit vers le bas (Patron uniquement)
+async function moveProductDown(productId) {
+    if (!db.isPatron()) {
+        alert('⛔ Accès réservé au patron');
+        return;
+    }
+
+    showLoading(true);
+    const result = await db.moveProductDown(productId);
+    showLoading(false);
+
+    if (result.success) {
+        // Recharger les produits
+        await loadProducts();
+        renderProducts();
+    } else if (result.error === 'Déjà en dernière position') {
+        // Ne rien faire, c'est déjà en bas
+    } else {
+        alert('❌ Erreur lors du déplacement: ' + result.error);
+    }
+}
+
+// Supprimer un produit (Patron uniquement)
+async function deleteProduct(productId, productName) {
+    if (!db.isPatron()) {
+        alert('⛔ Accès réservé au patron');
+        return;
+    }
+
+    if (!confirm(`⚠️ Êtes-vous sûr de vouloir supprimer "${productName}" ?\n\nCette action est irréversible.`)) {
+        return;
+    }
+
+    showLoading(true);
+    const result = await db.deleteProduct(productId);
+    showLoading(false);
+
+    if (result.success) {
+        // Recharger les produits et mettre à jour l'affichage
+        await loadProducts();
+        renderProducts();
+        await updateAlertCount();
+        renderCategories();
+    } else {
+        alert('❌ Erreur lors de la suppression : ' + result.error);
     }
 }
 
@@ -534,6 +830,7 @@ function openProductModal(product = null) {
         document.getElementById('product-quantity').value = product.quantity;
         document.getElementById('product-unit').value = product.unit;
         document.getElementById('product-alert').value = product.alert_threshold;
+        document.getElementById('product-optimal').value = product.optimal_stock || '';
         document.getElementById('product-notes').value = product.notes || '';
     } else {
         // Mode création
@@ -557,6 +854,7 @@ async function handleProductSubmit(e) {
         quantity: parseFloat(document.getElementById('product-quantity').value),
         unit: document.getElementById('product-unit').value,
         alert_threshold: parseFloat(document.getElementById('product-alert').value),
+        optimal_stock: document.getElementById('product-optimal').value ? parseFloat(document.getElementById('product-optimal').value) : null,
         notes: document.getElementById('product-notes').value
     };
 
@@ -741,25 +1039,148 @@ function renderAlerts() {
         return;
     }
 
-    AppState.lowStockProducts.forEach(product => {
+    // Couleurs par catégorie
+    const categoryColors = {
+        'frais': '#27ae60',
+        'sec': '#f39c12',
+        'surgele': '#3498db',
+        'consommables': '#9b59b6',
+        'boissons': '#e67e22',
+        'legumes': '#27ae60'
+    };
+
+    // Trier par catégorie puis alphabétique
+    const sortedProducts = [...AppState.lowStockProducts].sort((a, b) => {
+        // D'abord par catégorie
+        const categoryOrder = ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'legumes'];
+        const catIndexA = categoryOrder.indexOf(a.category);
+        const catIndexB = categoryOrder.indexOf(b.category);
+        if (catIndexA !== catIndexB) {
+            return catIndexA - catIndexB;
+        }
+        // Puis alphabétique
+        return a.name.localeCompare(b.name);
+    });
+
+    sortedProducts.forEach(product => {
         const categoryName = CATEGORIES.find(c => c.id === product.category)?.name || product.category;
-        const supplierName = product.supplier ? product.supplier.name : 'Sans fournisseur';
+        const borderColor = categoryColors[product.category] || '#999';
+
+        // Déterminer le niveau de stock avec le système 4 couleurs
+        const { stockLevel } = calculateStockLevel(
+            product.quantity,
+            product.alert_threshold,
+            product.optimal_stock
+        );
+
+        // Mapping des couleurs selon le niveau de stock
+        const stockColors = {
+            'stock-ok': '#27ae60',
+            'stock-attention': '#f39c12',
+            'stock-warning': '#e67e22',
+            'stock-critical': '#e74c3c'
+        };
+        const stockColor = stockColors[stockLevel];
 
         const item = document.createElement('div');
-        item.className = 'list-item';
+        item.className = 'list-item alert-item';
+        item.style.borderLeftColor = borderColor;
         item.innerHTML = `
             <div class="list-item-header">
                 <div class="list-item-title">${product.name}</div>
+                <span class="category-badge-alert" style="background-color: ${borderColor};">${categoryName}</span>
             </div>
-            <div class="list-item-info">📂 ${categoryName}</div>
-            <div class="list-item-info">📦 ${supplierName}</div>
-            <div class="list-item-info" style="color: #e74c3c; font-weight: bold;">
-                Stock: ${product.quantity} ${product.unit} (Seuil: ${product.alert_threshold})
+            <div class="alert-stock-display">
+                <div class="alert-stock-current" style="color: ${stockColor};">
+                    <span class="alert-qty-value">${product.quantity}</span>
+                    <span class="alert-qty-unit">${product.unit}</span>
+                </div>
+                <div class="alert-stock-threshold">
+                    Seuil: ${product.alert_threshold} ${product.unit}
+                </div>
             </div>
         `;
 
         container.appendChild(item);
     });
+}
+
+// Générer le message récapitulatif formaté
+function generateAlertMessage() {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('fr-FR', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    const timeStr = now.toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+
+    // Indicateurs par niveau de stock (paires de substitution UTF-16)
+    const levelIndicators = {
+        'stock-critical': '\uD83D\uDD34', // 🔴
+        'stock-warning': '\uD83D\uDFE0',  // 🟠
+        'stock-attention': '\uD83D\uDFE1', // 🟡
+        'stock-ok': '\uD83D\uDFE2'        // 🟢
+    };
+
+    // Emoji par catégorie (paires de substitution UTF-16)
+    const categoryEmojis = {
+        'frais': '\uD83E\uDDC0',      // 🧀
+        'sec': '\uD83C\uDF3E',         // 🌾
+        'surgele': '\u2744\uFE0F',     // ❄️
+        'consommables': '\uD83E\uDD62', // 🥢
+        'boissons': '\uD83E\uDDC3',    // 🧃
+        'legumes': '\uD83E\uDD6C'      // 🥬
+    };
+
+    let message = '\uD83D\uDEA8 ALERTE STOCK - Green Sushi\n'; // 🚨
+    message += '\uD83D\uDCC5 ' + dateStr + ' \u00E0 ' + timeStr + '\n'; // 📅 à
+    message += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n';
+
+    // Regrouper par catégorie
+    const byCategory = {};
+    AppState.lowStockProducts.forEach(product => {
+        if (!byCategory[product.category]) {
+            byCategory[product.category] = [];
+        }
+        byCategory[product.category].push(product);
+    });
+
+    // Ordre des catégories
+    const categoryOrder = ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'legumes'];
+
+    categoryOrder.forEach(catId => {
+        if (!byCategory[catId] || byCategory[catId].length === 0) return;
+
+        const category = CATEGORIES.find(c => c.id === catId);
+        const catLabel = categoryEmojis[catId] || '[LEGUMES]';
+
+        message += catLabel + ' ' + category.name.toUpperCase() + '\n';
+        message += '\u2500'.repeat(30) + '\n';
+
+        byCategory[catId].forEach(product => {
+            const { stockLevel } = calculateStockLevel(
+                product.quantity,
+                product.alert_threshold,
+                product.optimal_stock
+            );
+            const levelIndicator = levelIndicators[stockLevel] || '[OK]';
+
+            message += levelIndicator + ' ' + product.name + '\n';
+            message += '   Stock: ' + product.quantity + ' ' + product.unit + '\n\n';
+        });
+        message += '\n';
+    });
+
+    // Total
+    message += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
+    message += '\uD83D\uDCCA TOTAL: ' + AppState.lowStockProducts.length + ' produit' + (AppState.lowStockProducts.length > 1 ? 's' : '') + ' en alerte'; // 📊
+
+    return message;
 }
 
 async function sendAlerts() {
@@ -768,6 +1189,18 @@ async function sendAlerts() {
         return;
     }
 
+    // DEBUG: Afficher le message généré dans la console
+    const testMessage = generateAlertMessage();
+    console.log('=== MESSAGE GÉNÉRÉ ===');
+    console.log(testMessage);
+    console.log('=== FIN MESSAGE ===');
+
+    // Ouvrir la modale de choix
+    const modal = document.getElementById('send-choice-modal');
+    modal.classList.add('active');
+}
+
+async function sendViaWhatsApp() {
     // Récupérer les paramètres
     const settings = await db.getSettings();
     if (!settings.success) {
@@ -775,54 +1208,140 @@ async function sendAlerts() {
         return;
     }
 
-    const emailEnabled = settings.data.email_notifications === 'true';
-    const whatsappEnabled = settings.data.whatsapp_notifications === 'true';
-
-    if (!emailEnabled && !whatsappEnabled) {
-        alert('⚠️ Aucun moyen de notification activé. Veuillez configurer les paramètres.');
+    const whatsappNumber = settings.data.whatsapp_number;
+    if (!whatsappNumber) {
+        alert('⚠️ Aucun numéro WhatsApp configuré. Veuillez configurer les paramètres.');
         return;
     }
 
-    // Créer le message
-    let message = '🚨 ALERTE STOCK BAS - Green Sushi\n\n';
-    AppState.lowStockProducts.forEach(product => {
-        const supplierName = product.supplier ? product.supplier.name : 'Sans fournisseur';
-        message += `• ${product.name}\n`;
-        message += `  Stock: ${product.quantity} ${product.unit} (Seuil: ${product.alert_threshold})\n`;
-        message += `  Fournisseur: ${supplierName}\n\n`;
-    });
-
-    // Envoyer par email
-    if (emailEnabled && settings.data.email_recipient) {
-        const emailSent = await sendEmailAlert(settings.data.email_recipient, message);
-        if (emailSent) {
-            alert('✅ Alerte envoyée par email');
-        }
-    }
+    // Générer le message formaté
+    const message = generateAlertMessage();
 
     // Envoyer par WhatsApp
-    if (whatsappEnabled && settings.data.whatsapp_number) {
-        sendWhatsAppAlert(settings.data.whatsapp_number, message);
+    sendWhatsAppAlert(whatsappNumber, message);
+
+    // Fermer la modale
+    closeModal('send-choice-modal');
+
+    // Stocker les informations pour l'historique
+    AppState.pendingSendData = {
+        send_method: 'whatsapp',
+        recipient: whatsappNumber,
+        message_content: message,
+        product_count: AppState.lowStockProducts.length
+    };
+
+    // Marquer qu'un envoi est en attente de confirmation
+    AppState.pendingSendConfirmation = true;
+}
+
+async function sendViaEmail() {
+    // Récupérer les paramètres
+    const settings = await db.getSettings();
+    if (!settings.success) {
+        alert('❌ Erreur de récupération des paramètres');
+        return;
     }
+
+    const emailRecipient = settings.data.email_recipient;
+    if (!emailRecipient) {
+        alert('⚠️ Aucun email configuré. Veuillez configurer les paramètres.');
+        return;
+    }
+
+    // Générer le message formaté
+    const message = generateAlertMessage();
+
+    // Envoyer par email
+    await sendEmailAlert(emailRecipient, message);
+
+    // Fermer la modale
+    closeModal('send-choice-modal');
+
+    // Stocker les informations pour l'historique
+    AppState.pendingSendData = {
+        send_method: 'email',
+        recipient: emailRecipient,
+        message_content: message,
+        product_count: AppState.lowStockProducts.length
+    };
+
+    // Marquer qu'un envoi est en attente de confirmation
+    AppState.pendingSendConfirmation = true;
 }
 
 async function sendEmailAlert(email, message) {
-    // Pour l'envoi d'email, on utiliserait Supabase Edge Functions
-    // Ou un service tiers comme Resend, SendGrid, etc.
-    // Pour l'instant, on affiche juste le message
-    console.log('Email à envoyer à:', email);
-    console.log('Message:', message);
+    // Créer un mailto link avec le message
+    const subject = encodeURIComponent('🚨 Alerte Stock - Green Sushi');
+    const body = encodeURIComponent(message);
+    const mailtoUrl = `mailto:${email}?subject=${subject}&body=${body}`;
 
-    // TODO: Implémenter l'envoi réel d'email via Supabase Edge Function
-    alert(`📧 Email préparé pour ${email}\n\n${message}\n\n⚠️ Fonctionnalité à configurer dans Supabase`);
+    // Ouvrir le client email par défaut
+    window.location.href = mailtoUrl;
+
     return true;
 }
 
 function sendWhatsAppAlert(number, message) {
-    // Ouvrir WhatsApp avec le message pré-rempli
+    // Nettoyer le numéro (enlever espaces et caractères spéciaux sauf +)
+    const cleanNumber = number.replace(/[^\d+]/g, '');
+
+    // Encoder le message (encodeURIComponent standard suffit)
     const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/${number.replace(/\+/g, '')}?text=${encodedMessage}`;
-    window.open(whatsappUrl, '_blank');
+
+    // Construire les URLs pour les différents protocoles
+    const phone = cleanNumber.replace(/\+/g, '');
+    const params = `phone=${phone}&text=${encodedMessage}`;
+
+    // Tenter d'ouvrir avec les protocoles app (WhatsApp Business en premier, puis WhatsApp)
+    const whatsappBusinessUrl = `whatsapp-business://send?${params}`;
+    const whatsappUrl = `whatsapp://send?${params}`;
+
+    // Créer un lien avec le protocole WhatsApp Business en premier
+    const link = document.createElement('a');
+    link.href = whatsappBusinessUrl;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+
+    // Essayer d'ouvrir WhatsApp Business
+    link.click();
+
+    // Après un court délai, essayer WhatsApp standard si WhatsApp Business n'a pas fonctionné
+    setTimeout(() => {
+        link.href = whatsappUrl;
+        link.click();
+        document.body.removeChild(link);
+    }, 100);
+}
+
+async function handleSendConfirmed() {
+    // Sauvegarder dans l'historique
+    if (AppState.pendingSendData) {
+        await db.createMessageHistory(AppState.pendingSendData);
+        AppState.pendingSendData = null;
+    }
+
+    // Fermer la modale
+    closeModal('send-confirmation-modal');
+
+    // Réinitialiser l'état
+    AppState.pendingSendConfirmation = false;
+
+    // Afficher le message de succès
+    alert('✅ Merci ! Le récapitulatif a bien été envoyé.');
+}
+
+function handleSendNotConfirmed() {
+    // Nettoyer les données en attente
+    AppState.pendingSendData = null;
+
+    // Fermer la modale
+    closeModal('send-confirmation-modal');
+
+    // Réinitialiser l'état
+    AppState.pendingSendConfirmation = false;
+
+    // Pas de message, l'utilisateur peut réessayer
 }
 
 // ====================
@@ -862,10 +1381,132 @@ async function saveSettings() {
     const whatsappEnabled = document.getElementById('whatsapp-toggle').classList.contains('active');
     const whatsappNumber = document.getElementById('whatsapp-input').value;
 
+    showLoading(true);
     await db.updateSetting('email_notifications', emailEnabled.toString());
     await db.updateSetting('email_recipient', emailRecipient);
     await db.updateSetting('whatsapp_notifications', whatsappEnabled.toString());
     await db.updateSetting('whatsapp_number', whatsappNumber);
+    showLoading(false);
+
+    alert('✅ Paramètres sauvegardés !');
+}
+
+// ====================
+// HISTORIQUE DES MESSAGES
+// ====================
+
+async function openMessageHistory() {
+    const modal = document.getElementById('message-history-modal');
+    const listContainer = document.getElementById('message-history-list');
+
+    // Afficher la modale
+    modal.classList.add('active');
+
+    // Afficher un loader
+    listContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Chargement...</div>';
+
+    // Charger l'historique
+    const result = await db.getMessageHistory(100);
+
+    if (!result.success || result.data.length === 0) {
+        listContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Aucun message dans l\'historique</div>';
+        return;
+    }
+
+    // Afficher la liste
+    listContainer.innerHTML = result.data.map(message => {
+        const date = new Date(message.sent_at);
+        const dateStr = date.toLocaleDateString('fr-FR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+        const timeStr = date.toLocaleTimeString('fr-FR', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        const methodBadge = message.send_method === 'whatsapp'
+            ? '<span style="background: #25D366; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">WhatsApp</span>'
+            : '<span style="background: #3498db; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">Email</span>';
+
+        return `
+            <div class="history-item" data-message-id="${message.id}" style="
+                padding: 15px;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                margin-bottom: 10px;
+                cursor: pointer;
+                transition: all 0.2s;
+            " onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                    <div>
+                        <div style="font-weight: 600; color: #333; margin-bottom: 4px;">${dateStr} à ${timeStr}</div>
+                        <div style="color: #666; font-size: 0.9rem;">${message.user ? message.user.name : 'Utilisateur inconnu'}</div>
+                    </div>
+                    ${methodBadge}
+                </div>
+                <div style="color: #666; font-size: 0.85rem;">
+                    ${message.product_count} produit${message.product_count > 1 ? 's' : ''} • ${message.recipient}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Ajouter les event listeners
+    document.querySelectorAll('.history-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const messageId = item.getAttribute('data-message-id');
+            openMessageDetail(messageId);
+        });
+    });
+}
+
+async function openMessageDetail(messageId) {
+    const modal = document.getElementById('message-detail-modal');
+    const contentContainer = document.getElementById('message-detail-content');
+    const infoContainer = document.getElementById('message-detail-info');
+
+    // Afficher la modale
+    modal.classList.add('active');
+
+    // Afficher un loader
+    contentContainer.innerHTML = 'Chargement...';
+    infoContainer.innerHTML = '';
+
+    // Charger le message
+    const result = await db.getMessageById(messageId);
+
+    if (!result.success) {
+        contentContainer.innerHTML = 'Erreur de chargement';
+        return;
+    }
+
+    const message = result.data;
+    const date = new Date(message.sent_at);
+    const dateStr = date.toLocaleDateString('fr-FR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    });
+    const timeStr = date.toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+
+    // Afficher le contenu
+    contentContainer.textContent = message.message_content;
+
+    // Afficher les infos
+    const methodLabel = message.send_method === 'whatsapp' ? 'WhatsApp' : 'Email';
+    infoContainer.innerHTML = `
+        <div style="margin-bottom: 8px;"><strong>Date :</strong> ${dateStr} à ${timeStr}</div>
+        <div style="margin-bottom: 8px;"><strong>Envoyé par :</strong> ${message.user ? message.user.name : 'Utilisateur inconnu'}</div>
+        <div style="margin-bottom: 8px;"><strong>Méthode :</strong> ${methodLabel}</div>
+        <div style="margin-bottom: 8px;"><strong>Destinataire :</strong> ${message.recipient}</div>
+        <div><strong>Produits en alerte :</strong> ${message.product_count}</div>
+    `;
 }
 
 // ====================
@@ -1016,6 +1657,7 @@ function closeModal(modalId) {
     AppState.editingProduct = null;
     AppState.editingSupplier = null;
     AppState.editingUser = null;
+    AppState.editingFrozen = null;
 }
 
 // Fermer les modales en cliquant en dehors
@@ -1024,8 +1666,293 @@ document.addEventListener('click', (e) => {
         e.target.classList.remove('active');
         AppState.editingProduct = null;
         AppState.editingSupplier = null;
+        AppState.editingFrozen = null;
     }
 });
+
+// ====================
+// CONGÉLATION
+// ====================
+
+async function loadSushiTypes() {
+    const result = await db.getSushiTypes();
+    if (result.success) {
+        AppState.sushiTypes = result.data;
+    }
+}
+
+async function loadFrozenSushi() {
+    const result = await db.getFrozenSushi();
+    if (result.success) {
+        AppState.frozenSushi = result.data;
+    }
+}
+
+function renderFrozenList() {
+    const container = document.getElementById('frozen-list');
+    const monthFilter = document.getElementById('frozen-filter-month').value;
+    const yearFilter = document.getElementById('frozen-filter-year').value;
+
+    // Initialiser le select année si vide
+    const yearSelect = document.getElementById('frozen-filter-year');
+    if (yearSelect.options.length <= 1) {
+        const currentYear = new Date().getFullYear();
+        yearSelect.innerHTML = '<option value="">Toutes années</option>';
+        for (let y = currentYear; y >= currentYear - 3; y--) {
+            yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
+        }
+    }
+
+    // Filtrer les données
+    let filtered = [...AppState.frozenSushi];
+
+    if (monthFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
+        });
+    }
+
+    if (yearFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getFullYear()) === yearFilter;
+        });
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🧊</div>
+                <div class="empty-state-text">Aucune congélation enregistrée</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = '';
+
+    filtered.forEach(item => {
+        const sushiType = item.sushi_type || {};
+        const category = sushiType.category || 'frit';
+        const categoryLabels = { frit: 'Frit', vegi: 'Végi', duo: 'Duo', noel: 'Noël' };
+        const date = new Date(item.frozen_at);
+        const dateStr = date.toLocaleDateString('fr-FR');
+        const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const userName = item.user?.name || 'Inconnu';
+
+        const itemElement = document.createElement('div');
+        itemElement.className = `frozen-item category-${category}`;
+        itemElement.style.cursor = 'pointer';
+        itemElement.innerHTML = `
+            <div class="frozen-item-info">
+                <div class="frozen-item-name">
+                    ${sushiType.name || 'Sushi'}
+                    <span class="frozen-category-badge ${category}">${categoryLabels[category]}</span>
+                </div>
+                <div class="frozen-item-details">
+                    ${item.fish_type ? `🐟 ${item.fish_type} • ` : ''}
+                    📅 ${dateStr} à ${timeStr} • 👤 ${userName}
+                </div>
+            </div>
+            <div class="frozen-item-qty">
+                <div class="frozen-item-qty-value">${item.quantity}</div>
+                <div class="frozen-item-qty-label">pièces</div>
+            </div>
+        `;
+
+        // Clic sur l'item pour éditer
+        itemElement.addEventListener('click', () => {
+            openFrozenModal(item);
+        });
+
+        container.appendChild(itemElement);
+    });
+}
+
+function openFrozenModal(frozenItem = null) {
+    AppState.editingFrozen = frozenItem;
+
+    const modal = document.getElementById('frozen-modal');
+    const title = document.getElementById('frozen-modal-title');
+    const form = document.getElementById('frozen-form');
+    const sushiSelect = document.getElementById('frozen-sushi-type');
+    const datetimeInput = document.getElementById('frozen-datetime');
+    const qtyInput = document.getElementById('frozen-quantity');
+
+    // Reset form
+    form.reset();
+    document.getElementById('fish-type-group').style.display = 'none';
+
+    // Remplir le select des sushis
+    sushiSelect.innerHTML = '<option value="">Sélectionner...</option>';
+    AppState.sushiTypes.forEach(sushi => {
+        const categoryLabels = { frit: 'Frit', vegi: 'Végi', duo: 'Duo', noel: 'Noël' };
+        sushiSelect.innerHTML += `<option value="${sushi.id}">${sushi.name} (${categoryLabels[sushi.category]})</option>`;
+    });
+
+    if (frozenItem) {
+        // Mode édition
+        title.textContent = '🧊 Modifier la congélation';
+        sushiSelect.value = frozenItem.sushi_type_id;
+        handleSushiTypeChange(); // Afficher le select poisson si nécessaire
+        document.getElementById('frozen-fish-type').value = frozenItem.fish_type || '';
+        qtyInput.value = frozenItem.quantity;
+
+        const date = new Date(frozenItem.frozen_at);
+        const localDatetime = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        datetimeInput.value = localDatetime;
+    } else {
+        // Mode création
+        title.textContent = '🧊 Nouvelle congélation';
+        qtyInput.value = 1;
+
+        // Pré-remplir date/heure avec maintenant
+        const now = new Date();
+        const localDatetime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        datetimeInput.value = localDatetime;
+    }
+
+    modal.classList.add('active');
+}
+
+function handleSushiTypeChange() {
+    const sushiId = document.getElementById('frozen-sushi-type').value;
+    const fishGroup = document.getElementById('fish-type-group');
+    const fishSelect = document.getElementById('frozen-fish-type');
+
+    const sushiType = AppState.sushiTypes.find(s => s.id === sushiId);
+
+    if (sushiType && sushiType.requires_fish_selection && sushiType.available_fish) {
+        fishSelect.innerHTML = '<option value="">Sélectionner...</option>';
+        sushiType.available_fish.forEach(fish => {
+            fishSelect.innerHTML += `<option value="${fish}">${fish}</option>`;
+        });
+        fishGroup.style.display = 'block';
+        fishSelect.required = true;
+    } else {
+        fishGroup.style.display = 'none';
+        fishSelect.required = false;
+        fishSelect.value = '';
+    }
+}
+
+function adjustFrozenQty(delta) {
+    const input = document.getElementById('frozen-quantity');
+    let value = parseInt(input.value) || 1;
+    value = Math.max(1, value + delta);
+    input.value = value;
+}
+
+async function handleFrozenSubmit(e) {
+    e.preventDefault();
+
+    const sushiTypeId = document.getElementById('frozen-sushi-type').value;
+    const fishType = document.getElementById('frozen-fish-type').value || null;
+    const quantity = parseInt(document.getElementById('frozen-quantity').value) || 1;
+    const datetime = document.getElementById('frozen-datetime').value;
+
+    if (!sushiTypeId) {
+        alert('❌ Veuillez sélectionner un sushi');
+        return;
+    }
+
+    const sushiType = AppState.sushiTypes.find(s => s.id === sushiTypeId);
+    if (sushiType?.requires_fish_selection && !fishType) {
+        alert('❌ Veuillez sélectionner un type de poisson');
+        return;
+    }
+
+    const frozenData = {
+        sushi_type_id: sushiTypeId,
+        fish_type: fishType,
+        quantity: quantity,
+        frozen_at: datetime ? new Date(datetime).toISOString() : new Date().toISOString()
+    };
+
+    // Ajouter user_id seulement en création
+    if (!AppState.editingFrozen) {
+        frozenData.user_id = db.currentUser?.id;
+    }
+
+    showLoading(true);
+
+    let result;
+    if (AppState.editingFrozen) {
+        // Mise à jour
+        result = await db.updateFrozenSushi(AppState.editingFrozen.id, frozenData);
+    } else {
+        // Création
+        result = await db.createFrozenSushi(frozenData);
+    }
+
+    showLoading(false);
+
+    if (result.success) {
+        closeModal('frozen-modal');
+        await loadFrozenSushi();
+        renderFrozenList();
+    } else {
+        alert('❌ Erreur: ' + result.error);
+    }
+}
+
+function exportFrozenList() {
+    const monthFilter = document.getElementById('frozen-filter-month').value;
+    const yearFilter = document.getElementById('frozen-filter-year').value;
+
+    // Filtrer les données
+    let filtered = [...AppState.frozenSushi];
+
+    if (monthFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
+        });
+    }
+
+    if (yearFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getFullYear()) === yearFilter;
+        });
+    }
+
+    if (filtered.length === 0) {
+        alert('ℹ️ Aucune donnée à exporter');
+        return;
+    }
+
+    // Générer le texte d'export
+    const monthNames = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    const periodLabel = monthFilter ? `${monthNames[parseInt(monthFilter)]} ${yearFilter || ''}` : (yearFilter || 'Tout');
+
+    let exportText = `🧊 HISTORIQUE CONGÉLATION - Green Sushi\n`;
+    exportText += `📅 Période: ${periodLabel}\n`;
+    exportText += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    filtered.forEach(item => {
+        const sushiType = item.sushi_type || {};
+        const date = new Date(item.frozen_at);
+        const dateStr = date.toLocaleDateString('fr-FR');
+        const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+        exportText += `• ${sushiType.name || 'Sushi'}`;
+        if (item.fish_type) exportText += ` (${item.fish_type})`;
+        exportText += `\n  Qté: ${item.quantity} | ${dateStr} ${timeStr}\n\n`;
+    });
+
+    exportText += `━━━━━━━━━━━━━━━━━━━━\n`;
+    exportText += `📊 Total: ${filtered.length} entrée(s)`;
+
+    // Envoyer par email
+    const emailRecipient = 'greensushi.mq@gmail.com';
+    const subject = encodeURIComponent(`🧊 Historique Congélation - ${periodLabel}`);
+    const body = encodeURIComponent(exportText);
+    const mailtoUrl = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
+
+    window.location.href = mailtoUrl;
+}
 
 // ====================
 // FONCTIONS GLOBALES (appelées depuis HTML onclick)

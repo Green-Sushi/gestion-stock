@@ -21,7 +21,8 @@ const CATEGORIES = [
     { id: 'frais', name: 'Stock Frais', icon: '🧀' },
     { id: 'sec', name: 'Stock Sec', icon: '🌾' },
     { id: 'surgele', name: 'Stock Surgelé', icon: '❄️' },
-    { id: 'consommable', name: 'Stock Consommable', icon: '🥢' },
-    { id: 'boisson', name: 'Stock Boissons', icon: '🧃' }
+    { id: 'consommables', name: 'Stock Consommable', icon: '🥢' },
+    { id: 'boissons', name: 'Stock Boissons', icon: '🧃' },
+    { id: 'legumes', name: 'Légumes', icon: '🥬' }
 ];
 

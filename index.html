@@ -9,7 +9,9 @@
     <title>Green Sushi - Gestion de Stock</title>
 
     <link rel="manifest" href="/green-sushi-manifest.json">
-    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/logo/LOGO_GREEN_STOCK.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/images/logo/LOGO_GREEN_STOCK.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/images/logo/LOGO_GREEN_STOCK.png">
 
     <!-- Supabase Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -23,11 +25,25 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
         }
 
+        html {
+            overflow: hidden;
+            height: 100%;
+            position: fixed;
+            width: 100%;
+            overscroll-behavior: none;
+        }
+
         body {
             background-color: #f5f5f5;
             color: #333;
             -webkit-font-smoothing: antialiased;
             -webkit-tap-highlight-color: transparent;
+            overflow-y: auto;
+            overflow-x: hidden;
+            height: 100%;
+            position: relative;
+            overscroll-behavior-y: none;
+            -webkit-overflow-scrolling: touch;
         }
 
         /* === HEADER === */
@@ -90,17 +106,18 @@
             background-color: #e74c3c;
             color: white;
             border-radius: 50%;
-            min-width: 22px;
-            height: 22px;
+            min-width: 20px;
+            height: 20px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.75rem;
-            padding: 0 6px;
+            font-size: 0.7rem;
+            padding: 0 5px;
             position: absolute;
-            top: 8px;
-            right: 8px;
+            top: -5px;
+            right: -5px;
             font-weight: bold;
+            border: 2px solid white;
         }
 
         /* === CONTENEUR PRINCIPAL === */
@@ -211,7 +228,10 @@
         .pin-key.delete {
             background: #e74c3c;
             box-shadow: 0 4px 10px rgba(231, 76, 60, 0.3);
-            grid-column: span 3;
+        }
+
+        .pin-key-spacer {
+            /* Espace vide pour centrer le 0 sous le 8 */
         }
 
         .error-message {
@@ -227,39 +247,72 @@
             grid-template-columns: repeat(2, 1fr);
             gap: 15px;
             margin-top: 20px;
+            width: 100%;
+            max-width: 100%;
         }
 
         .category-card {
             background: white;
             border-radius: 16px;
-            padding: 25px 20px;
+            padding: 15px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-            text-align: center;
             cursor: pointer;
             transition: all 0.3s;
             border: 2px solid transparent;
+            position: relative;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 0;
+            overflow: hidden;
         }
 
         .category-card:active {
-            transform: scale(0.97);
+            transform: scale(0.98);
             border-color: #088F8F;
         }
 
-        .category-icon {
-            font-size: 3rem;
-            margin-bottom: 12px;
+        .category-image {
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            display: block;
         }
 
-        .category-name {
-            font-weight: 600;
-            color: #333;
-            font-size: 0.95rem;
+        .category-badges {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
         }
 
-        .category-count {
-            font-size: 0.8rem;
-            color: #777;
-            margin-top: 5px;
+        .category-badge {
+            min-width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+        }
+
+        .category-badge.total {
+            background: white;
+            color: #088F8F;
+            border: 3px solid #088F8F;
+        }
+
+        .category-badge.alerts {
+            background: #e74c3c;
+            color: white;
         }
 
         /* === BOUTONS === */
@@ -372,91 +425,218 @@
 
         .product-item {
             background: white;
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 12px;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.06);
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: all 0.2s;
+            flex-direction: column;
+            gap: 15px;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+            position: relative;
+        }
+
+        .product-item.low-stock-alert {
+            background: rgba(231, 76, 60, 0.08);
+            border-left-color: #e74c3c;
         }
 
         .product-item:active {
             transform: scale(0.99);
         }
 
-        .product-info {
-            flex: 1;
-        }
-
-        .product-name {
-            font-weight: 600;
-            margin-bottom: 5px;
-            font-size: 1rem;
-        }
-
-        .product-supplier {
-            font-size: 0.85rem;
-            color: #777;
-        }
-
-        .product-right {
+        .product-actions {
+            position: absolute;
+            top: 10px;
+            right: 10px;
             display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .product-quantity {
-            text-align: right;
-        }
-
-        .product-qty-value {
-            font-weight: 700;
-            font-size: 1.1rem;
-            color: #088F8F;
-        }
-
-        .product-qty-value.low-stock {
-            color: #e74c3c;
-        }
-
-        .product-unit {
-            font-size: 0.8rem;
-            color: #777;
-        }
-
-        .product-controls-quick {
-            display: flex;
-            align-items: center;
             gap: 8px;
+            z-index: 10;
         }
 
-        .btn-quick-adjust {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            border: 2px solid #088F8F;
+        .btn-edit-product,
+        .btn-delete-product,
+        .btn-move-up,
+        .btn-move-down {
             background: white;
-            color: #088F8F;
-            font-size: 1.2rem;
+            color: #555;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            width: 40px;
+            height: 40px;
+            font-size: 1.4rem;
             font-weight: bold;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             padding: 0;
+            line-height: 1;
+        }
+
+        .btn-move-up,
+        .btn-move-down {
+            border-color: #3498db;
+            color: #3498db;
+            font-size: 1.6rem;
+        }
+
+        .btn-move-up:active {
+            background: #3498db;
+            color: white;
+            transform: scale(0.95);
+        }
+
+        .btn-move-down:active {
+            background: #3498db;
+            color: white;
+            transform: scale(0.95);
+        }
+
+        .btn-edit-product {
+            border-color: #088F8F;
+            color: #088F8F;
+        }
+
+        .btn-edit-product:hover {
+            background: #088F8F;
+            color: white;
+            transform: scale(1.1);
+        }
+
+        .btn-delete-product {
+            border-color: #e74c3c;
+            color: #e74c3c;
+        }
+
+        .btn-delete-product:hover {
+            background: #e74c3c;
+            color: white;
+            transform: scale(1.1);
+        }
+
+        .btn-edit-product:active,
+        .btn-delete-product:active {
+            transform: scale(0.95);
+        }
+
+        .product-info {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .product-name {
+            font-weight: 600;
+            font-size: 1.15rem;
+            line-height: 1.3;
+        }
+
+        .product-supplier {
+            font-size: 0.9rem;
+            color: #777;
+        }
+
+        .product-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .product-quantity {
+            text-align: center;
+            min-width: 90px;
+            padding: 10px 15px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .product-quantity.stock-ok {
+            background: rgba(39, 174, 96, 0.15);
+        }
+
+        .product-quantity.stock-attention {
+            background: rgba(241, 196, 15, 0.15);
+        }
+
+        .product-quantity.stock-warning {
+            background: rgba(230, 126, 34, 0.15);
+        }
+
+        .product-quantity.stock-critical {
+            background: rgba(231, 76, 60, 0.15);
+        }
+
+        .product-qty-value {
+            font-weight: 700;
+            font-size: 1.8rem;
+            transition: all 0.3s ease;
+        }
+
+        .stock-ok .product-qty-value {
+            color: #27ae60;
+        }
+
+        .stock-attention .product-qty-value {
+            color: #f39c12;
+        }
+
+        .stock-warning .product-qty-value {
+            color: #e67e22;
+        }
+
+        .stock-critical .product-qty-value {
+            color: #e74c3c;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .product-unit {
+            font-size: 0.9rem;
+            color: #555;
+            margin-top: 2px;
+            font-weight: 600;
+        }
+
+        .product-controls-quick {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn-quick-adjust {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            border: 2px solid #088F8F;
+            background: white;
+            color: #088F8F;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            padding: 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
         .btn-quick-adjust:active {
-            transform: scale(0.9);
-            background: #088F8F;
-            color: white;
+            transform: scale(0.92);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
 
         .btn-quick-adjust:hover {
-            background: #e8f5f5;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
 
         .btn-minus {
@@ -464,13 +644,9 @@
             color: #e74c3c;
         }
 
-        .btn-minus:hover {
-            background: #fee;
-        }
-
         .btn-minus:active {
-            background: #e74c3c;
-            color: white;
+            background: #e74c3c !important;
+            color: white !important;
         }
 
         .btn-plus {
@@ -478,13 +654,25 @@
             color: #27ae60;
         }
 
-        .btn-plus:hover {
-            background: #efe;
+        .btn-plus:active {
+            background: #27ae60 !important;
+            color: white !important;
         }
 
-        .btn-plus:active {
-            background: #27ae60;
-            color: white;
+        .btn-plus-ten {
+            border-color: #3498db;
+            color: #3498db;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .btn-plus-ten:active {
+            background: #3498db !important;
+            color: white !important;
+        }
+
+        .btn-spacer {
+            width: 20px;
         }
 
         .product-info {
@@ -595,16 +783,36 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.06);
         }
 
+        .alert-item {
+            border-left: 4px solid #999;
+        }
+
         .list-item-header {
             display: flex;
             justify-content: space-between;
             align-items: start;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
         }
 
         .list-item-title {
             font-weight: 600;
-            font-size: 1rem;
+            font-size: 1.05rem;
+            flex: 1;
+        }
+
+        .list-item-category {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .category-badge-alert {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            white-space: nowrap;
         }
 
         .list-item-actions {
@@ -616,6 +824,37 @@
             font-size: 0.85rem;
             color: #777;
             margin-bottom: 4px;
+        }
+
+        .alert-stock-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .alert-stock-current {
+            display: flex;
+            align-items: baseline;
+            gap: 5px;
+        }
+
+        .alert-qty-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .alert-qty-unit {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .alert-stock-threshold {
+            font-size: 0.9rem;
+            color: #777;
+            font-weight: 500;
         }
 
         /* === EMPTY STATE === */
@@ -755,25 +994,230 @@
             to { transform: rotate(360deg); }
         }
 
+        /* === SPLASH SCREEN === */
+        #splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #088F8F 0%, #066a6a 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        #splash-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .splash-logo {
+            width: 180px;
+            height: 180px;
+            margin-bottom: 30px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .splash-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.3));
+        }
+
+        .splash-loader {
+            display: flex;
+            gap: 8px;
+        }
+
+        .splash-dot {
+            width: 12px;
+            height: 12px;
+            background: white;
+            border-radius: 50%;
+            animation: bounce 1.4s ease-in-out infinite;
+        }
+
+        .splash-dot:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .splash-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .splash-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        @keyframes bounce {
+            0%, 80%, 100% {
+                transform: translateY(0);
+                opacity: 0.7;
+            }
+            40% {
+                transform: translateY(-15px);
+                opacity: 1;
+            }
+        }
+
         /* === RESPONSIVE === */
         @media (min-width: 768px) {
             .categories-grid {
                 grid-template-columns: repeat(3, 1fr);
             }
         }
+
+        /* === CONGÉLATION === */
+        .frozen-filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .frozen-filters .form-select {
+            flex: 1;
+        }
+
+        .frozen-item {
+            background: white;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+            border-left: 4px solid #ccc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .frozen-item.category-frit { border-left-color: #e67e22; }
+        .frozen-item.category-vegi { border-left-color: #1abc9c; }
+        .frozen-item.category-duo { border-left-color: #e91e63; }
+        .frozen-item.category-noel { border-left-color: #e74c3c; }
+
+        .frozen-item-info {
+            flex: 1;
+        }
+
+        .frozen-item-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+        }
+
+        .frozen-item-details {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .frozen-item-qty {
+            text-align: right;
+        }
+
+        .frozen-item-qty-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #088F8F;
+        }
+
+        .frozen-item-qty-label {
+            font-size: 0.75rem;
+            color: #888;
+        }
+
+        .frozen-category-badge {
+            display: inline-block;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+        }
+
+        .frozen-category-badge.frit { background: #e67e22; }
+        .frozen-category-badge.vegi { background: #1abc9c; }
+        .frozen-category-badge.duo { background: #e91e63; }
+        .frozen-category-badge.noel { background: #e74c3c; }
+
+        .quantity-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .quantity-input {
+            width: 80px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .frozen-card {
+            background: white;
+            border-radius: 16px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 3px solid #06b6d4;
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .frozen-card:active {
+            transform: scale(0.98);
+        }
+
+        .frozen-card-icon {
+            font-size: 3rem;
+            margin-bottom: 8px;
+        }
+
+        .frozen-card-label {
+            font-weight: 700;
+            color: #06b6d4;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
+    <!-- SPLASH SCREEN -->
+    <div id="splash-screen">
+        <div class="splash-logo">
+            <img src="/images/logo/LOGO_GREEN_STOCK.png" alt="Green Sushi Logo">
+        </div>
+        <div class="splash-loader">
+            <div class="splash-dot"></div>
+            <div class="splash-dot"></div>
+            <div class="splash-dot"></div>
+        </div>
+    </div>
+
     <!-- HEADER -->
     <header>
         <button id="logout-btn" title="Déconnexion">
             Se déconnecter
         </button>
         <h1 id="header-title">Green Sushi - Stock</h1>
-        <div class="header-icon" style="position: relative;">
-            🔔
-            <div class="alert-badge" id="alert-count">0</div>
-        </div>
+        <div class="header-icon" id="role-icon" title="Rôle utilisateur"></div>
     </header>
 
     <!-- LOADING -->
@@ -807,8 +1251,9 @@
                         <button class="pin-key" data-key="7">7</button>
                         <button class="pin-key" data-key="8">8</button>
                         <button class="pin-key" data-key="9">9</button>
+                        <span class="pin-key-spacer"></span>
                         <button class="pin-key" data-key="0">0</button>
-                        <button class="pin-key delete" data-key="delete">⌫ Effacer</button>
+                        <button class="pin-key delete" data-key="delete">⌫</button>
                     </div>
                     <div class="error-message" id="login-error"></div>
                 </div>
@@ -844,6 +1289,40 @@
                 <button class="btn btn-small" id="send-alerts-btn">📤 Envoyer</button>
             </div>
             <div id="alerts-list"></div>
+        </div>
+
+        <!-- PAGE CONGÉLATION -->
+        <div id="frozen-page" class="page">
+            <div class="page-header">
+                <button id="back-to-home-frozen" class="back-button">←</button>
+                <h2 class="page-title">🧊 Congélation</h2>
+                <button class="btn btn-small" id="export-frozen-btn">📤</button>
+            </div>
+
+            <!-- Filtres -->
+            <div class="frozen-filters">
+                <select class="form-select" id="frozen-filter-month">
+                    <option value="">Tous les mois</option>
+                    <option value="01">Janvier</option>
+                    <option value="02">Février</option>
+                    <option value="03">Mars</option>
+                    <option value="04">Avril</option>
+                    <option value="05">Mai</option>
+                    <option value="06">Juin</option>
+                    <option value="07">Juillet</option>
+                    <option value="08">Août</option>
+                    <option value="09">Septembre</option>
+                    <option value="10">Octobre</option>
+                    <option value="11">Novembre</option>
+                    <option value="12">Décembre</option>
+                </select>
+                <select class="form-select" id="frozen-filter-year">
+                    <!-- Sera rempli dynamiquement -->
+                </select>
+            </div>
+
+            <div id="frozen-list"></div>
+            <button class="fab" id="add-frozen-btn">+</button>
         </div>
 
         <!-- PAGE DES FOURNISSEURS -->
@@ -889,9 +1368,20 @@
             </div>
 
             <div class="setting-item">
+                <button class="btn" style="width: 100%;" id="save-settings-btn">💾 Sauvegarder les paramètres</button>
+            </div>
+
+            <div class="setting-item">
                 <div class="setting-header">
                     <div class="setting-title">Utilisateurs</div>
                     <button class="btn btn-small" id="manage-users-btn">Gérer</button>
+                </div>
+            </div>
+
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div class="setting-title">Historique des envois</div>
+                    <button class="btn btn-small" id="view-history-btn">Consulter</button>
                 </div>
             </div>
 
@@ -920,8 +1410,9 @@
                         <option value="frais">Stock Frais</option>
                         <option value="sec">Stock Sec</option>
                         <option value="surgele">Stock Surgelé</option>
-                        <option value="consommable">Stock Consommable</option>
-                        <option value="boisson">Stock Boissons</option>
+                        <option value="consommables">Stock Consommable</option>
+                        <option value="boissons">Stock Boissons</option>
+                        <option value="legumes">Légumes</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -939,8 +1430,12 @@
                     <input type="text" class="form-input" id="product-unit" placeholder="kg, L, pièces, boîtes..." required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Seuil d'alerte *</label>
+                    <label class="form-label">Seuil d'alerte critique (Rouge) *</label>
                     <input type="number" step="0.01" class="form-input" id="product-alert" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Stock optimal (Vert)</label>
+                    <input type="number" step="0.01" class="form-input" id="product-optimal" placeholder="Quantité idéale recommandée">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Notes</label>
@@ -951,6 +1446,86 @@
                     <button type="submit" class="btn">Enregistrer</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL DÉCONNEXION -->
+    <div class="modal" id="logout-modal">
+        <div class="modal-content" style="max-width: 320px;">
+            <div style="padding: 30px 20px; text-align: center;">
+                <h3 style="font-size: 1.25rem; color: #333; margin: 0 0 30px 0;">Se déconnecter ?</h3>
+                <div class="modal-actions" style="gap: 15px;">
+                    <button type="button" class="btn btn-secondary close-modal" data-modal="logout-modal" style="flex: 1; font-weight: 600;">NON</button>
+                    <button type="button" class="btn" id="confirm-logout-btn" style="background: #e74c3c; flex: 1; font-weight: 600;">OUI</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CHOIX ENVOI RÉCAPITULATIF -->
+    <div class="modal" id="send-choice-modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div style="padding: 30px 20px;">
+                <h3 style="font-size: 1.25rem; color: #333; margin: 0 0 10px 0; text-align: center;">Envoyer le récapitulatif</h3>
+                <p style="color: #666; font-size: 0.9rem; text-align: center; margin-bottom: 30px;">Choisissez votre méthode d'envoi</p>
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <button type="button" class="btn" id="send-whatsapp-btn" style="width: 100%; background: #25D366; font-size: 1.1rem;">
+                        💬 WhatsApp
+                    </button>
+                    <button type="button" class="btn" id="send-email-btn" style="width: 100%; background: #3498db; font-size: 1.1rem;">
+                        ✉️ Email
+                    </button>
+                    <button type="button" class="btn btn-secondary close-modal" data-modal="send-choice-modal" style="width: 100%; margin-top: 10px;">
+                        Annuler
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CONFIRMATION ENVOI -->
+    <div class="modal" id="send-confirmation-modal">
+        <div class="modal-content" style="max-width: 360px;">
+            <div style="padding: 30px 20px; text-align: center;">
+                <h3 style="font-size: 1.25rem; color: #333; margin: 0 0 30px 0;">Message envoyé ?</h3>
+                <div class="modal-actions" style="gap: 15px;">
+                    <button type="button" class="btn btn-secondary" id="send-not-confirmed-btn" style="flex: 1; font-weight: 600;">NON</button>
+                    <button type="button" class="btn" id="send-confirmed-btn" style="background: #27ae60; flex: 1; font-weight: 600;">OUI</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL HISTORIQUE DES MESSAGES -->
+    <div class="modal" id="message-history-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Historique des envois</h3>
+                <button class="close-modal" data-modal="message-history-modal">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="message-history-list" style="max-height: 500px; overflow-y: auto;">
+                    <!-- Liste chargée dynamiquement -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DÉTAIL MESSAGE -->
+    <div class="modal" id="message-detail-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Détail du message</h3>
+                <button class="close-modal" data-modal="message-detail-modal">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="message-detail-content" style="white-space: pre-wrap; font-family: monospace; background: #f5f5f5; padding: 20px; border-radius: 8px; font-size: 0.9rem;">
+                    <!-- Contenu chargé dynamiquement -->
+                </div>
+                <div id="message-detail-info" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 0.9rem;">
+                    <!-- Infos chargées dynamiquement -->
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1039,6 +1614,46 @@
         </div>
     </div>
 
+    <!-- MODAL CONGÉLATION -->
+    <div class="modal" id="frozen-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="frozen-modal-title">🧊 Nouvelle Congélation</h3>
+                <button class="close-modal" data-modal="frozen-modal">×</button>
+            </div>
+            <form id="frozen-form">
+                <div class="form-group">
+                    <label class="form-label">Nom du sushi *</label>
+                    <select class="form-select" id="frozen-sushi-type" required>
+                        <option value="">Sélectionner...</option>
+                    </select>
+                </div>
+                <div class="form-group" id="fish-type-group" style="display: none;">
+                    <label class="form-label">Type de poisson *</label>
+                    <select class="form-select" id="frozen-fish-type">
+                        <option value="">Sélectionner...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Quantité</label>
+                    <div class="quantity-controls">
+                        <button type="button" class="btn-quick-adjust btn-minus" id="frozen-qty-minus">−</button>
+                        <input type="number" class="form-input quantity-input" id="frozen-quantity" value="1" min="1">
+                        <button type="button" class="btn-quick-adjust btn-plus" id="frozen-qty-plus">+</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date et heure</label>
+                    <input type="datetime-local" class="form-input" id="frozen-datetime">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary close-modal" data-modal="frozen-modal">Annuler</button>
+                    <button type="submit" class="btn">✅ Valider</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- NAVIGATION -->
     <nav>
         <div class="tab" data-page="home-page">
@@ -1046,7 +1661,10 @@
             Accueil
         </div>
         <div class="tab" data-page="alerts-page">
-            <span class="tab-icon">🔔</span>
+            <span class="tab-icon" style="position: relative;">
+                🔔
+                <div class="alert-badge" id="alert-count">0</div>
+            </span>
             Alertes
         </div>
         <div class="tab" data-page="suppliers-page">

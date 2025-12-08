@@ -647,7 +647,7 @@ class DatabaseManager {
                     frozen_at,
                     expiry_date,
                     sushi_type:sushi_types(id, name, category),
-                    user:users!frozen_sushi_user_id_fkey(id, name)
+                    user:users(id, name)
                 `)
                 .order('frozen_at', { ascending: false });
 
@@ -698,7 +698,7 @@ class DatabaseManager {
                     frozen_at,
                     expiry_date,
                     sushi_type:sushi_types(id, name, category),
-                    user:users!frozen_sushi_user_id_fkey(id, name)
+                    user:users(id, name)
                 `)
                 .single();
 
@@ -733,7 +733,7 @@ class DatabaseManager {
                     frozen_at,
                     expiry_date,
                     sushi_type:sushi_types(id, name, category, requires_fish_selection, available_fish),
-                    user:users!frozen_sushi_user_id_fkey(id, name)
+                    user:users(id, name)
                 `)
                 .single();
 
@@ -777,7 +777,7 @@ class DatabaseManager {
                     frozen_at,
                     expiry_date,
                     sushi_type:sushi_types(id, name, category),
-                    user:users!frozen_sushi_user_id_fkey(id, name)
+                    user:users(id, name)
                 `)
                 .gte('frozen_at', startDate)
                 .lt('frozen_at', endDate)

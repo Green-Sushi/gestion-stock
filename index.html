@@ -241,6 +241,59 @@
             min-height: 20px;
         }
 
+        /* === BANDEAU VUE D'ENSEMBLE === */
+        .stock-overview {
+            background: white;
+            border-radius: 14px;
+            padding: 14px 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            margin-top: 20px;
+        }
+
+        .stock-overview-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            border-left: 1px solid rgba(0,0,0,0.08);
+        }
+
+        .stock-overview-cell:first-child {
+            border-left: none;
+        }
+
+        .stock-overview-number {
+            font-size: 1.85rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .stock-overview-number.critical { color: #e74c3c; }
+        .stock-overview-number.warning { color: #e67e22; }
+        .stock-overview-number.ok { color: #27ae60; }
+
+        .stock-overview-label {
+            font-size: .68rem;
+            font-weight: 600;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            color: #7b8c8c;
+            margin-top: 2px;
+        }
+
+        .stock-overview-bar {
+            width: 60%;
+            height: 5px;
+            border-radius: 3px;
+            margin-top: 6px;
+        }
+
+        .stock-overview-bar.critical { background: #e74c3c; }
+        .stock-overview-bar.warning { background: #e67e22; }
+        .stock-overview-bar.ok { background: #27ae60; }
+
         /* === CARTES CATÉGORIES === */
         .categories-grid {
             display: grid;
@@ -312,6 +365,11 @@
 
         .category-badge.alerts {
             background: #e74c3c;
+            color: white;
+        }
+
+        .category-badge.warning {
+            background: #e67e22;
             color: white;
         }
 
@@ -559,10 +617,6 @@
             background: rgba(39, 174, 96, 0.15);
         }
 
-        .product-quantity.stock-attention {
-            background: rgba(241, 196, 15, 0.15);
-        }
-
         .product-quantity.stock-warning {
             background: rgba(230, 126, 34, 0.15);
         }
@@ -579,10 +633,6 @@
 
         .stock-ok .product-qty-value {
             color: #27ae60;
-        }
-
-        .stock-attention .product-qty-value {
-            color: #f39c12;
         }
 
         .stock-warning .product-qty-value {
@@ -1265,6 +1315,23 @@
             <div class="page-header">
                 <h2 class="page-title">Catégories</h2>
             </div>
+            <div class="stock-overview">
+                <div class="stock-overview-cell">
+                    <div class="stock-overview-number critical" id="overview-critical">0</div>
+                    <div class="stock-overview-label">Rupture</div>
+                    <div class="stock-overview-bar critical"></div>
+                </div>
+                <div class="stock-overview-cell">
+                    <div class="stock-overview-number warning" id="overview-warning">0</div>
+                    <div class="stock-overview-label">Limite</div>
+                    <div class="stock-overview-bar warning"></div>
+                </div>
+                <div class="stock-overview-cell">
+                    <div class="stock-overview-number ok" id="overview-ok">0</div>
+                    <div class="stock-overview-label">Large</div>
+                    <div class="stock-overview-bar ok"></div>
+                </div>
+            </div>
             <div class="categories-grid" id="categories-container"></div>
         </div>
 
@@ -1678,8 +1745,8 @@
     </nav>
 
     <!-- SCRIPTS -->
-    <script src="config.js?v=20251211"></script>
-    <script src="database.js?v=20251211"></script>
-    <script src="app.js?v=20251211"></script>
+    <script src="config.js?v=20260907"></script>
+    <script src="database.js?v=20260907"></script>
+    <script src="app.js?v=20260907"></script>
 </body>
 </html>

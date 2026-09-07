@@ -26,7 +26,7 @@
             font-family: 'Fredoka';
             src: url('./fonts/Fredoka-variable.woff2') format('woff2-variations'),
                  url('./fonts/Fredoka-variable.woff2') format('woff2');
-            font-weight: 300 600;
+            font-weight: 300 700;
             font-style: normal;
             font-display: swap;
         }
@@ -587,6 +587,21 @@
         }
 
         .product-menu.open {
+            display: block;
+        }
+
+        /* Voile derrière le menu ouvert. Il rend l'état sans ambiguïté :
+           sans lui, le menu se superpose au bouton « +10 » de sa propre
+           ligne et un appui réflexe tombe sur « Supprimer ». */
+        #product-menu-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 40, 40, 0.18);
+            z-index: 15;
+        }
+
+        #product-menu-backdrop.open {
             display: block;
         }
 
@@ -1798,6 +1813,10 @@
             Paramètres
         </div>
     </nav>
+
+    <!-- Voile affiché derrière un menu « ⋯ » ouvert : rend l'état visible
+         et absorbe le premier appui ailleurs. -->
+    <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
     <script src="config.js?v=20260908"></script>

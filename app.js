@@ -343,6 +343,13 @@ function setupGlobalListeners() {
         }
     });
 
+    // Fermer aussi au défilement : sinon le menu « voyage » avec la liste,
+    // détaché de sa ligne. `capture` car le défilement se produit sur un
+    // conteneur interne et ne remonte pas jusqu'à document.
+    document.addEventListener('scroll', () => {
+        closeAllProductMenus();
+    }, { capture: true, passive: true });
+
     // Boutons d'ajout
     document.getElementById('add-product-btn').addEventListener('click', () => {
         openProductModal();
@@ -692,11 +699,23 @@ function toggleProductMenu(menu) {
     closeAllProductMenus();
     if (!wasOpen) {
         menu.classList.add('open');
+        setProductMenuBackdrop(true);
     }
 }
 
 function closeAllProductMenus() {
     document.querySelectorAll('.product-menu.open').forEach(m => m.classList.remove('open'));
+    setProductMenuBackdrop(false);
+}
+
+// Voile derrière le menu ouvert : rend l'état visible et absorbe le premier
+// appui ailleurs, pour qu'un geste réflexe vers « +10 » ne tombe pas sur
+// « Supprimer », que le menu recouvre.
+function setProductMenuBackdrop(visible) {
+    const backdrop = document.getElementById('product-menu-backdrop');
+    if (backdrop) {
+        backdrop.classList.toggle('open', visible);
+    }
 }
 
 function filterProducts(searchTerm) {

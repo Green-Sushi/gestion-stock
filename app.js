@@ -282,6 +282,7 @@ function setupGlobalListeners() {
     document.getElementById('back-to-home').addEventListener('click', () => {
         showPage('home-page');
         updateActiveTab('home-page');
+        renderCategories();
     });
 
     // Fermeture des modales
@@ -405,6 +406,7 @@ function setupGlobalListeners() {
     document.getElementById('back-to-home-frozen').addEventListener('click', () => {
         showPage('home-page');
         updateActiveTab('home-page');
+        renderCategories();
     });
 
     document.getElementById('add-frozen-btn').addEventListener('click', openFrozenModal);
@@ -438,10 +440,15 @@ function renderCategories() {
     CATEGORIES.forEach(category => {
         // Compter les produits de cette catégorie
         const categoryProducts = AppState.products.filter(p => p.category === category.id);
-        const count = categoryProducts.length;
 
-        // Compter les produits en alerte
-        const alertCount = categoryProducts.filter(p => p.quantity <= p.alert_threshold).length;
+        // Compter les produits en alerte (rouge) et en limite (orange)
+        let alertCount = 0;
+        let warningCount = 0;
+        categoryProducts.forEach(p => {
+            const { stockLevel } = calculateStockLevel(p.quantity, p.alert_threshold);
+            if (stockLevel === 'stock-critical') alertCount++;
+            else if (stockLevel === 'stock-warning') warningCount++;
+        });
 
         const card = document.createElement('div');
         card.className = 'category-card';
@@ -449,8 +456,8 @@ function renderCategories() {
         card.innerHTML = `
             <img src="./images/categories/${categoryImages[category.id]}" alt="${category.name}" class="category-image">
             <div class="category-badges">
-                <div class="category-badge total" title="${count} produit${count > 1 ? 's' : ''}">${count}</div>
                 ${alertCount > 0 ? `<div class="category-badge alerts" title="${alertCount} en alerte">${alertCount}</div>` : ''}
+                ${warningCount > 0 ? `<div class="category-badge warning" title="${warningCount} en limite">${warningCount}</div>` : ''}
             </div>
         `;
 
@@ -473,6 +480,29 @@ function renderCategories() {
         showPage('frozen-page');
     });
     container.appendChild(frozenCard);
+
+    updateStockOverview();
+}
+
+// Totaliser le nombre de produits par niveau de stock pour le bandeau d'accueil
+function updateStockOverview() {
+    let critical = 0;
+    let warning = 0;
+    let ok = 0;
+
+    AppState.products.forEach(p => {
+        const { stockLevel } = calculateStockLevel(p.quantity, p.alert_threshold);
+        if (stockLevel === 'stock-critical') critical++;
+        else if (stockLevel === 'stock-warning') warning++;
+        else ok++;
+    });
+
+    const criticalEl = document.getElementById('overview-critical');
+    const warningEl = document.getElementById('overview-warning');
+    const okEl = document.getElementById('overview-ok');
+    if (criticalEl) criticalEl.textContent = critical;
+    if (warningEl) warningEl.textContent = warning;
+    if (okEl) okEl.textContent = ok;
 }
 
 function showCategoryProducts(category) {
@@ -485,8 +515,8 @@ function showCategoryProducts(category) {
 // PRODUITS
 // ====================
 
-// Calculer le niveau de stock (système 4 niveaux)
-function calculateStockLevel(quantity, alertThreshold, optimalStock) {
+// Calculer le niveau de stock (système 3 niveaux)
+function calculateStockLevel(quantity, alertThreshold) {
     let stockLevel = 'stock-ok';
     let isLowStock = false;
 
@@ -497,9 +527,6 @@ function calculateStockLevel(quantity, alertThreshold, optimalStock) {
     } else if (quantity <= alertThreshold * 2) {
         // ORANGE: stock en limite (≤ seuil × 2)
         stockLevel = 'stock-warning';
-    } else if (optimalStock && quantity <= optimalStock * 0.5) {
-        // JAUNE: stock attention (≤ optimal × 0.5)
-        stockLevel = 'stock-attention';
     }
     // Sinon VERT: stock ok
 
@@ -527,12 +554,12 @@ function renderProducts(searchTerm = '') {
         );
     }
 
-    // Trier par stock bas en premier
+    // Trier par niveau de stock (rupture, puis limite, puis large), alphabétique dans chaque groupe
+    const levelOrder = { 'stock-critical': 0, 'stock-warning': 1, 'stock-ok': 2 };
     products.sort((a, b) => {
-        const aLow = a.quantity <= a.alert_threshold;
-        const bLow = b.quantity <= b.alert_threshold;
-        if (aLow && !bLow) return -1;
-        if (!aLow && bLow) return 1;
+        const aLevel = levelOrder[calculateStockLevel(a.quantity, a.alert_threshold).stockLevel];
+        const bLevel = levelOrder[calculateStockLevel(b.quantity, b.alert_threshold).stockLevel];
+        if (aLevel !== bLevel) return aLevel - bLevel;
         return a.name.localeCompare(b.name);
     });
 
@@ -547,11 +574,10 @@ function renderProducts(searchTerm = '') {
     }
 
     products.forEach(product => {
-        // Déterminer le niveau de stock avec le système 4 niveaux
+        // Déterminer le niveau de stock avec le système 3 niveaux
         const { stockLevel, isLowStock } = calculateStockLevel(
             product.quantity,
-            product.alert_threshold,
-            product.optimal_stock
+            product.alert_threshold
         );
 
         const supplierName = product.supplier ? product.supplier.name : 'Sans fournisseur';
@@ -688,11 +714,10 @@ async function adjustProductQuantity(productId, delta) {
             qtyElement.style.transform = 'scale(1)';
         }, 300);
 
-        // Déterminer le nouveau niveau de stock avec le système 4 niveaux
+        // Déterminer le nouveau niveau de stock avec le système 3 niveaux
         const { stockLevel, isLowStock } = calculateStockLevel(
             newQuantity,
-            product.alert_threshold,
-            product.optimal_stock
+            product.alert_threshold
         );
 
         // Mettre à jour la classe du conteneur de quantité
@@ -728,6 +753,11 @@ async function adjustProductQuantity(productId, delta) {
     } else {
         // Mettre à jour le compteur d'alertes
         await updateAlertCount();
+        // Garder le bandeau juste. On n'appelle PAS renderCategories() ici :
+        // elle reconstruirait 6 balises <img> (6,8 Mo au total) sur une page
+        // masquée, à chaque appui sur +/-. Les pastilles de catégorie sont
+        // recalculées de toute façon aux quatre entrées dans l'accueil.
+        updateStockOverview();
     }
 }
 
@@ -1066,11 +1096,10 @@ function renderAlerts() {
         const categoryName = CATEGORIES.find(c => c.id === product.category)?.name || product.category;
         const borderColor = categoryColors[product.category] || '#999';
 
-        // Déterminer le niveau de stock avec le système 4 couleurs
+        // Déterminer le niveau de stock avec le système 3 couleurs
         const { stockLevel } = calculateStockLevel(
             product.quantity,
-            product.alert_threshold,
-            product.optimal_stock
+            product.alert_threshold
         );
 
         // Mapping des couleurs selon le niveau de stock
@@ -1165,8 +1194,7 @@ function generateAlertMessage() {
         byCategory[catId].forEach(product => {
             const { stockLevel } = calculateStockLevel(
                 product.quantity,
-                product.alert_threshold,
-                product.optimal_stock
+                product.alert_threshold
             );
             const levelIndicator = levelIndicators[stockLevel] || '[OK]';
 

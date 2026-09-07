@@ -350,6 +350,16 @@ function setupGlobalListeners() {
         closeAllProductMenus();
     }, { capture: true, passive: true });
 
+    // Fermeture du voile par appui direct dessus, en plus de l'écouteur
+    // global ci-dessus. Garde-fou : si l'appui sur le voile ne remontait pas
+    // comme un clic (comportement possible de Safari iOS), l'écran resterait
+    // grisé et sans réaction. On écoute donc aussi le toucher.
+    const menuBackdrop = document.getElementById('product-menu-backdrop');
+    if (menuBackdrop) {
+        menuBackdrop.addEventListener('click', closeAllProductMenus);
+        menuBackdrop.addEventListener('touchstart', closeAllProductMenus, { passive: true });
+    }
+
     // Boutons d'ajout
     document.getElementById('add-product-btn').addEventListener('click', () => {
         openProductModal();

@@ -599,6 +599,11 @@
             inset: 0;
             background: rgba(10, 40, 40, 0.18);
             z-index: 15;
+            /* INDISPENSABLE sur iPhone : Safari n'émet un événement de clic
+               que sur les éléments qu'il juge cliquables. Sans ce curseur,
+               un appui sur le voile ne produirait AUCUN clic, le voile ne se
+               fermerait jamais et l'écran paraîtrait figé. */
+            cursor: pointer;
         }
 
         #product-menu-backdrop.open {

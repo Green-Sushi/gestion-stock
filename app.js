@@ -753,8 +753,11 @@ async function adjustProductQuantity(productId, delta) {
     } else {
         // Mettre à jour le compteur d'alertes
         await updateAlertCount();
-        // Garder l'accueil juste : bandeau vue d'ensemble + pastilles de catégorie
-        renderCategories();
+        // Garder le bandeau juste. On n'appelle PAS renderCategories() ici :
+        // elle reconstruirait 6 balises <img> (6,8 Mo au total) sur une page
+        // masquée, à chaque appui sur +/-. Les pastilles de catégorie sont
+        // recalculées de toute façon aux quatre entrées dans l'accueil.
+        updateStockOverview();
     }
 }
 

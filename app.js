@@ -282,6 +282,7 @@ function setupGlobalListeners() {
     document.getElementById('back-to-home').addEventListener('click', () => {
         showPage('home-page');
         updateActiveTab('home-page');
+        renderCategories();
     });
 
     // Fermeture des modales
@@ -405,6 +406,7 @@ function setupGlobalListeners() {
     document.getElementById('back-to-home-frozen').addEventListener('click', () => {
         showPage('home-page');
         updateActiveTab('home-page');
+        renderCategories();
     });
 
     document.getElementById('add-frozen-btn').addEventListener('click', openFrozenModal);
@@ -751,6 +753,8 @@ async function adjustProductQuantity(productId, delta) {
     } else {
         // Mettre à jour le compteur d'alertes
         await updateAlertCount();
+        // Garder l'accueil juste : bandeau vue d'ensemble + pastilles de catégorie
+        renderCategories();
     }
 }
 

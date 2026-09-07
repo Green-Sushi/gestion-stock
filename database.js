@@ -317,6 +317,9 @@ class DatabaseManager {
         }
     }
 
+    // Depuis le lot 2 (interface allégée), plus aucun bouton n'appelle cette
+    // fonction : les flèches ↑/↓ ont été retirées de la ligne produit. La
+    // fonction et display_order restent en place, volontairement.
     async moveProductUp(productId) {
         try {
             // Récupérer le produit actuel
@@ -360,6 +363,9 @@ class DatabaseManager {
         }
     }
 
+    // Depuis le lot 2 (interface allégée), plus aucun bouton n'appelle cette
+    // fonction : les flèches ↑/↓ ont été retirées de la ligne produit. La
+    // fonction et display_order restent en place, volontairement.
     async moveProductDown(productId) {
         try {
             // Récupérer le produit actuel

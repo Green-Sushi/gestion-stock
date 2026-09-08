@@ -39,16 +39,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // Vérifier si déjà connecté
-    const storedUser = localStorage.getItem('currentUser');
+    // Vérifier si déjà connecté. On passe par db.getCurrentUser() et NON par
+    // le stockage directement : c'est lui qui vérifie l'échéance de 12 h et
+    // efface une session périmée. Lire le stockage à la main contournerait
+    // l'expiration et la rendrait inopérante.
+    const session = db.getCurrentUser();
 
-    if (storedUser) {
+    if (session) {
         try {
-            AppState.currentUser = JSON.parse(storedUser);
+            AppState.currentUser = session;
             await initializeApp();
             hideSplashScreen();
         } catch (e) {
-            // Session invalide, afficher login
             showPage('login-page');
             setupLoginPage();
             hideSplashScreen();
@@ -252,12 +254,45 @@ function updatePinDisplay() {
 }
 
 function logout() {
+    adminPinSession = null;
     // Ouvrir la modale de confirmation
     const modal = document.getElementById('logout-modal');
     modal.classList.add('active');
 }
 
+// Ramene proprement a l'ecran de connexion, avec un message si la session a
+// expire. Sans ca, l'application se degrade en silence : les menus « ⋯ »
+// disparaissent et tout repond « Accès réservé au patron », sans explication
+// et sans barre d'adresse pour recharger depuis l'ecran d'accueil.
+function retourConnexion(message) {
+    adminPinSession = null;
+    db.logout();
+    AppState.currentUser = null;
+    AppState.pinCode = '';
+    AppState.users = [];
+
+    document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
+    updatePinDisplay();
+
+    const loginError = document.getElementById('login-error');
+    if (loginError) loginError.textContent = message || '';
+
+    showPage('login-page');
+    updateRoleIcon();
+}
+
+// Verifie que la session est toujours valide. Appelee au retour dans
+// l'application et periodiquement : l'echeance de 12 h tombe presque toujours
+// pendant que l'application dort en arriere-plan, pas au demarrage.
+function verifierSessionActive() {
+    if (!AppState.currentUser) return;
+    if (!db.getCurrentUser()) {
+        retourConnexion('Session expirée, retapez votre code.');
+    }
+}
+
 function confirmLogout() {
+    adminPinSession = null;
     db.logout();
     AppState.currentUser = null;
     AppState.pinCode = '';
@@ -356,6 +391,13 @@ function setupGlobalListeners() {
             }
         }
     });
+
+    // Surveillance de l'echeance : au retour dans l'application (le cas le
+    // plus frequent : elle a dormi la nuit) et toutes les minutes.
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) verifierSessionActive();
+    });
+    setInterval(verifierSessionActive, 60 * 1000);
 
     // Menu « ⋯ » des lignes produit : un seul écouteur global pour fermer
     // le menu ouvert dès qu'on touche ailleurs (ou qu'on quitte la page).
@@ -1013,11 +1055,15 @@ async function loadSuppliers() {
     }
 }
 
+// Les comptes ne sont plus chargés au démarrage : la table est fermée et
+// leur lecture exige un code patron. Ils sont chargés à l'ouverture de
+// l'écran de gestion, et uniquement là.
+// Code patron saisi pour la session de gestion. Volontairement gardé en
+// mémoire seulement : il disparaît au rechargement de la page.
+let adminPinSession = null;
+
 async function loadUsers() {
-    const result = await db.getUsers();
-    if (result.success) {
-        AppState.users = result.data;
-    }
+    AppState.users = [];
 }
 
 function renderSuppliers(searchTerm = '') {
@@ -1632,11 +1678,31 @@ async function openMessageDetail(messageId) {
 // ====================
 
 async function openUsersManagement() {
-    // Vérifier que l'utilisateur est patron
     if (!db.isPatron()) {
         alert('⛔ Accès réservé au patron');
         return;
     }
+
+    // Écran le plus sensible de l'application : on redemande le code. C'est
+    // ce qui empêche quelqu'un qui a le téléphone déverrouillé de se créer
+    // un compte patron. La base refuse de toute façon sans code valide.
+    if (!adminPinSession) {
+        const saisi = prompt('Votre code patron, pour accéder à la gestion des comptes :');
+        if (!saisi) return;
+        adminPinSession = saisi;
+    }
+
+    showLoading(true);
+    const essai = await db.getUsers(adminPinSession);
+    showLoading(false);
+
+    if (!essai.success) {
+        adminPinSession = null;
+        alert('⛔ Code patron invalide');
+        return;
+    }
+
+    AppState.users = essai.data;
 
     const modal = document.getElementById('users-management-modal');
     modal.classList.add('active');
@@ -1648,13 +1714,17 @@ async function renderUsersList() {
     const container = document.getElementById('users-list');
     container.innerHTML = '';
 
-    const result = await db.getUsers();
+    const result = await db.getUsers(adminPinSession);
     if (!result.success) {
-        container.innerHTML = '<div class="empty-state-text">Erreur de chargement</div>';
+        // Le code garde est probablement invalide : on l'oublie pour que la
+        // prochaine ouverture le redemande, au lieu d'echouer en boucle.
+        adminPinSession = null;
+        container.innerHTML = '<div class="empty-state-text">Code patron invalide. Fermez et rouvrez cet écran.</div>';
         return;
     }
 
     const users = result.data;
+    AppState.users = users;
 
     if (users.length === 0) {
         container.innerHTML = '<div class="empty-state-text">Aucun utilisateur</div>';
@@ -1674,7 +1744,7 @@ async function renderUsersList() {
             <div class="list-item-header">
                 <div>
                     <div class="list-item-title">${user.name}</div>
-                    <div class="list-item-info">${roleText} • PIN: ${user.pin_code}</div>
+                    <div class="list-item-info">${roleText} • code masqué</div>
                 </div>
                 <div class="list-item-actions">
                     ${roleBadge}
@@ -1703,11 +1773,17 @@ function openUserModal(userId = null) {
         // Mode édition
         title.textContent = 'Modifier l\'utilisateur';
         document.getElementById('user-name').value = user.name;
-        document.getElementById('user-pin').value = user.pin_code;
+        // Le code n'est plus lisible, même par le patron. Champ laissé vide :
+        // le remplir attribue un nouveau code, le laisser vide le conserve.
+        document.getElementById('user-pin').value = '';
+        document.getElementById('user-pin').placeholder = 'Laisser vide pour conserver le code actuel';
+        document.getElementById('user-pin').required = false;
         document.getElementById('user-role').value = user.role;
     } else {
         // Mode création
         title.textContent = 'Nouvel utilisateur';
+        document.getElementById('user-pin').placeholder = '6 chiffres';
+        document.getElementById('user-pin').required = true;
     }
 
     modal.classList.add('active');
@@ -1716,32 +1792,40 @@ function openUserModal(userId = null) {
 async function handleUserSubmit(e) {
     e.preventDefault();
 
-    const userData = {
-        name: document.getElementById('user-name').value,
-        pin_code: document.getElementById('user-pin').value,
-        role: document.getElementById('user-role').value
-    };
+    const nom = document.getElementById('user-name').value;
+    const role = document.getElementById('user-role').value;
+    const pinSaisi = document.getElementById('user-pin').value.trim();
+    const enEdition = !!AppState.editingUser;
 
-    // Validation
-    if (!/^\d{6}$/.test(userData.pin_code)) {
+    // En édition, un champ vide conserve le code existant.
+    if (!enEdition && !/^\d{6}$/.test(pinSaisi)) {
+        alert('❌ Le code PIN doit contenir exactement 6 chiffres');
+        return;
+    }
+    if (enEdition && pinSaisi !== '' && !/^\d{6}$/.test(pinSaisi)) {
         alert('❌ Le code PIN doit contenir exactement 6 chiffres');
         return;
     }
 
     showLoading(true);
 
-    let result;
-    if (AppState.editingUser) {
-        // Mise à jour
-        result = await db.updateUser(AppState.editingUser.id, userData);
-    } else {
-        // Création
-        result = await db.createUser(userData);
-    }
+    const result = await db.saveUser(adminPinSession, {
+        id: enEdition ? AppState.editingUser.id : null,
+        name: nom,
+        role: role,
+        pin: pinSaisi === '' ? null : pinSaisi
+    });
 
     showLoading(false);
 
     if (result.success) {
+        // Si le patron vient de changer SON PROPRE code, le code garde en
+        // memoire est devenu faux : tout echouerait ensuite avec « Code patron
+        // invalide », y compris le simple rafraichissement de la liste.
+        const cestMoi = enEdition && AppState.editingUser.id === db.getCurrentUser()?.id;
+        if (cestMoi && pinSaisi !== '') {
+            adminPinSession = pinSaisi;
+        }
         closeModal('user-modal');
         await renderUsersList();
     } else {
@@ -1755,7 +1839,7 @@ async function deleteUser(userId) {
     }
 
     showLoading(true);
-    const result = await db.deleteUser(userId);
+    const result = await db.deleteUser(adminPinSession, userId);
     showLoading(false);
 
     if (result.success) {

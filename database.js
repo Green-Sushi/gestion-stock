@@ -1,5 +1,9 @@
 // Gestionnaire de base de données avec Supabase
 class DatabaseManager {
+    // Duree d'une session : 12 heures. Couvre une journee de travail sans
+    // gener, et un telephone oublie ne reste pas ouvert indefiniment.
+    static SESSION_DUREE_MS = 12 * 60 * 60 * 1000;
+
     constructor() {
         this.supabase = null;
         this.currentUser = null;
@@ -26,22 +30,38 @@ class DatabaseManager {
 
     // ===== AUTHENTIFICATION =====
 
+    // La table `users` n'est plus accessible depuis le navigateur : la
+    // verification passe par une fonction de la base, qui compare le code a
+    // son empreinte et ne renvoie JAMAIS le code lui-meme.
     async authenticateWithPin(pin) {
         try {
-            const { data, error } = await this.supabase
-                .from('users')
-                .select('*')
-                .eq('pin_code', pin)
-                .single();
+            const { data, error } = await this.supabase.rpc('verify_pin', { p_pin: pin });
 
-            if (error) throw error;
+            // Ne JAMAIS annoncer « code invalide » quand c'est la base qui est
+            // injoignable : l'utilisateur en conclurait qu'il a perdu son code.
+            if (error) {
+                console.error('Erreur authentification:', error);
+                return { success: false, error: 'Connexion impossible. Vérifiez le réseau et réessayez.' };
+            }
+            if (!data || data.length === 0) {
+                return { success: false, error: 'Code PIN invalide' };
+            }
 
-            this.currentUser = data;
-            localStorage.setItem('currentUser', JSON.stringify(data));
-            return { success: true, user: data };
+            const row = data[0];
+            // On ne conserve QUE de quoi identifier la session. Jamais le code.
+            const session = {
+                id: row.user_id,
+                name: row.user_name,
+                role: row.user_role,
+                expiresAt: Date.now() + DatabaseManager.SESSION_DUREE_MS
+            };
+
+            this.currentUser = session;
+            localStorage.setItem('currentUser', JSON.stringify(session));
+            return { success: true, user: session };
         } catch (error) {
             console.error('Erreur authentification:', error);
-            return { success: false, error: 'Code PIN invalide' };
+            return { success: false, error: 'Connexion impossible. Vérifiez le réseau et réessayez.' };
         }
     }
 
@@ -51,14 +71,27 @@ class DatabaseManager {
     }
 
     getCurrentUser() {
-        if (this.currentUser) return this.currentUser;
-
-        const stored = localStorage.getItem('currentUser');
-        if (stored) {
-            this.currentUser = JSON.parse(stored);
+        if (this.currentUser) {
+            if (this.estSessionExpiree(this.currentUser)) { this.logout(); return null; }
             return this.currentUser;
         }
-        return null;
+
+        const stored = localStorage.getItem('currentUser');
+        if (!stored) return null;
+
+        let session;
+        try { session = JSON.parse(stored); } catch { this.logout(); return null; }
+
+        // Une session d'avant ce changement n'a pas d'echeance : on la rejette
+        // plutot que de la laisser vivre indefiniment.
+        if (this.estSessionExpiree(session)) { this.logout(); return null; }
+
+        this.currentUser = session;
+        return this.currentUser;
+    }
+
+    estSessionExpiree(session) {
+        return !session || !session.expiresAt || Date.now() > session.expiresAt;
     }
 
     isPatron() {
@@ -67,61 +100,41 @@ class DatabaseManager {
 
     // ===== GESTION DES UTILISATEURS =====
 
-    async getUsers() {
-        try {
-            const { data, error } = await this.supabase
-                .from('users')
-                .select('*')
-                .order('name');
+    // Les quatre fonctions ci-dessous exigent un code patron valide, verifie
+    // PAR LA BASE. L'interface ne peut plus s'en dispenser : la table est
+    // fermee, il n'existe aucun autre chemin.
 
+    async getUsers(adminPin) {
+        try {
+            const { data, error } = await this.supabase.rpc('admin_list_users', { p_admin_pin: adminPin });
             if (error) throw error;
-            return { success: true, data };
+            // On remet des noms de champs conformes au reste de l'application.
+            const users = (data || []).map(r => ({ id: r.user_id, name: r.user_name, role: r.user_role }));
+            return { success: true, data: users };
         } catch (error) {
             console.error('Erreur récupération utilisateurs:', error);
             return { success: false, error: error.message };
         }
     }
 
-    async createUser(userData) {
+    async saveUser(adminPin, { id = null, name, role, pin = null }) {
         try {
-            const { data, error } = await this.supabase
-                .from('users')
-                .insert([userData])
-                .select()
-                .single();
-
+            const { data, error } = await this.supabase.rpc('admin_save_user', {
+                p_admin_pin: adminPin, p_id: id, p_name: name, p_role: role, p_pin: pin
+            });
             if (error) throw error;
-            return { success: true, data };
+            return { success: true, data: { id: data } };
         } catch (error) {
-            console.error('Erreur création utilisateur:', error);
+            console.error('Erreur enregistrement utilisateur:', error);
             return { success: false, error: error.message };
         }
     }
 
-    async updateUser(userId, userData) {
+    async deleteUser(adminPin, userId) {
         try {
-            const { data, error } = await this.supabase
-                .from('users')
-                .update(userData)
-                .eq('id', userId)
-                .select()
-                .single();
-
-            if (error) throw error;
-            return { success: true, data };
-        } catch (error) {
-            console.error('Erreur modification utilisateur:', error);
-            return { success: false, error: error.message };
-        }
-    }
-
-    async deleteUser(userId) {
-        try {
-            const { error } = await this.supabase
-                .from('users')
-                .delete()
-                .eq('id', userId);
-
+            const { error } = await this.supabase.rpc('admin_delete_user', {
+                p_admin_pin: adminPin, p_id: userId
+            });
             if (error) throw error;
             return { success: true };
         } catch (error) {

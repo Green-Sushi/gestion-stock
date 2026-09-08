@@ -93,14 +93,23 @@ function applyPermissions() {
     const patronOnlyElements = [
         'add-product-btn',          // Bouton ajouter produit
         'add-supplier-btn',         // Bouton ajouter fournisseur
-        'manage-users-btn'          // Bouton gérer utilisateurs
+        'manage-users-btn',         // Bouton gérer utilisateurs
+        // Blocs de l'ecran Parametres reserves au patron. 'setting-users'
+        // est le plus sensible : il affiche le code PIN de chaque compte en
+        // clair, celui du patron compris.
+        'setting-email',            // Bloc notifications e-mail
+        'setting-whatsapp',         // Bloc notifications WhatsApp
+        'setting-save',             // Bloc enregistrer les reglages
+        'setting-users'             // Bloc gestion des comptes
         // 'send-alerts-btn' supprimé - accessible à tous
     ];
 
     // Onglets réservés au patron
+    // 'settings-page' n'y figure plus : l'onglet est ouvert aux employes pour
+    // qu'ils disposent d'un chemin de deconnexion. Seuls deux de ses six blocs
+    // leur sont visibles ; les quatre autres sont masques ci-dessous.
     const patronOnlyTabs = [
-        'suppliers-page',   // Page fournisseurs
-        'settings-page'     // Page paramètres
+        'suppliers-page'    // Page fournisseurs
     ];
 
     // Cacher/afficher les éléments selon le rôle
@@ -125,12 +134,22 @@ function applyPermissions() {
 
 // Afficher l'emoji du rôle dans le header
 function updateRoleIcon() {
-    const roleIcon = document.getElementById('role-icon');
-    if (!roleIcon) return;
+    const chip = document.getElementById('session-chip');
+    if (!chip) return;
 
     const isPatron = db.isPatron();
-    roleIcon.textContent = isPatron ? '🔑' : '👤';
-    roleIcon.title = isPatron ? 'Patron' : 'Salarié';
+    const name = db.getCurrentUser()?.name;
+
+    // Sans nom, on n'affiche rien plutot qu'une pastille vide.
+    if (!name) {
+        chip.textContent = '';
+        chip.style.display = 'none';
+        return;
+    }
+
+    chip.style.display = '';
+    chip.textContent = (isPatron ? '🔑 ' : '👤 ') + name;
+    chip.title = isPatron ? 'Patron' : 'Salarié';
 }
 
 // ====================
@@ -294,7 +313,9 @@ function setupGlobalListeners() {
     });
 
     // Logout
-    document.getElementById('logout-btn')?.addEventListener('click', logout);
+    // Unique chemin de deconnexion depuis le lot 3 : le bouton du bandeau a
+    // ete remplace par la pastille de session. C'est pourquoi l'onglet
+    // Parametres est desormais ouvert aux employes (voir applyPermissions).
     document.getElementById('logout-btn-settings')?.addEventListener('click', logout);
     document.getElementById('confirm-logout-btn')?.addEventListener('click', confirmLogout);
 

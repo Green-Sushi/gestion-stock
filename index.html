@@ -107,19 +107,10 @@
             text-align: center;
         }
 
-        .header-icon {
+        /* Contrepoids de la pastille de session : garde le titre centre. */
+        .header-spacer {
             width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            border-radius: 8px;
-            transition: background 0.2s;
-        }
-
-        .header-icon:active {
-            background: rgba(255,255,255,0.2);
+            flex: none;
         }
 
         .alert-badge {
@@ -496,6 +487,9 @@
             display: flex;
             align-items: center;
             gap: 6px;
+            max-width: 40vw;
+            overflow: hidden;
+            text-overflow: ellipsis;
             background: rgba(255, 255, 255, .16);
             padding: 4px 10px;
             border-radius: 999px;
@@ -1118,7 +1112,7 @@
             width: 50px;
             height: 28px;
             background: #ddd;
-            border-radius: 13px;
+            border-radius: 999px;
             cursor: pointer;
             transition: background 0.3s;
         }
@@ -1394,7 +1388,7 @@
     <header>
         <div class="session-chip" id="session-chip"></div>
         <h1 id="header-title">Green Sushi - Stock</h1>
-        <div style="width: 40px;"></div>
+        <div class="header-spacer"></div>
     </header>
 
     <!-- LOADING -->

@@ -348,6 +348,11 @@ function setupGlobalListeners() {
     // détaché de sa ligne. `capture` car le défilement se produit sur un
     // conteneur interne et ne remonte pas jusqu'à document.
     document.addEventListener('scroll', () => {
+        // Un appui sur iPhone s'accompagne presque toujours d'un déplacement
+        // du doigt de 1 ou 2 pixels, qui produit un événement de défilement
+        // dans l'instant. Sans ce garde-temps, le menu se refermait avant
+        // même que l'appui sur « Modifier » ou « Supprimer » n'aboutisse.
+        if (Date.now() - productMenuOpenedAt < 600) return;
         closeAllProductMenus();
     }, { capture: true, passive: true });
 
@@ -709,17 +714,25 @@ function renderProducts(searchTerm = '') {
 }
 
 // Menu « ⋯ » d'une ligne produit : un seul menu ouvert à la fois.
+// Instant d'ouverture du dernier menu. Sert à ignorer le micro-défilement
+// que produit le doigt au moment même de l'appui : sans ce délai, le menu se
+// refermait aussitôt ouvert et l'appui suivant tombait dans le vide.
+let productMenuOpenedAt = 0;
+
 function toggleProductMenu(menu) {
     const wasOpen = menu.classList.contains('open');
     closeAllProductMenus();
     if (!wasOpen) {
         menu.classList.add('open');
+        menu.closest('.product-item')?.classList.add('menu-open');
         setProductMenuBackdrop(true);
+        productMenuOpenedAt = Date.now();
     }
 }
 
 function closeAllProductMenus() {
     document.querySelectorAll('.product-menu.open').forEach(m => m.classList.remove('open'));
+    document.querySelectorAll('.product-item.menu-open').forEach(i => i.classList.remove('menu-open'));
     setProductMenuBackdrop(false);
 }
 

@@ -606,6 +606,14 @@
             display: block;
         }
 
+        /* La ligne dont le menu est ouvert passe AU-DESSUS du voile.
+           Sans ça, selon l'empilement des couches, le voile pouvait
+           intercepter les appuis sur « Modifier » et « Supprimer », qui
+           restaient alors sans effet. */
+        .product-item.menu-open {
+            z-index: 30;
+        }
+
         /* Voile derrière le menu ouvert. Il rend l'état sans ambiguïté :
            sans lui, le menu se superpose au bouton « +10 » de sa propre
            ligne et un appui réflexe tombe sur « Supprimer ». */
@@ -1848,8 +1856,8 @@
     <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
-    <script src="config.js?v=20260909"></script>
-    <script src="database.js?v=20260909"></script>
-    <script src="app.js?v=20260909"></script>
+    <script src="config.js?v=20260910"></script>
+    <script src="database.js?v=20260910"></script>
+    <script src="app.js?v=20260910"></script>
 </body>
 </html>

@@ -351,13 +351,17 @@ function setupGlobalListeners() {
     }, { capture: true, passive: true });
 
     // Fermeture du voile par appui direct dessus, en plus de l'écouteur
-    // global ci-dessus. Garde-fou : si l'appui sur le voile ne remontait pas
-    // comme un clic (comportement possible de Safari iOS), l'écran resterait
-    // grisé et sans réaction. On écoute donc aussi le toucher.
+    // global ci-dessus. Porter un gestionnaire de clic suffit à rendre le
+    // voile « cliquable » pour Safari iOS, qui sinon n'émettrait aucun clic
+    // sur un <div> nu : l'écran resterait grisé et sans réaction.
+    //
+    // NE PAS ajouter d'écouteur `touchstart` ici. Fermer le voile dès le
+    // toucher le fait disparaître AVANT le clic qui suit ~300 ms plus tard ;
+    // ce clic serait alors dirigé vers l'élément situé dessous — donc
+    // potentiellement sur « Supprimer ». C'est le « clic fantôme ».
     const menuBackdrop = document.getElementById('product-menu-backdrop');
     if (menuBackdrop) {
         menuBackdrop.addEventListener('click', closeAllProductMenus);
-        menuBackdrop.addEventListener('touchstart', closeAllProductMenus, { passive: true });
     }
 
     // Boutons d'ajout

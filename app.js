@@ -295,6 +295,7 @@ function setupGlobalListeners() {
 
     // Logout
     document.getElementById('logout-btn')?.addEventListener('click', logout);
+    document.getElementById('logout-btn-settings')?.addEventListener('click', logout);
     document.getElementById('confirm-logout-btn')?.addEventListener('click', confirmLogout);
 
     // Clavier PIN (event delegation au niveau document pour fonctionner toujours)

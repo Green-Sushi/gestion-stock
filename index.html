@@ -17,6 +17,29 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
+        /* === POLICES LOCALES (aucune requête externe) ===
+           Fredoka et Outfit sont des polices VARIABLES : un seul fichier
+           couvre toute la plage de graisses. D'où une seule règle par
+           famille, avec une plage de font-weight. Déclarer un fichier par
+           graisse ne sert à rien et téléchargerait le même fichier 3 fois. */
+        @font-face {
+            font-family: 'Fredoka';
+            src: url('./fonts/Fredoka-variable.woff2') format('woff2-variations'),
+                 url('./fonts/Fredoka-variable.woff2') format('woff2');
+            font-weight: 300 700;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        @font-face {
+            font-family: 'Outfit';
+            src: url('./fonts/Outfit-variable.woff2') format('woff2-variations'),
+                 url('./fonts/Outfit-variable.woff2') format('woff2');
+            font-weight: 100 900;
+            font-style: normal;
+            font-display: swap;
+        }
+
         /* === STYLES GLOBAUX === */
         * {
             box-sizing: border-box;
@@ -31,6 +54,19 @@
             position: fixed;
             width: 100%;
             overscroll-behavior: none;
+        }
+
+        /* Supprime le zoom au double-appui sur tout ce qui se touche.
+           Indispensable au clavier PIN : deux chiffres tapés vite étaient
+           pris pour un double-appui et l'écran zoomait. La balise viewport
+           « user-scalable=no » ne suffit pas : iOS l'ignore depuis iOS 10. */
+        button,
+        .tab,
+        .pin-key,
+        .category-card,
+        .product-info,
+        .btn-product-menu {
+            touch-action: manipulation;
         }
 
         body {
@@ -64,6 +100,7 @@
         }
 
         header h1 {
+            font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, sans-serif;
             font-size: 1.1rem;
             font-weight: 600;
             flex: 1;
@@ -151,14 +188,17 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: calc(100vh - 60px);
-            padding: 20px;
+            /* dvh et non vh : sur iPhone, vh compte la barre d'adresse comme
+               si elle était masquée, ce qui rend la page plus haute que
+               l'écran et la fait défiler pour rien. */
+            min-height: calc(100dvh - 60px);
+            padding: 10px;
         }
 
         .login-box {
-            background: white;
+            background: #eef4f4;
             border-radius: 20px;
-            padding: 40px 30px;
+            padding: 22px 20px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.1);
             text-align: center;
             max-width: 400px;
@@ -166,11 +206,20 @@
         }
 
         .login-icon {
-            font-size: 4rem;
-            margin-bottom: 20px;
+            width: 52px;
+            height: 52px;
+            margin: 0 auto 20px;
+            background: #088F8F;
+            border-radius: 18px;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .login-box h2 {
+            font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-weight: 600;
             margin-bottom: 30px;
             color: #088F8F;
         }
@@ -183,20 +232,19 @@
         }
 
         .pin-digit {
-            width: 50px;
-            height: 60px;
-            font-size: 2rem;
-            text-align: center;
-            border: 2px solid #ddd;
-            border-radius: 12px;
-            background: #f9f9f9;
+            width: 16px;
+            height: 16px;
+            font-size: 0;
+            color: transparent;
+            border: 2px solid #b9cdcd;
+            border-radius: 50%;
+            background: transparent;
             transition: all 0.2s;
         }
 
         .pin-digit.filled {
             border-color: #088F8F;
-            background: #e8f5f5;
-            font-weight: bold;
+            background: #088F8F;
         }
 
         .pin-keyboard {
@@ -208,26 +256,29 @@
         }
 
         .pin-key {
-            background: #088F8F;
-            color: white;
+            background: white;
+            color: #0d3b3b;
             border: none;
-            border-radius: 12px;
-            font-size: 1.5rem;
-            font-weight: bold;
-            padding: 20px;
+            border-radius: 18px;
+            font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-weight: 500;
+            font-size: 1.4rem;
+            padding: 17px;
             cursor: pointer;
             transition: all 0.2s;
-            box-shadow: 0 4px 10px rgba(8, 143, 143, 0.3);
+            box-shadow: 0 1px 3px rgba(8, 40, 40, .10);
         }
 
         .pin-key:active {
             transform: scale(0.95);
-            box-shadow: 0 2px 5px rgba(8, 143, 143, 0.3);
+            box-shadow: 0 1px 2px rgba(8, 40, 40, .10);
         }
 
         .pin-key.delete {
-            background: #e74c3c;
-            box-shadow: 0 4px 10px rgba(231, 76, 60, 0.3);
+            background: transparent;
+            color: #7d9494;
+            font-size: 1.1rem;
+            box-shadow: none;
         }
 
         .pin-key-spacer {
@@ -275,8 +326,9 @@
         .stock-overview-number.ok { color: #27ae60; }
 
         .stock-overview-label {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
             font-size: .68rem;
-            font-weight: 600;
+            font-weight: 700;
             letter-spacing: .05em;
             text-transform: uppercase;
             color: #7b8c8c;
@@ -449,8 +501,9 @@
         }
 
         .page-title {
+            font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, sans-serif;
             font-size: 1.4rem;
-            font-weight: 700;
+            font-weight: 600;
             color: #088F8F;
         }
 
@@ -504,87 +557,109 @@
             transform: scale(0.99);
         }
 
-        .product-actions {
-            position: absolute;
-            top: 10px;
-            right: 10px;
+        .product-top-row {
             display: flex;
-            gap: 8px;
-            z-index: 10;
+            align-items: flex-start;
+            gap: 10px;
         }
 
-        .btn-edit-product,
-        .btn-delete-product,
-        .btn-move-up,
-        .btn-move-down {
-            background: white;
-            color: #555;
-            border: 2px solid #ddd;
+        .product-menu-wrap {
+            position: relative;
+            flex: none;
+        }
+
+        .btn-product-menu {
+            width: 34px;
+            height: 34px;
             border-radius: 8px;
-            width: 40px;
-            height: 40px;
-            font-size: 1.4rem;
-            font-weight: bold;
+            background: #f0f3f3;
+            border: none;
+            color: #7d9494;
+            font-size: 1.3rem;
+            font-weight: 700;
+            line-height: 1;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             padding: 0;
-            line-height: 1;
         }
 
-        .btn-move-up,
-        .btn-move-down {
-            border-color: #3498db;
-            color: #3498db;
-            font-size: 1.6rem;
+        .btn-product-menu:active {
+            background: #e2e9e9;
         }
 
-        .btn-move-up:active {
-            background: #3498db;
-            color: white;
-            transform: scale(0.95);
+        .product-menu {
+            display: none;
+            position: absolute;
+            top: 40px;
+            right: 0;
+            min-width: 160px;
+            background: white;
+            border-radius: 13px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            overflow: hidden;
+            z-index: 20;
         }
 
-        .btn-move-down:active {
-            background: #3498db;
-            color: white;
-            transform: scale(0.95);
+        .product-menu.open {
+            display: block;
         }
 
-        .btn-edit-product {
-            border-color: #088F8F;
-            color: #088F8F;
+        /* La ligne dont le menu est ouvert passe AU-DESSUS du voile.
+           Sans ça, selon l'empilement des couches, le voile pouvait
+           intercepter les appuis sur « Modifier » et « Supprimer », qui
+           restaient alors sans effet. */
+        .product-item.menu-open {
+            z-index: 30;
         }
 
-        .btn-edit-product:hover {
-            background: #088F8F;
-            color: white;
-            transform: scale(1.1);
+        /* Voile derrière le menu ouvert. Il rend l'état sans ambiguïté :
+           sans lui, le menu se superpose au bouton « +10 » de sa propre
+           ligne et un appui réflexe tombe sur « Supprimer ». */
+        #product-menu-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 40, 40, 0.18);
+            z-index: 15;
+            /* INDISPENSABLE sur iPhone : Safari n'émet un événement de clic
+               que sur les éléments qu'il juge cliquables. Sans ce curseur,
+               un appui sur le voile ne produirait AUCUN clic, le voile ne se
+               fermerait jamais et l'écran paraîtrait figé. */
+            cursor: pointer;
         }
 
-        .btn-delete-product {
-            border-color: #e74c3c;
+        #product-menu-backdrop.open {
+            display: block;
+        }
+
+        .product-menu-item {
+            display: block;
+            width: 100%;
+            padding: 12px 16px;
+            background: none;
+            border: none;
+            text-align: left;
+            font-size: 0.95rem;
+            color: #333;
+            cursor: pointer;
+        }
+
+        .product-menu-item:active {
+            background: #f5f5f5;
+        }
+
+        .product-menu-item.delete {
             color: #e74c3c;
-        }
-
-        .btn-delete-product:hover {
-            background: #e74c3c;
-            color: white;
-            transform: scale(1.1);
-        }
-
-        .btn-edit-product:active,
-        .btn-delete-product:active {
-            transform: scale(0.95);
         }
 
         .product-info {
             display: flex;
             flex-direction: column;
             gap: 5px;
+            flex: 1;
+            min-width: 0;
         }
 
         .product-name {
@@ -952,7 +1027,12 @@
         .tab-icon {
             font-size: 1.5rem;
             display: block;
-            margin-bottom: 4px;
+            /* Se rétrécit à la taille de l'icône. Sans ça le span occupe
+               toute la largeur de l'onglet, et le badge d'alertes — calé sur
+               son bord droit — part loin de la cloche dès qu'un onglet
+               s'élargit (vue employé : 2 onglets au lieu de 4). */
+            width: fit-content;
+            margin: 0 auto 4px;
         }
 
         .tab.active {
@@ -1281,7 +1361,12 @@
         <div id="login-page" class="page active">
             <div class="login-container">
                 <div class="login-box">
-                    <div class="login-icon">🔐</div>
+                    <div class="login-icon">
+                        <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="5" y="11" width="14" height="10" rx="2" />
+                            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                        </svg>
+                    </div>
                     <h2>Code PIN</h2>
                     <div class="pin-input">
                         <div class="pin-digit" id="pin-1"></div>
@@ -1453,7 +1538,10 @@
             </div>
 
             <div class="setting-item">
-                <button class="btn btn-danger" style="width: 100%;" id="logout-btn">🚪 Déconnexion</button>
+                <!-- id distinct de celui du bandeau : deux éléments portaient
+                     « logout-btn », si bien que ce bouton-ci était repeint par
+                     le style de l'autre (invisible) et n'avait aucune action. -->
+                <button class="btn btn-danger" style="width: 100%;" id="logout-btn-settings">🚪 Déconnexion</button>
             </div>
         </div>
     </div>
@@ -1724,29 +1812,52 @@
     <!-- NAVIGATION -->
     <nav>
         <div class="tab" data-page="home-page">
-            <span class="tab-icon">🏠</span>
+            <span class="tab-icon">
+                <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 11.5L12 4l9 7.5" />
+                    <path d="M5.5 9.5V20a1 1 0 0 0 1 1H10v-5.5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1V21h3.5a1 1 0 0 0 1-1V9.5" />
+                </svg>
+            </span>
             Accueil
         </div>
         <div class="tab" data-page="alerts-page">
             <span class="tab-icon" style="position: relative;">
-                🔔
+                <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 10a6 6 0 0 1 12 0c0 3.2 1 5 2 6.5H4c1-1.5 2-3.3 2-6.5Z" />
+                    <path d="M10 19a2 2 0 0 0 4 0" />
+                </svg>
                 <div class="alert-badge" id="alert-count">0</div>
             </span>
             Alertes
         </div>
         <div class="tab" data-page="suppliers-page">
-            <span class="tab-icon">📦</span>
+            <span class="tab-icon">
+                <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3.5 8L12 3.5 20.5 8 12 12.5 3.5 8Z" />
+                    <path d="M3.5 8v8.5L12 21l8.5-4.5V8" />
+                    <path d="M12 12.5V21" />
+                </svg>
+            </span>
             Fournisseurs
         </div>
         <div class="tab" data-page="settings-page">
-            <span class="tab-icon">⚙️</span>
+            <span class="tab-icon">
+                <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3.2" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+            </span>
             Paramètres
         </div>
     </nav>
 
+    <!-- Voile affiché derrière un menu « ⋯ » ouvert : rend l'état visible
+         et absorbe le premier appui ailleurs. -->
+    <div id="product-menu-backdrop"></div>
+
     <!-- SCRIPTS -->
-    <script src="config.js?v=20260907"></script>
-    <script src="database.js?v=20260907"></script>
-    <script src="app.js?v=20260907"></script>
+    <script src="config.js?v=20260910"></script>
+    <script src="database.js?v=20260910"></script>
+    <script src="app.js?v=20260910"></script>
 </body>
 </html>

@@ -295,6 +295,7 @@ function setupGlobalListeners() {
 
     // Logout
     document.getElementById('logout-btn')?.addEventListener('click', logout);
+    document.getElementById('logout-btn-settings')?.addEventListener('click', logout);
     document.getElementById('confirm-logout-btn')?.addEventListener('click', confirmLogout);
 
     // Clavier PIN (event delegation au niveau document pour fonctionner toujours)
@@ -334,6 +335,40 @@ function setupGlobalListeners() {
             }
         }
     });
+
+    // Menu « ⋯ » des lignes produit : un seul écouteur global pour fermer
+    // le menu ouvert dès qu'on touche ailleurs (ou qu'on quitte la page).
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.product-menu-wrap')) {
+            closeAllProductMenus();
+        }
+    });
+
+    // Fermer aussi au défilement : sinon le menu « voyage » avec la liste,
+    // détaché de sa ligne. `capture` car le défilement se produit sur un
+    // conteneur interne et ne remonte pas jusqu'à document.
+    document.addEventListener('scroll', () => {
+        // Un appui sur iPhone s'accompagne presque toujours d'un déplacement
+        // du doigt de 1 ou 2 pixels, qui produit un événement de défilement
+        // dans l'instant. Sans ce garde-temps, le menu se refermait avant
+        // même que l'appui sur « Modifier » ou « Supprimer » n'aboutisse.
+        if (Date.now() - productMenuOpenedAt < 600) return;
+        closeAllProductMenus();
+    }, { capture: true, passive: true });
+
+    // Fermeture du voile par appui direct dessus, en plus de l'écouteur
+    // global ci-dessus. Porter un gestionnaire de clic suffit à rendre le
+    // voile « cliquable » pour Safari iOS, qui sinon n'émettrait aucun clic
+    // sur un <div> nu : l'écran resterait grisé et sans réaction.
+    //
+    // NE PAS ajouter d'écouteur `touchstart` ici. Fermer le voile dès le
+    // toucher le fait disparaître AVANT le clic qui suit ~300 ms plus tard ;
+    // ce clic serait alors dirigé vers l'élément situé dessous — donc
+    // potentiellement sur « Supprimer ». C'est le « clic fantôme ».
+    const menuBackdrop = document.getElementById('product-menu-backdrop');
+    if (menuBackdrop) {
+        menuBackdrop.addEventListener('click', closeAllProductMenus);
+    }
 
     // Boutons d'ajout
     document.getElementById('add-product-btn').addEventListener('click', () => {
@@ -585,20 +620,23 @@ function renderProducts(searchTerm = '') {
         const item = document.createElement('div');
         item.className = isLowStock ? 'product-item low-stock-alert' : 'product-item';
 
-        // Boutons d'action visibles uniquement pour le Patron
-        const actionButtons = db.isPatron() ?
-            `<div class="product-actions">
-                <button class="btn-move-up" data-product-id="${product.id}" title="Déplacer vers le haut">↑</button>
-                <button class="btn-move-down" data-product-id="${product.id}" title="Déplacer vers le bas">↓</button>
-                <button class="btn-edit-product" data-product-id="${product.id}" title="Modifier ce produit">✏️</button>
-                <button class="btn-delete-product" data-product-id="${product.id}" title="Supprimer ce produit">🗑️</button>
+        // Menu d'actions (⋯) visible uniquement pour le Patron
+        const actionMenu = db.isPatron() ?
+            `<div class="product-menu-wrap">
+                <button class="btn-product-menu" data-product-id="${product.id}" title="Actions">⋯</button>
+                <div class="product-menu">
+                    <button type="button" class="product-menu-item edit">Modifier</button>
+                    <button type="button" class="product-menu-item delete">Supprimer</button>
+                </div>
             </div>` : '';
 
         item.innerHTML = `
-            ${actionButtons}
-            <div class="product-info" data-product-id="${product.id}">
-                <div class="product-name">${product.name}</div>
-                <div class="product-supplier">${supplierName}</div>
+            <div class="product-top-row">
+                <div class="product-info" data-product-id="${product.id}">
+                    <div class="product-name">${product.name}</div>
+                    <div class="product-supplier">${supplierName}</div>
+                </div>
+                ${actionMenu}
             </div>
             <div class="product-controls">
                 <button class="btn-quick-adjust btn-minus" data-product-id="${product.id}" title="Retirer 1">−</button>
@@ -644,36 +682,28 @@ function renderProducts(searchTerm = '') {
             adjustProductQuantity(product.id, 10);
         });
 
-        // Boutons d'action (Patron uniquement)
+        // Menu d'actions ⋯ (Patron uniquement)
         if (db.isPatron()) {
-            const btnMoveUp = item.querySelector('.btn-move-up');
-            if (btnMoveUp) {
-                btnMoveUp.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    await moveProductUp(product.id);
-                });
-            }
+            const btnMenu = item.querySelector('.btn-product-menu');
+            const menu = item.querySelector('.product-menu');
 
-            const btnMoveDown = item.querySelector('.btn-move-down');
-            if (btnMoveDown) {
-                btnMoveDown.addEventListener('click', async (e) => {
+            if (btnMenu && menu) {
+                btnMenu.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    await moveProductDown(product.id);
+                    toggleProductMenu(menu);
                 });
-            }
 
-            const btnEdit = item.querySelector('.btn-edit-product');
-            if (btnEdit) {
+                const btnEdit = menu.querySelector('.product-menu-item.edit');
                 btnEdit.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    closeAllProductMenus();
                     openProductModal(product);
                 });
-            }
 
-            const btnDelete = item.querySelector('.btn-delete-product');
-            if (btnDelete) {
+                const btnDelete = menu.querySelector('.product-menu-item.delete');
                 btnDelete.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    closeAllProductMenus();
                     deleteProduct(product.id, product.name);
                 });
             }
@@ -681,6 +711,39 @@ function renderProducts(searchTerm = '') {
 
         container.appendChild(item);
     });
+}
+
+// Menu « ⋯ » d'une ligne produit : un seul menu ouvert à la fois.
+// Instant d'ouverture du dernier menu. Sert à ignorer le micro-défilement
+// que produit le doigt au moment même de l'appui : sans ce délai, le menu se
+// refermait aussitôt ouvert et l'appui suivant tombait dans le vide.
+let productMenuOpenedAt = 0;
+
+function toggleProductMenu(menu) {
+    const wasOpen = menu.classList.contains('open');
+    closeAllProductMenus();
+    if (!wasOpen) {
+        menu.classList.add('open');
+        menu.closest('.product-item')?.classList.add('menu-open');
+        setProductMenuBackdrop(true);
+        productMenuOpenedAt = Date.now();
+    }
+}
+
+function closeAllProductMenus() {
+    document.querySelectorAll('.product-menu.open').forEach(m => m.classList.remove('open'));
+    document.querySelectorAll('.product-item.menu-open').forEach(i => i.classList.remove('menu-open'));
+    setProductMenuBackdrop(false);
+}
+
+// Voile derrière le menu ouvert : rend l'état visible et absorbe le premier
+// appui ailleurs, pour qu'un geste réflexe vers « +10 » ne tombe pas sur
+// « Supprimer », que le menu recouvre.
+function setProductMenuBackdrop(visible) {
+    const backdrop = document.getElementById('product-menu-backdrop');
+    if (backdrop) {
+        backdrop.classList.toggle('open', visible);
+    }
 }
 
 function filterProducts(searchTerm) {
@@ -762,6 +825,9 @@ async function adjustProductQuantity(productId, delta) {
 }
 
 // Déplacer un produit vers le haut (Patron uniquement)
+// Depuis le lot 2 (interface allégée), plus aucun bouton n'appelle cette
+// fonction : les flèches ↑/↓ ont été retirées de la ligne produit. La
+// fonction et display_order restent en place, volontairement.
 async function moveProductUp(productId) {
     if (!db.isPatron()) {
         alert('⛔ Accès réservé au patron');
@@ -784,6 +850,9 @@ async function moveProductUp(productId) {
 }
 
 // Déplacer un produit vers le bas (Patron uniquement)
+// Depuis le lot 2 (interface allégée), plus aucun bouton n'appelle cette
+// fonction : les flèches ↑/↓ ont été retirées de la ligne produit. La
+// fonction et display_order restent en place, volontairement.
 async function moveProductDown(productId) {
     if (!db.isPatron()) {
         alert('⛔ Accès réservé au patron');

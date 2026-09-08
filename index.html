@@ -122,23 +122,6 @@
             background: rgba(255,255,255,0.2);
         }
 
-        #logout-btn {
-            background: transparent;
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            cursor: pointer;
-            border-radius: 8px;
-            transition: background 0.2s;
-            white-space: nowrap;
-        }
-
-        #logout-btn:active {
-            background: rgba(255,255,255,0.2);
-        }
-
         .alert-badge {
             background-color: #e74c3c;
             color: white;
@@ -197,7 +180,7 @@
 
         .login-box {
             background: #eef4f4;
-            border-radius: 20px;
+            border-radius: 18px;
             padding: 22px 20px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.1);
             text-align: center;
@@ -295,7 +278,7 @@
         /* === BANDEAU VUE D'ENSEMBLE === */
         .stock-overview {
             background: white;
-            border-radius: 14px;
+            border-radius: 13px;
             padding: 14px 10px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
             display: grid;
@@ -358,7 +341,7 @@
 
         .category-card {
             background: white;
-            border-radius: 16px;
+            border-radius: 18px;
             padding: 15px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
             cursor: pointer;
@@ -430,7 +413,7 @@
             background: #088F8F;
             color: white;
             border: none;
-            border-radius: 12px;
+            border-radius: 999px;
             padding: 14px 24px;
             font-size: 1rem;
             font-weight: 600;
@@ -454,6 +437,72 @@
         .btn-danger {
             background: #e74c3c;
             box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+        }
+
+        /* === CLASSES PARTAGEES DES BOUTONS ===
+           Remplacent les habillages qui etaient ecrits a la main dans les
+           balises. Aucune couleur ne doit plus figurer dans un attribut style. */
+        .btn-success {
+            background: #27ae60;
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+        }
+
+        .btn-whatsapp {
+            background: #25D366;
+            font-size: 1.1rem;
+            box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
+        }
+
+        .btn-email {
+            background: #3498db;
+            font-size: 1.1rem;
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn-full {
+            width: 100%;
+            justify-content: center;
+        }
+
+        /* Bouton d'une paire empilee dans une fenetre de confirmation. */
+        .btn-stacked {
+            width: 100%;
+            justify-content: center;
+            min-height: 48px;
+            font-weight: 600;
+        }
+
+        /* Annulation : contour seul. Le regard doit aller d'abord a l'action. */
+        .btn-ghost {
+            background: #fff;
+            color: #5b7373;
+            border: 1.5px solid #d3e0e0;
+            box-shadow: none;
+        }
+
+        .btn-ghost:active {
+            background: #f2f7f7;
+        }
+
+        /* Paire de boutons empiles dans une fenetre de confirmation. */
+        .modal-actions.stacked {
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* Pastille de session dans le bandeau : remplace l'ancien bouton de
+           deconnexion et repond a « on ne sait pas qui est connecte ». */
+        .session-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 255, 255, .16);
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: .78rem;
+            font-weight: 600;
+            color: #fff;
+            white-space: nowrap;
         }
 
         .btn-small {
@@ -524,7 +573,7 @@
             width: 100%;
             padding: 12px 40px 12px 15px;
             border: 2px solid #ddd;
-            border-radius: 12px;
+            border-radius: 13px;
             font-size: 1rem;
             transition: border 0.2s;
         }
@@ -536,7 +585,7 @@
 
         .product-item {
             background: white;
-            border-radius: 15px;
+            border-radius: 18px;
             padding: 20px;
             margin-bottom: 15px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.06);
@@ -684,7 +733,7 @@
             text-align: center;
             min-width: 90px;
             padding: 10px 15px;
-            border-radius: 10px;
+            border-radius: 13px;
             transition: all 0.3s ease;
         }
 
@@ -740,7 +789,7 @@
         .btn-quick-adjust {
             width: 50px;
             height: 50px;
-            border-radius: 12px;
+            border-radius: 13px;
             border: 2px solid #088F8F;
             background: white;
             color: #088F8F;
@@ -820,7 +869,7 @@
             width: 100%;
             padding: 12px;
             border: 2px solid #ddd;
-            border-radius: 12px;
+            border-radius: 13px;
             font-size: 1rem;
             transition: border 0.2s;
         }
@@ -857,7 +906,7 @@
 
         .modal-content {
             background: white;
-            border-radius: 20px;
+            border-radius: 18px;
             padding: 25px;
             max-width: 500px;
             width: 100%;
@@ -902,7 +951,7 @@
         /* === LISTE GÉNÉRIQUES === */
         .list-item {
             background: white;
-            border-radius: 12px;
+            border-radius: 13px;
             padding: 15px;
             margin-bottom: 12px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.06);
@@ -936,7 +985,7 @@
             font-weight: 700;
             color: white;
             padding: 4px 10px;
-            border-radius: 12px;
+            border-radius: 13px;
             white-space: nowrap;
         }
 
@@ -1047,7 +1096,7 @@
         /* === SETTINGS === */
         .setting-item {
             background: white;
-            border-radius: 12px;
+            border-radius: 13px;
             padding: 15px;
             margin-bottom: 12px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.06);
@@ -1069,7 +1118,7 @@
             width: 50px;
             height: 28px;
             background: #ddd;
-            border-radius: 14px;
+            border-radius: 13px;
             cursor: pointer;
             transition: background 0.3s;
         }
@@ -1224,7 +1273,7 @@
 
         .frozen-item {
             background: white;
-            border-radius: 15px;
+            border-radius: 18px;
             padding: 15px;
             margin-bottom: 12px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.06);
@@ -1275,7 +1324,7 @@
             font-weight: 700;
             color: white;
             padding: 2px 8px;
-            border-radius: 10px;
+            border-radius: 13px;
             margin-left: 8px;
         }
 
@@ -1299,7 +1348,7 @@
 
         .frozen-card {
             background: white;
-            border-radius: 16px;
+            border-radius: 18px;
             padding: 15px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
             cursor: pointer;
@@ -1343,11 +1392,9 @@
 
     <!-- HEADER -->
     <header>
-        <button id="logout-btn" title="Déconnexion">
-            Se déconnecter
-        </button>
+        <div class="session-chip" id="session-chip"></div>
         <h1 id="header-title">Green Sushi - Stock</h1>
-        <div class="header-icon" id="role-icon" title="Rôle utilisateur"></div>
+        <div style="width: 40px;"></div>
     </header>
 
     <!-- LOADING -->
@@ -1495,7 +1542,7 @@
                 <h2 class="page-title">Paramètres</h2>
             </div>
 
-            <div class="setting-item">
+            <div class="setting-item" id="setting-email">
                 <div class="setting-header">
                     <div class="setting-title">Notifications par Email</div>
                     <div class="toggle" id="email-toggle">
@@ -1507,7 +1554,7 @@
                 </div>
             </div>
 
-            <div class="setting-item">
+            <div class="setting-item" id="setting-whatsapp">
                 <div class="setting-header">
                     <div class="setting-title">Notifications WhatsApp</div>
                     <div class="toggle" id="whatsapp-toggle">
@@ -1519,11 +1566,11 @@
                 </div>
             </div>
 
-            <div class="setting-item">
-                <button class="btn" style="width: 100%;" id="save-settings-btn">💾 Sauvegarder les paramètres</button>
+            <div class="setting-item" id="setting-save">
+                <button class="btn btn-full" id="save-settings-btn">💾 Sauvegarder les paramètres</button>
             </div>
 
-            <div class="setting-item">
+            <div class="setting-item" id="setting-users">
                 <div class="setting-header">
                     <div class="setting-title">Utilisateurs</div>
                     <button class="btn btn-small" id="manage-users-btn">Gérer</button>
@@ -1541,7 +1588,7 @@
                 <!-- id distinct de celui du bandeau : deux éléments portaient
                      « logout-btn », si bien que ce bouton-ci était repeint par
                      le style de l'autre (invisible) et n'avait aucune action. -->
-                <button class="btn btn-danger" style="width: 100%;" id="logout-btn-settings">🚪 Déconnexion</button>
+                <button class="btn btn-danger btn-full" id="logout-btn-settings">🚪 Déconnexion</button>
             </div>
         </div>
     </div>
@@ -1609,9 +1656,9 @@
         <div class="modal-content" style="max-width: 320px;">
             <div style="padding: 30px 20px; text-align: center;">
                 <h3 style="font-size: 1.25rem; color: #333; margin: 0 0 30px 0;">Se déconnecter ?</h3>
-                <div class="modal-actions" style="gap: 15px;">
-                    <button type="button" class="btn btn-secondary close-modal" data-modal="logout-modal" style="flex: 1; font-weight: 600;">NON</button>
-                    <button type="button" class="btn" id="confirm-logout-btn" style="background: #e74c3c; flex: 1; font-weight: 600;">OUI</button>
+                <div class="modal-actions stacked">
+                    <button type="button" class="btn btn-danger btn-stacked" id="confirm-logout-btn">Se déconnecter</button>
+                    <button type="button" class="btn btn-ghost btn-stacked close-modal" data-modal="logout-modal">Annuler</button>
                 </div>
             </div>
         </div>
@@ -1624,13 +1671,13 @@
                 <h3 style="font-size: 1.25rem; color: #333; margin: 0 0 10px 0; text-align: center;">Envoyer le récapitulatif</h3>
                 <p style="color: #666; font-size: 0.9rem; text-align: center; margin-bottom: 30px;">Choisissez votre méthode d'envoi</p>
                 <div style="display: flex; flex-direction: column; gap: 15px;">
-                    <button type="button" class="btn" id="send-whatsapp-btn" style="width: 100%; background: #25D366; font-size: 1.1rem;">
+                    <button type="button" class="btn btn-whatsapp btn-full" id="send-whatsapp-btn">
                         💬 WhatsApp
                     </button>
-                    <button type="button" class="btn" id="send-email-btn" style="width: 100%; background: #3498db; font-size: 1.1rem;">
+                    <button type="button" class="btn btn-email btn-full" id="send-email-btn">
                         ✉️ Email
                     </button>
-                    <button type="button" class="btn btn-secondary close-modal" data-modal="send-choice-modal" style="width: 100%; margin-top: 10px;">
+                    <button type="button" class="btn btn-ghost btn-full close-modal" data-modal="send-choice-modal">
                         Annuler
                     </button>
                 </div>
@@ -1643,9 +1690,9 @@
         <div class="modal-content" style="max-width: 360px;">
             <div style="padding: 30px 20px; text-align: center;">
                 <h3 style="font-size: 1.25rem; color: #333; margin: 0 0 30px 0;">Message envoyé ?</h3>
-                <div class="modal-actions" style="gap: 15px;">
-                    <button type="button" class="btn btn-secondary" id="send-not-confirmed-btn" style="flex: 1; font-weight: 600;">NON</button>
-                    <button type="button" class="btn" id="send-confirmed-btn" style="background: #27ae60; flex: 1; font-weight: 600;">OUI</button>
+                <div class="modal-actions stacked">
+                    <button type="button" class="btn btn-success btn-stacked" id="send-confirmed-btn">Oui, c'est envoyé</button>
+                    <button type="button" class="btn btn-ghost btn-stacked" id="send-not-confirmed-btn">Non, pas encore</button>
                 </div>
             </div>
         </div>
@@ -1732,7 +1779,7 @@
                 <button class="close-modal" data-modal="users-management-modal">×</button>
             </div>
             <div id="users-list" style="margin-bottom: 20px;"></div>
-            <button class="btn" id="add-user-btn" style="width: 100%;">+ Ajouter un utilisateur</button>
+            <button class="btn btn-full" id="add-user-btn">+ Ajouter un utilisateur</button>
         </div>
     </div>
 
@@ -1856,8 +1903,8 @@
     <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
-    <script src="config.js?v=20260910"></script>
-    <script src="database.js?v=20260910"></script>
-    <script src="app.js?v=20260910"></script>
+    <script src="config.js?v=20260911"></script>
+    <script src="database.js?v=20260911"></script>
+    <script src="app.js?v=20260911"></script>
 </body>
 </html>

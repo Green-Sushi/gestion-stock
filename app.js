@@ -1121,7 +1121,9 @@ async function handleProductSubmit(e) {
     e.preventDefault();
 
     const productData = {
-        name: document.getElementById('product-name').value,
+        // Nettoyé à l'enregistrement : une espace en fin de nom casse la mise
+        // en gras du récapitulatif et fausse les tris alphabétiques.
+        name: document.getElementById('product-name').value.trim(),
         category: document.getElementById('product-category').value,
         supplier_id: document.getElementById('product-supplier').value || null,
         quantity: parseFloat(document.getElementById('product-quantity').value),
@@ -1433,7 +1435,13 @@ function generateAlertMessage(gras = true) {
         weekday: 'long', day: 'numeric', month: 'long'
     });
 
-    const emphase = (t) => gras ? '*' + t + '*' : t;
+    // WhatsApp n'applique le gras que si l'astérisque de fermeture colle au
+    // dernier caractère. Un nom terminé par une espace — 15 produits sont
+    // dans ce cas — affichait « *Mochi - Matcha * » en toutes lettres.
+    const emphase = (t) => {
+        const propre = String(t).trim();
+        return gras ? '*' + propre + '*' : propre;
+    };
     const nomCategorie = (id) => {
         const c = CATEGORIES.find(x => x.id === id);
         return (c ? c.name : id).replace(/^Stock /, '').toUpperCase();

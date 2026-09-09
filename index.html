@@ -682,14 +682,14 @@
            haut sur un iPhone et repousserait les cartes hors de l'écran. On
            la contient donc en hauteur, posée sur une carte blanche dont le
            fond prolonge la bande blanche du bas de l'image. */
+        /* Les deux visuels sont carrés et de même taille : ils s'affichent
+           donc à l'identique, sans qu'un titre paraisse plus large que
+           l'autre. Pas de carte derrière — l'image EST le titre, et un
+           cadre blanc jurerait avec le fond vert de l'un des deux. */
         .accueil-section-image {
             display: block;
-            width: 100%;
-            background: white;
-            border-radius: 18px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            text-align: center;
             margin: 22px 0 12px;
-            overflow: hidden;
         }
 
         #categories-container .accueil-section-image:first-child { margin-top: 0; }
@@ -697,9 +697,10 @@
         .accueil-section-image img {
             display: block;
             height: 150px;
-            width: auto;
+            width: 150px;
             margin: 0 auto;
-            object-fit: contain;
+            border-radius: 18px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         }
 
         #categories-container { margin-top: 20px; }
@@ -2345,8 +2346,8 @@
     <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
-<script src="config.js?v=20261001"></script>
-    <script src="database.js?v=20261001"></script>
-    <script src="app.js?v=20261001"></script>
+<script src="config.js?v=20261002"></script>
+    <script src="database.js?v=20261002"></script>
+    <script src="app.js?v=20261002"></script>
 </body>
 </html>

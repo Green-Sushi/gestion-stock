@@ -600,13 +600,17 @@ function renderCategories() {
     container.innerHTML = '';
 
     // Mapping des catégories vers les noms de fichiers images
+    // Images en WebP : 512 px suffisent (la carte fait ~175 px, x3 sur un
+    // écran d'iPhone). Les PNG d'origine faisaient 800 px et 6,8 Mo au total,
+    // pour 164 Ko désormais. Ils sont conservés comme repli au cas où un
+    // appareil ne lirait pas ce format — ils ne sont alors jamais téléchargés.
     const categoryImages = {
-        'frais': 'frais.png',
-        'sec': 'sec.png',
-        'surgele': 'surgelé.png',
-        'consommables': 'consommables.png',
-        'boissons': 'boissons.png',
-        'legumes': 'legumes.png'
+        'frais': 'frais',
+        'sec': 'sec',
+        'surgele': 'surgelé',
+        'consommables': 'consommables',
+        'boissons': 'boissons',
+        'legumes': 'legumes'
     };
 
     CATEGORIES.forEach(category => {
@@ -626,7 +630,9 @@ function renderCategories() {
         card.className = 'category-card';
         card.dataset.category = category.id;
         card.innerHTML = `
-            <img src="./images/categories/${categoryImages[category.id]}" alt="${category.name}" class="category-image">
+            <img src="./images/categories/${categoryImages[category.id]}.webp"
+                 onerror="this.onerror=null; this.src='./images/categories/${categoryImages[category.id]}.png';"
+                 alt="${category.name}" class="category-image">
             <div class="category-badges">
                 ${alertCount > 0 ? `<div class="category-badge alerts" title="${alertCount} en alerte">${alertCount}</div>` : ''}
                 ${warningCount > 0 ? `<div class="category-badge warning" title="${warningCount} en limite">${warningCount}</div>` : ''}

@@ -1068,13 +1068,16 @@ function openProductModal(product = null) {
     // c'est normal et affiché comme tel.
     const auteur = document.getElementById('product-auteur');
     if (auteur) {
-        if (product && product.created_by) {
-            const nom = AppState.userNames?.[product.created_by];
-            const quand = product.created_at
-                ? new Date(product.created_at).toLocaleDateString('fr-FR')
-                : null;
-            auteur.textContent = 'Ajouté par ' + (nom || 'un compte supprimé')
+        const quand = product?.created_at
+            ? new Date(product.created_at).toLocaleDateString('fr-FR')
+            : null;
+
+        if (product && product.created_by_name) {
+            auteur.textContent = 'Ajouté par ' + product.created_by_name
                 + (quand ? ' le ' + quand : '');
+        } else if (product && product.created_by) {
+            // Auteur enregistré mais sans nom : cas résiduel, on n'invente pas.
+            auteur.textContent = quand ? 'Ajouté le ' + quand : '';
         } else if (product) {
             auteur.textContent = 'Fiche antérieure au suivi des créations';
         } else {
@@ -1164,12 +1167,6 @@ let adminPinSession = null;
 
 async function loadUsers() {
     AppState.users = [];
-
-    // Noms des comptes, pour afficher « ajouté par X ». N'expose que des
-    // noms : ni rôle, ni code. Un échec est sans gravité, on affiche alors
-    // simplement l'origine sans nom.
-    const noms = await db.getUserNames();
-    AppState.userNames = noms.success ? noms.data : {};
 }
 
 function renderSuppliers(searchTerm = '') {

@@ -33,25 +33,19 @@ ALTER TABLE public.suppliers
   REFERENCES public.users(id) ON DELETE SET NULL;
 
 -- ---------------------------------------------------------------------
--- Lire le nom d'un auteur.
--- La table `users` ayant été fermée le 08/09/2026 (voir
--- migration-securite-comptes.sql), l'application ne peut plus traduire un
--- identifiant d'auteur en nom. Sans cette fonction, la traçabilité
--- existerait sans être lisible dans l'application.
--- Elle ne renvoie QUE identifiants et noms : jamais le rôle, jamais
--- l'empreinte du code. Les noms ne sont pas secrets, ils s'affichent déjà
--- dans le bandeau de l'application.
+-- Nom de l'auteur, inscrit AU MOMENT de la création.
+-- Pourquoi le nom et pas seulement l'identifiant : la table `users` ayant
+-- été fermée le 08/09/2026 (voir migration-securite-comptes.sql),
+-- l'application ne peut plus traduire un identifiant en nom. La première
+-- version de cette migration ouvrait pour cela une fonction publique
+-- listant les comptes — ce qui rendait les prénoms du personnel lisibles
+-- par quiconque possède la clé publique. Écrire le nom sur la fiche évite
+-- toute exposition.
+-- Effet de bord assumé, et correct pour un journal : renommer un compte
+-- plus tard ne réécrit pas l'historique.
 -- ---------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.list_user_names()
-RETURNS TABLE (user_id UUID, user_name VARCHAR)
-LANGUAGE sql SECURITY DEFINER STABLE
-SET search_path = public
-AS $$
-  SELECT u.id, u.name FROM public.users u ORDER BY u.name;
-$$;
-
-REVOKE ALL ON FUNCTION public.list_user_names() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.list_user_names() TO anon, authenticated;
+ALTER TABLE public.products  ADD COLUMN IF NOT EXISTS created_by_name TEXT;
+ALTER TABLE public.suppliers ADD COLUMN IF NOT EXISTS created_by_name TEXT;
 
 COMMIT;
 
@@ -62,9 +56,16 @@ COMMIT;
 -- Aucune donnée d'origine n'est perdue : seule l'information d'auteur,
 -- ajoutée depuis, disparaît.
 --
+-- ⚠️ À N'EXÉCUTER QU'EN MÊME TEMPS QU'UN RETOUR DU CODE DE L'APPLICATION.
+--    L'application écrit dans ces colonnes à chaque création. Les supprimer
+--    en laissant le code en place ferait ÉCHOUER toute création de produit
+--    et de fournisseur : la base rejette une écriture vers une colonne qui
+--    n'existe pas. Revenir d'abord au code d'avant, puis exécuter ceci.
+--
 --   ALTER TABLE public.products  DROP COLUMN IF EXISTS created_by;
+--   ALTER TABLE public.products  DROP COLUMN IF EXISTS created_by_name;
 --   ALTER TABLE public.suppliers DROP COLUMN IF EXISTS created_by;
---   DROP FUNCTION IF EXISTS public.list_user_names();
+--   ALTER TABLE public.suppliers DROP COLUMN IF EXISTS created_by_name;
 --
 -- =====================================================================
 -- CONSULTER LA TRAÇABILITÉ
@@ -72,10 +73,9 @@ COMMIT;
 -- Qui a créé quoi, et quand :
 --
 --   SELECT p.name AS produit,
---          COALESCE(u.name, '(avant le 08/09/2026)') AS cree_par,
+--          COALESCE(p.created_by_name, '(avant le 08/09/2026)') AS cree_par,
 --          p.created_at::date AS le
 --     FROM public.products p
---     LEFT JOIN public.users u ON u.id = p.created_by
 --    ORDER BY p.created_at DESC;
 --
 -- Qui a bougé les quantités (déjà tracé de longue date) :

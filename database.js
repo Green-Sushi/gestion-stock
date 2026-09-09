@@ -467,7 +467,7 @@ class DatabaseManager {
         try {
             const { data, error } = await this.supabase
                 .from('stock_movements')
-                .insert([movementData])
+                .insert([{ ...movementData, user_name: this.currentUser?.name || null }])
                 .select()
                 .single();
 
@@ -486,7 +486,7 @@ class DatabaseManager {
                 .select(`
                     *,
                     product:products(name),
-                    user:users(name, role)
+                    user_name
                 `)
                 .order('created_at', { ascending: false })
                 .limit(limit);
@@ -600,6 +600,7 @@ class DatabaseManager {
                 .from('message_history')
                 .insert([{
                     user_id: this.currentUser?.id,
+                    user_name: this.currentUser?.name || null,
                     send_method: messageData.send_method,
                     recipient: messageData.recipient,
                     message_content: messageData.message_content,
@@ -622,7 +623,7 @@ class DatabaseManager {
                 .from('message_history')
                 .select(`
                     *,
-                    user:users(name, role)
+                    user_name
                 `)
                 .order('sent_at', { ascending: false })
                 .limit(limit);
@@ -641,7 +642,7 @@ class DatabaseManager {
                 .from('message_history')
                 .select(`
                     *,
-                    user:users(name, role)
+                    user_name
                 `)
                 .eq('id', messageId)
                 .single();
@@ -684,7 +685,7 @@ class DatabaseManager {
                     frozen_at,
                     expiry_date,
                     sushi_type:sushi_types(id, name, category),
-                    user:users(id, name)
+                    user_name
                 `)
                 .order('frozen_at', { ascending: false });
 
@@ -711,11 +712,15 @@ class DatabaseManager {
         }
     }
 
+    // Le nom de l'auteur est inscrit SUR la ligne. La table `users` étant
+    // fermée, une jointure vers elle ferait échouer toute la requête —
+    // c'est ce qui avait cassé quatre écrans.
     async createFrozenSushi(data) {
         try {
             const insertData = {
                 sushi_type_id: data.sushi_type_id,
                 fish_type: data.fish_type || null,
+                user_name: this.currentUser?.name || null,
                 quantity: data.quantity,
                 user_id: data.user_id
             };
@@ -735,7 +740,7 @@ class DatabaseManager {
                     frozen_at,
                     expiry_date,
                     sushi_type:sushi_types(id, name, category),
-                    user:users(id, name)
+                    user_name
                 `)
                 .single();
 
@@ -779,7 +784,7 @@ class DatabaseManager {
                     frozen_at,
                     expiry_date,
                     sushi_type:sushi_types(id, name, category),
-                    user:users(id, name)
+                    user_name
                 `)
                 .gte('frozen_at', startDate)
                 .lt('frozen_at', endDate)
@@ -792,6 +797,108 @@ class DatabaseManager {
             return { success: false, error: error.message };
         }
     }
+
+    // ===== GESTION DE LA SURGÉLATION DU POISSON =====
+
+    async getFrozenFish(filters = {}) {
+        try {
+            let query = this.supabase
+                .from('frozen_fish')
+                .select(`
+                    id,
+                    fish_type,
+                    quantity,
+                    unit,
+                    frozen_at,
+                    expiry_date,
+                    note,
+                    user_name
+                `)
+                .order('frozen_at', { ascending: false });
+
+            // Appliquer les filtres si fournis
+            if (filters.month && filters.year) {
+                // Filtrer par mois et année
+                const startDate = `${filters.year}-${filters.month.padStart(2, '0')}-01`;
+                const endMonth = parseInt(filters.month) === 12 ? 1 : parseInt(filters.month) + 1;
+                const endYear = parseInt(filters.month) === 12 ? parseInt(filters.year) + 1 : filters.year;
+                const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+                query = query
+                    .gte('frozen_at', startDate)
+                    .lt('frozen_at', endDate);
+            }
+
+            const { data, error } = await query;
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Erreur récupération surgélations poisson:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // expiry_date n'est PAS calculée par la base pour cette table : c'est
+    // à l'appelant de la fournir (frozen_at + 6 mois). Le nom de l'auteur
+    // est inscrit SUR la ligne. La table `users` étant fermée, une jointure
+    // vers elle ferait échouer toute la requête — c'est ce qui avait cassé
+    // quatre écrans.
+    async createFrozenFish(data) {
+        try {
+            const insertData = {
+                fish_type: data.fish_type,
+                quantity: data.quantity,
+                unit: data.unit,
+                note: data.note || null,
+                expiry_date: data.expiry_date,
+                user_name: this.currentUser?.name || null,
+                user_id: data.user_id
+            };
+
+            // Ajouter frozen_at si fourni, sinon NOW() sera utilisé par défaut
+            if (data.frozen_at) {
+                insertData.frozen_at = data.frozen_at;
+            }
+
+            const { data: result, error } = await this.supabase
+                .from('frozen_fish')
+                .insert([insertData])
+                .select(`
+                    id,
+                    fish_type,
+                    quantity,
+                    unit,
+                    frozen_at,
+                    expiry_date,
+                    note,
+                    user_name
+                `)
+                .single();
+
+            if (error) throw error;
+            return { success: true, data: result };
+        } catch (error) {
+            console.error('Erreur création surgélation poisson:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async deleteFrozenFish(id) {
+        try {
+            const { error } = await this.supabase
+                .from('frozen_fish')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            return { success: true };
+        } catch (error) {
+            console.error('Erreur suppression surgélation poisson:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
 }
 
 // Instance globale

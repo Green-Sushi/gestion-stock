@@ -171,6 +171,10 @@ function showPage(pageId) {
         AppState.currentPage = pageId;
     }
 
+    // L'en-tête est masqué sur l'écran de connexion : le bandeau hors-ligne
+    // doit y remonter en haut plutôt que de flotter dans le vide.
+    document.body.classList.toggle('sur-connexion', pageId === 'login-page');
+
     // Mettre à jour la navigation
     if (pageId !== 'login-page' && pageId !== 'products-page') {
         updateActiveTab(pageId);
@@ -336,8 +340,11 @@ function estHorsLigne() {
 }
 
 function majBandeauReseau() {
+    const horsLigne = estHorsLigne();
     const bandeau = document.getElementById('bandeau-hors-ligne');
-    if (bandeau) bandeau.classList.toggle('visible', estHorsLigne());
+    if (bandeau) bandeau.classList.toggle('visible', horsLigne);
+    // Le contenu descend au lieu d'être recouvert par le bandeau.
+    document.body.classList.toggle('hors-ligne', horsLigne);
 }
 
 // Message unique pour un enregistrement qui a échoué. On distingue le réseau
@@ -345,8 +352,19 @@ function majBandeauReseau() {
 function signalerEchec(prefixe, erreur) {
     if (estHorsLigne()) {
         notifier('Hors ligne — ' + prefixe + ' non enregistré', 'err', 4000);
+        return;
+    }
+
+    // Cas le plus fréquent en wifi faible : le téléphone SE CROIT en ligne
+    // mais rien ne passe. La couche réseau renvoie alors un texte technique
+    // anglais (« Failed to fetch »), incompréhensible pour l'utilisateur.
+    const texte = String(erreur || '');
+    const echecReseau = /failed to fetch|networkerror|network request failed|load failed|timeout/i.test(texte);
+
+    if (echecReseau || !texte) {
+        notifier(prefixe + ' non enregistré — vérifiez la connexion', 'err', 4500);
     } else {
-        notifier(prefixe + ' : ' + (erreur || 'erreur inconnue'), 'err', 4500);
+        notifier(prefixe + ' : ' + texte, 'err', 4500);
     }
 }
 
@@ -929,7 +947,12 @@ async function adjustProductQuantity(productId, delta) {
         if (qtyElement) {
             qtyElement.textContent = oldQuantity;
         }
-        renderProducts();
+        // Reconstruire la liste détruit un menu « ⋯ » ouvert SANS effacer son
+        // voile : l'écran resterait gris sans explication. On ferme d'abord.
+        closeAllProductMenus();
+        // Et on conserve le filtre de recherche en cours, sinon la liste
+        // complète réapparaît alors que le champ affiche toujours son texte.
+        renderProducts(document.getElementById('product-search')?.value || '');
         signalerEchec('Quantité', result.error);
     } else {
         // Mettre à jour le compteur d'alertes
@@ -1096,7 +1119,7 @@ async function handleProductSubmit(e) {
         await updateAlertCount();
         renderCategories();
     } else {
-        alert('❌ Erreur: ' + result.error);
+        signalerEchec('Produit', result.error);
     }
 }
 
@@ -1897,7 +1920,7 @@ async function handleUserSubmit(e) {
         closeModal('user-modal');
         await renderUsersList();
     } else {
-        alert('❌ Erreur: ' + result.error);
+        signalerEchec('Compte', result.error);
     }
 }
 
@@ -2121,7 +2144,7 @@ async function handleFrozenSubmit(e) {
         await loadFrozenSushi();
         renderFrozenList();
     } else {
-        alert('❌ Erreur: ' + result.error);
+        signalerEchec('Congélation', result.error);
     }
 }
 

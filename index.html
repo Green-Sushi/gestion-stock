@@ -707,16 +707,28 @@
             top: 60px;               /* sous l'en-tête */
             left: 0;
             right: 0;
-            z-index: 250;
+            /* Sous les fenêtres (200) : une fenêtre ouverte hors ligne ne doit
+               pas se faire barrer le haut par le bandeau. */
+            z-index: 150;
             background: #e67e22;
             color: #fff;
             text-align: center;
             padding: 8px 14px;
             font-size: .84rem;
             font-weight: 600;
+            height: 33px;
         }
 
         #bandeau-hors-ligne.visible { display: block; }
+
+        /* Le contenu descend au lieu d'être recouvert : sans ça le bandeau
+           mangeait le haut de la vue d'ensemble et du champ de recherche. */
+        body.hors-ligne .container { margin-top: 93px; }
+
+        /* Sur l'écran de connexion l'en-tête est masqué : le bandeau remonte
+           en haut plutôt que de flotter dans le vide. */
+        body.sur-connexion #bandeau-hors-ligne { top: 0; }
+        body.sur-connexion.hors-ligne .container { margin-top: 33px; }
 
         /* Voile derrière le menu ouvert. Il rend l'état sans ambiguïté :
            sans lui, le menu se superpose au bouton « +10 » de sa propre

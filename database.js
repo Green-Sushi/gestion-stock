@@ -4,9 +4,15 @@ class DatabaseManager {
     // gener, et un telephone oublie ne reste pas ouvert indefiniment.
     static SESSION_DUREE_MS = 12 * 60 * 60 * 1000;
 
-    // Plafond de fiches de traçabilité lues d'un coup. Au-delà, l'écran
-    // invite à filtrer par mois — il ne cache jamais sans le dire.
-    static LIMITE_RECEPTIONS = 200;
+    // Plafond de fiches de traçabilité lues d'un coup. Au-delà, l'écran le
+    // DIT — il ne cache jamais en silence.
+    //
+    // Une fiche = UN produit : une livraison de quinze références en crée
+    // quinze. À 200, le plafond tombait en deux semaines d'usage normal, et
+    // le mois étant le filtre le plus fin, les fiches du début du mois
+    // devenaient inatteignables. Une fiche pèse quelques centaines d'octets :
+    // 1000 reste sans commune mesure avec le poids des photos.
+    static LIMITE_RECEPTIONS = 1000;
 
     constructor() {
         this.supabase = null;

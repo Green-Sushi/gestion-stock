@@ -2777,9 +2777,27 @@ async function getCachedPhotoUrl(storagePath) {
 // Les trois usages — chargement, affichage, export — passent par ici, sinon
 // ils filtreraient chacun sur une période différente.
 function periodeReceptionChoisie() {
-    const mois = document.getElementById('reception-month-filter').value || null;
-    let annee = document.getElementById('reception-year-filter').value || null;
-    if (mois && !annee) annee = String(new Date().getFullYear());
+    const moisSelect = document.getElementById('reception-month-filter');
+    const anneeSelect = document.getElementById('reception-year-filter');
+
+    const mois = moisSelect.value || null;
+    let annee = anneeSelect.value || null;
+
+    if (mois && !annee) {
+        annee = String(new Date().getFullYear());
+        // L'année forcée doit se VOIR. Sans cette ligne, l'écran affichait
+        // « Mars » et « Toutes années » côte à côte alors qu'un seul mois de
+        // mars était chargé : on croyait consulter tout son historique de
+        // mars. Sur un registre qui sert de preuve, c'est l'erreur qui coûte
+        // cher le jour d'un contrôle.
+        //
+        // Une affectation par script ne déclenche pas 'change' : aucun
+        // rechargement en boucle. On vérifie quand même que l'année existe
+        // dans la liste, qui n'est remplie qu'au premier affichage.
+        const existe = Array.from(anneeSelect.options).some(o => o.value === annee);
+        if (existe) anneeSelect.value = annee;
+    }
+
     return { mois, annee };
 }
 
@@ -2815,8 +2833,9 @@ async function loadReceptions() {
     }
 }
 
-// Deuxième filet, après celui du serveur : la liste en mémoire peut avoir
-// été chargée sous une autre période (envoi d'une fiche, suppression).
+// Deuxième filet, après celui du serveur. Aujourd'hui aucun chemin ne charge
+// la liste sans passer par les filtres — c'est une ceinture de sécurité : si
+// un jour l'un d'eux le faisait, l'affichage resterait juste.
 function filtrerReceptions(liste, mois, annee) {
     return (liste || []).filter(item => {
         const date = new Date(item.received_at);

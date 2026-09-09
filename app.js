@@ -1720,7 +1720,7 @@ async function openMessageHistory() {
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
                     <div>
                         <div style="font-weight: 600; color: #333; margin-bottom: 4px;">${dateStr} à ${timeStr}</div>
-                        <div style="color: #666; font-size: 0.9rem;">${message.user ? message.user.name : 'Utilisateur inconnu'}</div>
+                        <div style="color: #666; font-size: 0.9rem;">${message.user_name || 'Auteur non enregistré'}</div>
                     </div>
                     ${methodBadge}
                 </div>
@@ -1780,7 +1780,7 @@ async function openMessageDetail(messageId) {
     const methodLabel = message.send_method === 'whatsapp' ? 'WhatsApp' : 'Email';
     infoContainer.innerHTML = `
         <div style="margin-bottom: 8px;"><strong>Date :</strong> ${dateStr} à ${timeStr}</div>
-        <div style="margin-bottom: 8px;"><strong>Envoyé par :</strong> ${message.user ? message.user.name : 'Utilisateur inconnu'}</div>
+        <div style="margin-bottom: 8px;"><strong>Envoyé par :</strong> ${message.user_name || 'Auteur non enregistré'}</div>
         <div style="margin-bottom: 8px;"><strong>Méthode :</strong> ${methodLabel}</div>
         <div style="margin-bottom: 8px;"><strong>Destinataire :</strong> ${message.recipient}</div>
         <div><strong>Produits en alerte :</strong> ${message.product_count}</div>
@@ -2053,7 +2053,7 @@ function renderFrozenList() {
         const date = new Date(item.frozen_at);
         const dateStr = date.toLocaleDateString('fr-FR');
         const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-        const userName = item.user?.name || 'Inconnu';
+        const userName = item.user_name || 'Auteur non enregistré';
 
         return `
             <div class="frozen-item category-${category}">

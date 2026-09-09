@@ -13,8 +13,14 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/images/logo/LOGO_GREEN_STOCK.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/images/logo/LOGO_GREEN_STOCK.png">
 
-    <!-- Supabase Client -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Bibliothèque Supabase, hébergée ici et non chez un tiers.
+         Deux raisons : sans elle l'application ne peut pas joindre la base,
+         donc une panne du serveur extérieur la rendait totalement inutilisable ;
+         et l'ancienne adresse demandait « la dernière version 2.x », si bien
+         qu'une mise à jour publiée ailleurs arrivait sans avoir été décidée
+         ni testée. Version figée : 2.116.0 (dist/umd), celle qui était servie
+         le 08/09/2026. Toute montée exige de revalider la connexion. -->
+    <script src="./vendor/supabase-js-2.116.0.js"></script>
 
     <style>
         /* === POLICES LOCALES (aucune requête externe) ===
@@ -1987,8 +1993,8 @@
     <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
-    <script src="config.js?v=20260914"></script>
-    <script src="database.js?v=20260914"></script>
-    <script src="app.js?v=20260914"></script>
+    <script src="config.js?v=20260915"></script>
+    <script src="database.js?v=20260915"></script>
+    <script src="app.js?v=20260915"></script>
 </body>
 </html>

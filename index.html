@@ -657,6 +657,14 @@
             z-index: 30;
         }
 
+        /* Origine d'une fiche produit : « ajouté par X le ... ». */
+        .product-auteur {
+            font-size: .74rem;
+            color: #8b9a9a;
+            margin-top: 2px;
+            font-weight: 400;
+        }
+
         /* === MESSAGES DE CONFIRMATION ===
            L'application n'en avait AUCUN : rien ne disait jamais « c'est
            enregistré ». Impossible de distinguer une saisie prise en compte
@@ -1665,6 +1673,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 class="modal-title" id="product-modal-title">Nouveau Produit</h3>
+                <div id="product-auteur" class="product-auteur"></div>
                 <button class="close-modal" data-modal="product-modal">×</button>
             </div>
             <form id="product-form">
@@ -1976,8 +1985,8 @@
     <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
-    <script src="config.js?v=20260913"></script>
-    <script src="database.js?v=20260913"></script>
-    <script src="app.js?v=20260913"></script>
+    <script src="config.js?v=20260914"></script>
+    <script src="database.js?v=20260914"></script>
+    <script src="app.js?v=20260914"></script>
 </body>
 </html>

@@ -93,7 +93,10 @@ function applyPermissions() {
 
     // Éléments réservés au patron
     const patronOnlyElements = [
-        'add-product-btn',          // Bouton ajouter produit
+        // 'add-product-btn' retiré le 08/09/2026 : les employés peuvent
+        // créer des produits. Créer est constructif, supprimer est
+        // destructif — et depuis la migration de traçabilité, on sait
+        // désormais qui a créé quoi. Modifier et supprimer restent au patron.
         'add-supplier-btn',         // Bouton ajouter fournisseur
         'manage-users-btn',         // Bouton gérer utilisateurs
         // Blocs de l'ecran Parametres reserves au patron. 'setting-users'
@@ -1061,6 +1064,24 @@ function openProductModal(product = null) {
         supplierSelect.appendChild(option);
     });
 
+    // Origine de la fiche : vide pour les produits antérieurs au 08/09/2026,
+    // c'est normal et affiché comme tel.
+    const auteur = document.getElementById('product-auteur');
+    if (auteur) {
+        if (product && product.created_by) {
+            const nom = AppState.userNames?.[product.created_by];
+            const quand = product.created_at
+                ? new Date(product.created_at).toLocaleDateString('fr-FR')
+                : null;
+            auteur.textContent = 'Ajouté par ' + (nom || 'un compte supprimé')
+                + (quand ? ' le ' + quand : '');
+        } else if (product) {
+            auteur.textContent = 'Fiche antérieure au suivi des créations';
+        } else {
+            auteur.textContent = '';
+        }
+    }
+
     if (product) {
         // Mode édition
         title.textContent = 'Modifier le produit';
@@ -1143,6 +1164,12 @@ let adminPinSession = null;
 
 async function loadUsers() {
     AppState.users = [];
+
+    // Noms des comptes, pour afficher « ajouté par X ». N'expose que des
+    // noms : ni rôle, ni code. Un échec est sans gravité, on affiche alors
+    // simplement l'origine sans nom.
+    const noms = await db.getUserNames();
+    AppState.userNames = noms.success ? noms.data : {};
 }
 
 function renderSuppliers(searchTerm = '') {

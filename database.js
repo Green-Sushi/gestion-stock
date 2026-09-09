@@ -100,6 +100,22 @@ class DatabaseManager {
 
     // ===== GESTION DES UTILISATEURS =====
 
+    // Noms des comptes, pour afficher « ajouté par X ». La table users étant
+    // fermée, l'application ne peut plus la lire directement. Cette fonction
+    // ne renvoie que des identifiants et des noms : ni rôle, ni empreinte.
+    async getUserNames() {
+        try {
+            const { data, error } = await this.supabase.rpc('list_user_names');
+            if (error) throw error;
+            const carte = {};
+            (data || []).forEach(r => { carte[r.user_id] = r.user_name; });
+            return { success: true, data: carte };
+        } catch (error) {
+            console.error('Erreur récupération des noms:', error);
+            return { success: false, error: error.message, data: {} };
+        }
+    }
+
     // Les quatre fonctions ci-dessous exigent un code patron valide, verifie
     // PAR LA BASE. L'interface ne peut plus s'en dispenser : la table est
     // fermee, il n'existe aucun autre chemin.
@@ -162,9 +178,10 @@ class DatabaseManager {
 
     async createSupplier(supplierData) {
         try {
+            const avecAuteur = { ...supplierData, created_by: this.currentUser?.id || null };
             const { data, error } = await this.supabase
                 .from('suppliers')
-                .insert([supplierData])
+                .insert([avecAuteur])
                 .select()
                 .single();
 
@@ -256,9 +273,12 @@ class DatabaseManager {
 
     async createProduct(productData) {
         try {
+            // L'auteur de la création est désormais enregistré : sans lui,
+            // « on sait qui fait quoi » aurait été faux pour les créations.
+            const avecAuteur = { ...productData, created_by: this.currentUser?.id || null };
             const { data, error } = await this.supabase
                 .from('products')
-                .insert([productData])
+                .insert([avecAuteur])
                 .select()
                 .single();
 

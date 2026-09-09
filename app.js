@@ -650,9 +650,12 @@ function renderCategories() {
     // Carte Congélation
     const frozenCard = document.createElement('div');
     frozenCard.className = 'frozen-card';
+    // L'illustration porte déjà sa légende « sushi frit », comme les six
+    // autres cartes : pas de texte ajouté par-dessus, sinon il ferait doublon.
     frozenCard.innerHTML = `
-        <div class="frozen-card-icon">🧊</div>
-        <div class="frozen-card-label">Congélation</div>
+        <img src="./images/categories/sushi-frit.webp"
+             onerror="this.onerror=null; this.src='./images/categories/sushi-frit.png';"
+             alt="Sushi frit" class="category-image">
     `;
     frozenCard.addEventListener('click', () => {
         showPage('frozen-page');

@@ -794,6 +794,139 @@ class DatabaseManager {
             return { success: false, error: error.message };
         }
     }
+
+    // ===== GESTION DE LA SURGÉLATION DU POISSON =====
+
+    async getFrozenFish(filters = {}) {
+        try {
+            let query = this.supabase
+                .from('frozen_fish')
+                .select(`
+                    id,
+                    fish_type,
+                    quantity,
+                    unit,
+                    frozen_at,
+                    expiry_date,
+                    note,
+                    user_name
+                `)
+                .order('frozen_at', { ascending: false });
+
+            // Appliquer les filtres si fournis
+            if (filters.month && filters.year) {
+                // Filtrer par mois et année
+                const startDate = `${filters.year}-${filters.month.padStart(2, '0')}-01`;
+                const endMonth = parseInt(filters.month) === 12 ? 1 : parseInt(filters.month) + 1;
+                const endYear = parseInt(filters.month) === 12 ? parseInt(filters.year) + 1 : filters.year;
+                const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+                query = query
+                    .gte('frozen_at', startDate)
+                    .lt('frozen_at', endDate);
+            }
+
+            const { data, error } = await query;
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Erreur récupération surgélations poisson:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // expiry_date n'est PAS calculée par la base pour cette table : c'est
+    // à l'appelant de la fournir (frozen_at + 6 mois). Le nom de l'auteur
+    // est inscrit SUR la ligne. La table `users` étant fermée, une jointure
+    // vers elle ferait échouer toute la requête — c'est ce qui avait cassé
+    // quatre écrans.
+    async createFrozenFish(data) {
+        try {
+            const insertData = {
+                fish_type: data.fish_type,
+                quantity: data.quantity,
+                unit: data.unit,
+                note: data.note || null,
+                expiry_date: data.expiry_date,
+                user_name: this.currentUser?.name || null,
+                user_id: data.user_id
+            };
+
+            // Ajouter frozen_at si fourni, sinon NOW() sera utilisé par défaut
+            if (data.frozen_at) {
+                insertData.frozen_at = data.frozen_at;
+            }
+
+            const { data: result, error } = await this.supabase
+                .from('frozen_fish')
+                .insert([insertData])
+                .select(`
+                    id,
+                    fish_type,
+                    quantity,
+                    unit,
+                    frozen_at,
+                    expiry_date,
+                    note,
+                    user_name
+                `)
+                .single();
+
+            if (error) throw error;
+            return { success: true, data: result };
+        } catch (error) {
+            console.error('Erreur création surgélation poisson:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async deleteFrozenFish(id) {
+        try {
+            const { error } = await this.supabase
+                .from('frozen_fish')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            return { success: true };
+        } catch (error) {
+            console.error('Erreur suppression surgélation poisson:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getFrozenFishForExport(month, year) {
+        try {
+            // Utiliser la même logique que getFrozenFish mais avec filtres obligatoires
+            const startDate = `${year}-${month.padStart(2, '0')}-01`;
+            const endMonth = parseInt(month) === 12 ? 1 : parseInt(month) + 1;
+            const endYear = parseInt(month) === 12 ? parseInt(year) + 1 : year;
+            const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+            const { data, error } = await this.supabase
+                .from('frozen_fish')
+                .select(`
+                    id,
+                    fish_type,
+                    quantity,
+                    unit,
+                    frozen_at,
+                    expiry_date,
+                    note,
+                    user_name
+                `)
+                .gte('frozen_at', startDate)
+                .lt('frozen_at', endDate)
+                .order('frozen_at', { ascending: false });
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Erreur récupération surgélations poisson pour export:', error);
+            return { success: false, error: error.message };
+        }
+    }
 }
 
 // Instance globale

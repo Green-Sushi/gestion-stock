@@ -1413,6 +1413,14 @@
         .frozen-category-badge.vegi { background: #1abc9c; }
         .frozen-category-badge.duo { background: #e91e63; }
         .frozen-category-badge.noel { background: #e74c3c; }
+        .frozen-category-badge.soon { background: #e67e22; }
+        .frozen-category-badge.expired { background: #e74c3c; }
+
+        .frozen-item-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
         .quantity-controls {
             display: flex;
@@ -1575,7 +1583,7 @@
         <div id="frozen-page" class="page">
             <div class="page-header">
                 <button id="back-to-home-frozen" class="back-button">←</button>
-                <h2 class="page-title">🧊 Congélation</h2>
+                <h2 class="page-title">🧊 Sushi frit</h2>
                 <button class="btn btn-small" id="export-frozen-btn">📤</button>
             </div>
 
@@ -1603,6 +1611,40 @@
 
             <div id="frozen-list"></div>
             <button class="fab" id="add-frozen-btn">+</button>
+        </div>
+
+        <!-- PAGE SURGÉLATION DU POISSON -->
+        <div id="fish-page" class="page">
+            <div class="page-header">
+                <button id="back-to-home-fish" class="back-button">←</button>
+                <h2 class="page-title">🐟 Surgélation</h2>
+                <button class="btn btn-small" id="export-fish-btn">📤</button>
+            </div>
+
+            <!-- Filtres -->
+            <div class="frozen-filters">
+                <select class="form-select" id="fish-month-filter">
+                    <option value="">Tous les mois</option>
+                    <option value="01">Janvier</option>
+                    <option value="02">Février</option>
+                    <option value="03">Mars</option>
+                    <option value="04">Avril</option>
+                    <option value="05">Mai</option>
+                    <option value="06">Juin</option>
+                    <option value="07">Juillet</option>
+                    <option value="08">Août</option>
+                    <option value="09">Septembre</option>
+                    <option value="10">Octobre</option>
+                    <option value="11">Novembre</option>
+                    <option value="12">Décembre</option>
+                </select>
+                <select class="form-select" id="fish-year-filter">
+                    <!-- Sera rempli dynamiquement -->
+                </select>
+            </div>
+
+            <div id="fish-list"></div>
+            <button class="fab" id="add-fish-btn">+</button>
         </div>
 
         <!-- PAGE DES FOURNISSEURS -->
@@ -1904,7 +1946,7 @@
     <div class="modal" id="frozen-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 class="modal-title">🧊 Nouvelle Congélation</h3>
+                <h3 class="modal-title">🧊 Nouveau sushi frit</h3>
                 <button class="close-modal" data-modal="frozen-modal">×</button>
             </div>
             <form id="frozen-form">
@@ -1934,6 +1976,59 @@
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary close-modal" data-modal="frozen-modal">Annuler</button>
+                    <button type="submit" class="btn">✅ Valider</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL SURGÉLATION DU POISSON -->
+    <div class="modal" id="fish-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">🐟 Nouvelle surgélation</h3>
+                <button class="close-modal" data-modal="fish-modal">×</button>
+            </div>
+            <form id="fish-form">
+                <div class="form-group">
+                    <label class="form-label">Poisson *</label>
+                    <select class="form-select" id="fish-type" required>
+                        <option value="">Sélectionner...</option>
+                        <option value="Saumon">Saumon</option>
+                        <option value="Thon">Thon</option>
+                        <option value="Marlin">Marlin</option>
+                        <option value="Autre">Autre</option>
+                    </select>
+                </div>
+                <div class="form-group" id="fish-type-other-group" style="display: none;">
+                    <label class="form-label">Préciser *</label>
+                    <input type="text" class="form-input" id="fish-type-other" placeholder="Nom du poisson">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Quantité</label>
+                    <div class="quantity-controls">
+                        <button type="button" class="btn-quick-adjust btn-minus" id="fish-qty-minus">−</button>
+                        <input type="number" class="form-input quantity-input" id="fish-quantity" value="1" min="1">
+                        <button type="button" class="btn-quick-adjust btn-plus" id="fish-qty-plus">+</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Unité</label>
+                    <select class="form-select" id="fish-unit">
+                        <option value="kg">kg</option>
+                        <option value="filet">filet</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date et heure</label>
+                    <input type="datetime-local" class="form-input" id="fish-datetime">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Note</label>
+                    <textarea class="form-textarea" id="fish-note" placeholder="n° de lot, fournisseur…"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary close-modal" data-modal="fish-modal">Annuler</button>
                     <button type="submit" class="btn">✅ Valider</button>
                 </div>
             </form>
@@ -1993,8 +2088,8 @@
     <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
-    <script src="config.js?v=20260916"></script>
-    <script src="database.js?v=20260916"></script>
-    <script src="app.js?v=20260916"></script>
+    <script src="config.js?v=20260917"></script>
+    <script src="database.js?v=20260917"></script>
+    <script src="app.js?v=20260917"></script>
 </body>
 </html>

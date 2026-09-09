@@ -20,7 +20,8 @@ const AppState = {
     pendingSendConfirmation: false,
     sushiTypes: [],
     frozenSushi: [],
-    editingFrozen: null
+    editingFrozen: null,
+    frozenFish: []
 };
 
 // ====================
@@ -197,6 +198,10 @@ function showPage(pageId) {
 
     if (pageId === 'frozen-page') {
         loadFrozenSushi().then(() => renderFrozenList());
+    }
+
+    if (pageId === 'fish-page') {
+        loadFrozenFish().then(() => renderFishList());
     }
 }
 
@@ -589,6 +594,22 @@ function setupGlobalListeners() {
     document.getElementById('export-frozen-btn').addEventListener('click', exportFrozenList);
     document.getElementById('frozen-filter-month').addEventListener('change', renderFrozenList);
     document.getElementById('frozen-filter-year').addEventListener('change', renderFrozenList);
+
+    // Surgélation du poisson
+    document.getElementById('back-to-home-fish').addEventListener('click', () => {
+        showPage('home-page');
+        updateActiveTab('home-page');
+        renderCategories();
+    });
+
+    document.getElementById('add-fish-btn').addEventListener('click', openFishModal);
+    document.getElementById('fish-form').addEventListener('submit', handleFishSubmit);
+    document.getElementById('fish-type').addEventListener('change', handleFishTypeChange);
+    document.getElementById('fish-qty-minus').addEventListener('click', () => adjustFishQty(-1));
+    document.getElementById('fish-qty-plus').addEventListener('click', () => adjustFishQty(1));
+    document.getElementById('export-fish-btn').addEventListener('click', exportFishList);
+    document.getElementById('fish-month-filter').addEventListener('change', renderFishList);
+    document.getElementById('fish-year-filter').addEventListener('change', renderFishList);
 }
 
 // ====================
@@ -652,6 +673,18 @@ function renderCategories() {
         showPage('frozen-page');
     });
     container.appendChild(frozenCard);
+
+    // Carte Surgélation du poisson — légende incluse dans l'image, pas de
+    // texte ajouté par-dessus.
+    const fishCard = document.createElement('div');
+    fishCard.className = 'frozen-card';
+    fishCard.innerHTML = `
+        <img src="./images/categories/surgelation.webp" alt="Surgélation" class="category-image" onerror="this.onerror=null; this.src='./images/categories/surgelation.png';">
+    `;
+    fishCard.addEventListener('click', () => {
+        showPage('fish-page');
+    });
+    container.appendChild(fishCard);
 
     updateStockOverview();
 }
@@ -2163,7 +2196,7 @@ async function handleFrozenSubmit(e) {
     showLoading(false);
 
     if (result.success) {
-        notifier('Congélation enregistrée');
+        notifier('Sushi frit enregistré');
         closeModal('frozen-modal');
         await loadFrozenSushi();
         renderFrozenList();
@@ -2202,7 +2235,7 @@ function exportFrozenList() {
     const monthNames = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
     const periodLabel = monthFilter ? `${monthNames[parseInt(monthFilter)]} ${yearFilter || ''}` : (yearFilter || 'Tout');
 
-    let exportText = `🧊 HISTORIQUE CONGÉLATION - Green Sushi\n`;
+    let exportText = `🧊 HISTORIQUE SUSHI FRIT - Green Sushi\n`;
     exportText += `📅 Période: ${periodLabel}\n`;
     exportText += `━━━━━━━━━━━━━━━━━━━━\n\n`;
 
@@ -2222,7 +2255,290 @@ function exportFrozenList() {
 
     // Envoyer par email
     const emailRecipient = 'greensushi.mq@gmail.com';
-    const subject = encodeURIComponent(`🧊 Historique Congélation - ${periodLabel}`);
+    const subject = encodeURIComponent(`🧊 Historique Sushi Frit - ${periodLabel}`);
+    const body = encodeURIComponent(exportText);
+    const mailtoUrl = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
+
+    window.location.href = mailtoUrl;
+}
+
+// ====================
+// SURGÉLATION DU POISSON
+// ====================
+
+async function loadFrozenFish() {
+    const result = await db.getFrozenFish();
+    if (result.success) {
+        AppState.frozenFish = result.data;
+    }
+}
+
+// Distance en jours calendaires entre aujourd'hui et la date limite, sans
+// tenir compte de l'heure : deux dates seulement, jamais de fuseau horaire.
+function getFishExpiryStatus(expiryDate) {
+    if (!expiryDate) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const expiry = new Date(expiryDate + 'T00:00:00');
+    const diffDays = Math.round((expiry - today) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return 'expired';
+    if (diffDays <= 30) return 'soon';
+    return null;
+}
+
+// + 6 mois calculé sur les composants locaux de la date (année/mois/jour),
+// jamais via toISOString() : une surgélation saisie en soirée en Martinique
+// (UTC-4) verrait sa date basculer au lendemain une fois repassée par l'UTC.
+function addMonthsToDateOnly(date, months) {
+    const d = new Date(date.getFullYear(), date.getMonth() + months, date.getDate());
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+function renderFishList() {
+    const container = document.getElementById('fish-list');
+    const monthFilter = document.getElementById('fish-month-filter').value;
+    const yearFilter = document.getElementById('fish-year-filter').value;
+
+    // Initialiser le select année si vide
+    const yearSelect = document.getElementById('fish-year-filter');
+    if (yearSelect.options.length <= 1) {
+        const currentYear = new Date().getFullYear();
+        yearSelect.innerHTML = '<option value="">Toutes années</option>';
+        for (let y = currentYear; y >= currentYear - 3; y--) {
+            yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
+        }
+    }
+
+    // Filtrer les données
+    let filtered = [...AppState.frozenFish];
+
+    if (monthFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
+        });
+    }
+
+    if (yearFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getFullYear()) === yearFilter;
+        });
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🐟</div>
+                <div class="empty-state-text">Aucune surgélation enregistrée</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = filtered.map(item => {
+        const date = new Date(item.frozen_at);
+        const dateStr = date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+        const expiryStr = item.expiry_date
+            ? new Date(item.expiry_date + 'T00:00:00').toLocaleDateString('fr-FR')
+            : '—';
+
+        const status = getFishExpiryStatus(item.expiry_date);
+        let badge = '';
+        if (status === 'expired') badge = '<span class="frozen-category-badge expired">Expiré</span>';
+        else if (status === 'soon') badge = '<span class="frozen-category-badge soon">Expire bientôt</span>';
+
+        return `
+            <div class="frozen-item">
+                <div class="frozen-item-info">
+                    <div class="frozen-item-name">
+                        ${item.fish_type || 'Poisson'}
+                        ${badge}
+                    </div>
+                    <div class="frozen-item-details">
+                        Surgelé le ${dateStr} · limite ${expiryStr}
+                        ${item.note ? ` · ${item.note}` : ''}
+                    </div>
+                </div>
+                <div class="frozen-item-actions">
+                    <div class="frozen-item-qty">
+                        <div class="frozen-item-qty-value">${item.quantity}</div>
+                        <div class="frozen-item-qty-label">${item.unit}</div>
+                    </div>
+                    <button type="button" class="btn btn-small btn-icon btn-danger" onclick="deleteFrozenFish('${item.id}')">🗑️</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function openFishModal() {
+    const modal = document.getElementById('fish-modal');
+    const form = document.getElementById('fish-form');
+    const datetimeInput = document.getElementById('fish-datetime');
+    const qtyInput = document.getElementById('fish-quantity');
+
+    // Reset form
+    form.reset();
+    qtyInput.value = 1;
+    document.getElementById('fish-type-other-group').style.display = 'none';
+    document.getElementById('fish-type-other').required = false;
+
+    // Pré-remplir date/heure avec maintenant
+    const now = new Date();
+    const localDatetime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    datetimeInput.value = localDatetime;
+
+    modal.classList.add('active');
+}
+
+function handleFishTypeChange() {
+    const type = document.getElementById('fish-type').value;
+    const otherGroup = document.getElementById('fish-type-other-group');
+    const otherInput = document.getElementById('fish-type-other');
+
+    if (type === 'Autre') {
+        otherGroup.style.display = 'block';
+        otherInput.required = true;
+    } else {
+        otherGroup.style.display = 'none';
+        otherInput.required = false;
+        otherInput.value = '';
+    }
+}
+
+function adjustFishQty(delta) {
+    const input = document.getElementById('fish-quantity');
+    let value = parseInt(input.value) || 1;
+    value = Math.max(1, value + delta);
+    input.value = value;
+}
+
+async function handleFishSubmit(e) {
+    e.preventDefault();
+
+    const fishTypeSelect = document.getElementById('fish-type').value;
+    const fishTypeOther = document.getElementById('fish-type-other').value.trim();
+    const quantity = parseInt(document.getElementById('fish-quantity').value) || 1;
+    const unit = document.getElementById('fish-unit').value;
+    const datetime = document.getElementById('fish-datetime').value;
+    const note = document.getElementById('fish-note').value.trim();
+
+    if (!fishTypeSelect) {
+        notifier('Sélectionnez un poisson', 'err');
+        return;
+    }
+
+    if (fishTypeSelect === 'Autre' && !fishTypeOther) {
+        notifier('Précisez le poisson', 'err');
+        return;
+    }
+
+    const fishType = fishTypeSelect === 'Autre' ? fishTypeOther : fishTypeSelect;
+    const frozenAt = datetime ? new Date(datetime) : new Date();
+
+    const fishData = {
+        fish_type: fishType,
+        quantity: quantity,
+        unit: unit,
+        note: note || null,
+        frozen_at: frozenAt.toISOString(),
+        expiry_date: addMonthsToDateOnly(frozenAt, 6),
+        user_id: db.currentUser?.id
+    };
+
+    showLoading(true);
+    const result = await db.createFrozenFish(fishData);
+    showLoading(false);
+
+    if (result.success) {
+        notifier('Surgélation enregistrée');
+        closeModal('fish-modal');
+        await loadFrozenFish();
+        renderFishList();
+    } else {
+        signalerEchec('Surgélation', result.error);
+    }
+}
+
+async function deleteFrozenFish(id) {
+    if (!confirm('⚠️ Supprimer cette entrée de surgélation ?')) {
+        return;
+    }
+
+    showLoading(true);
+    const result = await db.deleteFrozenFish(id);
+    showLoading(false);
+
+    if (result.success) {
+        notifier('Surgélation supprimée');
+        await loadFrozenFish();
+        renderFishList();
+    } else {
+        signalerEchec('Suppression', result.error);
+    }
+}
+
+function exportFishList() {
+    const monthFilter = document.getElementById('fish-month-filter').value;
+    const yearFilter = document.getElementById('fish-year-filter').value;
+
+    // Filtrer les données
+    let filtered = [...AppState.frozenFish];
+
+    if (monthFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
+        });
+    }
+
+    if (yearFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getFullYear()) === yearFilter;
+        });
+    }
+
+    if (filtered.length === 0) {
+        notifier('Aucune donnée à exporter', 'err');
+        return;
+    }
+
+    // Générer le texte d'export
+    const monthNames = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    const periodLabel = monthFilter ? `${monthNames[parseInt(monthFilter)]} ${yearFilter || ''}` : (yearFilter || 'Tout');
+
+    let exportText = `🐟 HISTORIQUE SURGÉLATION POISSON - Green Sushi\n`;
+    exportText += `📅 Période: ${periodLabel}\n`;
+    exportText += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    filtered.forEach(item => {
+        const date = new Date(item.frozen_at);
+        const dateStr = date.toLocaleDateString('fr-FR');
+        const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const expiryStr = item.expiry_date
+            ? new Date(item.expiry_date + 'T00:00:00').toLocaleDateString('fr-FR')
+            : '—';
+
+        exportText += `• ${item.fish_type || 'Poisson'}\n`;
+        exportText += `  Qté: ${item.quantity} ${item.unit} | ${dateStr} ${timeStr} | limite ${expiryStr}\n`;
+        if (item.note) exportText += `  Note: ${item.note}\n`;
+        exportText += `\n`;
+    });
+
+    exportText += `━━━━━━━━━━━━━━━━━━━━\n`;
+    exportText += `📊 Total: ${filtered.length} entrée(s)`;
+
+    // Envoyer par email
+    const emailRecipient = 'greensushi.mq@gmail.com';
+    const subject = encodeURIComponent(`🐟 Historique Surgélation Poisson - ${periodLabel}`);
     const body = encodeURIComponent(exportText);
     const mailtoUrl = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
 
@@ -2236,3 +2552,4 @@ function exportFrozenList() {
 window.openSupplierModal = openSupplierModal;
 window.openUserModal = openUserModal;
 window.deleteUser = deleteUser;
+window.deleteFrozenFish = deleteFrozenFish;

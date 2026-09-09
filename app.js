@@ -201,7 +201,11 @@ function showPage(pageId) {
     document.body.classList.toggle('sur-connexion', pageId === 'login-page');
 
     // Mettre à jour la navigation
-    if (pageId !== 'login-page' && pageId !== 'products-page') {
+    // Stock, Suivi et Produits sont des écrans ATTEINTS depuis l'accueil :
+    // l'onglet Accueil doit y rester allumé, sinon la barre du bas paraît
+    // éteinte alors qu'on est bien dans cette branche de l'application.
+    const ecransSousAccueil = ['products-page', 'stock-page', 'suivi-page'];
+    if (pageId !== 'login-page' && !ecransSousAccueil.includes(pageId)) {
         updateActiveTab(pageId);
     }
 
@@ -215,6 +219,13 @@ function showPage(pageId) {
     } else {
         header.style.display = 'flex';
         nav.style.display = 'flex';
+    }
+
+    // Les compteurs par catégorie doivent être à jour en arrivant sur ces
+    // écrans, quelle que soit la route empruntée pour y venir. Les images
+    // sont en cache : ce redessin ne coûte rien de perceptible.
+    if (pageId === 'stock-page' || pageId === 'suivi-page') {
+        renderCategories();
     }
 
     if (pageId === 'frozen-page') {
@@ -426,9 +437,10 @@ function setupGlobalListeners() {
     });
 
     // Bouton retour
+    // Les produits s'ouvrent depuis la page Stock : on y retourne, pas à
+    // l'accueil — sinon il faudrait deux appuis pour changer de catégorie.
     document.getElementById('back-to-home').addEventListener('click', () => {
-        showPage('home-page');
-        updateActiveTab('home-page');
+        showPage('stock-page');
         renderCategories();
     });
 
@@ -606,8 +618,7 @@ function setupGlobalListeners() {
 
     // Congélation
     document.getElementById('back-to-home-frozen').addEventListener('click', () => {
-        showPage('home-page');
-        updateActiveTab('home-page');
+        showPage('suivi-page');
         renderCategories();
     });
 
@@ -622,8 +633,7 @@ function setupGlobalListeners() {
 
     // Surgélation du poisson
     document.getElementById('back-to-home-fish').addEventListener('click', () => {
-        showPage('home-page');
-        updateActiveTab('home-page');
+        showPage('suivi-page');
         renderCategories();
     });
 
@@ -638,10 +648,15 @@ function setupGlobalListeners() {
 
     // Traçabilité (réceptions)
     document.getElementById('back-to-home-tracabilite').addEventListener('click', () => {
-        showPage('home-page');
-        updateActiveTab('home-page');
+        showPage('suivi-page');
         renderCategories();
     });
+
+    document.getElementById('carte-stock').addEventListener('click', () => showPage('stock-page'));
+    document.getElementById('carte-suivi').addEventListener('click', () => showPage('suivi-page'));
+
+    document.getElementById('back-to-home-stock').addEventListener('click', () => showPage('home-page'));
+    document.getElementById('back-to-home-suivi').addEventListener('click', () => showPage('home-page'));
 
     document.getElementById('add-reception-btn').addEventListener('click', openReceptionModal);
     document.getElementById('reception-form').addEventListener('submit', handleReceptionSubmit);

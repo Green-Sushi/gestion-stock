@@ -682,29 +682,6 @@
            haut sur un iPhone et repousserait les cartes hors de l'écran. On
            la contient donc en hauteur, posée sur une carte blanche dont le
            fond prolonge la bande blanche du bas de l'image. */
-        /* Les deux visuels sont carrés et de même taille : ils s'affichent
-           donc à l'identique, sans qu'un titre paraisse plus large que
-           l'autre. Pas de carte derrière — l'image EST le titre, et un
-           cadre blanc jurerait avec le fond vert de l'un des deux. */
-        .accueil-section-image {
-            display: block;
-            text-align: center;
-            margin: 22px 0 12px;
-        }
-
-        #categories-container .accueil-section-image:first-child { margin-top: 0; }
-
-        .accueil-section-image img {
-            display: block;
-            height: 150px;
-            width: 150px;
-            margin: 0 auto;
-            border-radius: 18px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-        }
-
-        #categories-container { margin-top: 20px; }
-        #categories-container .categories-grid { margin-top: 0; }
 
         .alerts-section-title {
             font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -1688,7 +1665,7 @@
         <!-- PAGE D'ACCUEIL -->
         <div id="home-page" class="page">
             <div class="page-header">
-                <h2 class="page-title">Catégories</h2>
+                <h2 class="page-title">Accueil</h2>
             </div>
             <div class="stock-overview">
                 <div class="stock-overview-cell">
@@ -1707,20 +1684,38 @@
                     <div class="stock-overview-bar ok"></div>
                 </div>
             </div>
-            <div id="categories-container">
-                <div class="accueil-section-image">
+            <div class="categories-grid">
+                <div class="category-card" id="carte-stock">
                     <img src="./images/categories/section-stock.webp"
                          onerror="this.onerror=null; this.src='./images/categories/section-stock.png';"
-                         alt="Stock">
+                         alt="Stock" class="category-image">
                 </div>
-                <div class="categories-grid" id="grille-stock"></div>
-                <div class="accueil-section-image">
+                <div class="category-card" id="carte-suivi">
                     <img src="./images/categories/section-suivi.webp"
                          onerror="this.onerror=null; this.src='./images/categories/section-suivi.png';"
-                         alt="Suivi">
+                         alt="Suivi" class="category-image">
                 </div>
-                <div class="categories-grid" id="grille-suivi"></div>
             </div>
+        </div>
+
+        <!-- PAGE STOCK — les six catégories de produits -->
+        <div id="stock-page" class="page">
+            <div class="page-header">
+                <button id="back-to-home-stock" class="back-button">←</button>
+                <h2 class="page-title">Stock</h2>
+                <div style="width: 30px;"></div>
+            </div>
+            <div class="categories-grid" id="grille-stock"></div>
+        </div>
+
+        <!-- PAGE SUIVI — les trois registres qui font foi dans le temps -->
+        <div id="suivi-page" class="page">
+            <div class="page-header">
+                <button id="back-to-home-suivi" class="back-button">←</button>
+                <h2 class="page-title">Suivi</h2>
+                <div style="width: 30px;"></div>
+            </div>
+            <div class="categories-grid" id="grille-suivi"></div>
         </div>
 
         <!-- PAGE DE PRODUITS -->
@@ -2346,8 +2341,8 @@
     <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
-<script src="config.js?v=20261002"></script>
-    <script src="database.js?v=20261002"></script>
-    <script src="app.js?v=20261002"></script>
+<script src="config.js?v=20261003"></script>
+    <script src="database.js?v=20261003"></script>
+    <script src="app.js?v=20261003"></script>
 </body>
 </html>

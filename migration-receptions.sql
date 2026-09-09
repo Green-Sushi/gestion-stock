@@ -142,3 +142,37 @@ COMMIT;
 --   ALTER TABLE public.receptions DROP COLUMN IF EXISTS product_id;
 --   ALTER TABLE public.receptions DROP COLUMN IF EXISTS product_name;
 -- ⚠️ À n'exécuter qu'en même temps qu'un retour du code.
+
+-- =====================================================================
+-- CATÉGORIE HYGIÈNE — 2026-09-09
+-- =====================================================================
+-- Le nettoyage était rangé dans « Consommables », avec les barquettes et
+-- les baguettes. Deux usages sans rapport : ce qu'on sert au client, et ce
+-- qui sert à nettoyer.
+--
+-- Au passage, la contrainte listait 'autre' (jamais utilisé, 0 produit) et
+-- OMETTAIT 'legumes', pourtant proposé dans l'application depuis toujours.
+-- Toute création dans Légumes échouait en base : la catégorie ne pouvait
+-- pas se remplir, ce qui explique qu'elle soit restée vide.
+-- =====================================================================
+
+BEGIN;
+
+ALTER TABLE public.products DROP CONSTRAINT products_category_check;
+
+ALTER TABLE public.products ADD CONSTRAINT products_category_check
+  CHECK (category IN ('frais','sec','surgele','consommables','boissons','legumes','hygiene'));
+
+UPDATE public.products SET category = 'hygiene'
+WHERE category = 'consommables'
+  AND name IN ('Boîte de gants L','Boîte de gants M','Produit lave-vaisselle',
+               'Produit pour le sol','Tête de serpillère','Sac Poubelle');
+
+COMMIT;
+
+-- Retour arrière :
+--   UPDATE public.products SET category = 'consommables' WHERE category = 'hygiene';
+--   ALTER TABLE public.products DROP CONSTRAINT products_category_check;
+--   ALTER TABLE public.products ADD CONSTRAINT products_category_check
+--     CHECK (category IN ('frais','sec','surgele','consommables','boissons','autre'));
+--   ⚠️ Le retour arrière recasse Légumes. À ne faire qu'avec un retour du code.

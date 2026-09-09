@@ -102,6 +102,11 @@ async function initializeApp() {
     // Afficher l'emoji du rôle
     updateRoleIcon();
 
+    // La liste des catégories du formulaire produit vient de CATEGORIES, et
+    // de nulle part ailleurs : recopiée dans la page, elle avait fini par
+    // omettre Hygiène et rester juste par accident pour les autres.
+    remplirListeCategories();
+
     // Afficher la page d'accueil
     showPage('home-page');
     renderCategories();
@@ -682,6 +687,17 @@ function setupGlobalListeners() {
 // CATÉGORIES
 // ====================
 
+function remplirListeCategories() {
+    const select = document.getElementById('product-category');
+    select.innerHTML = '<option value="">Sélectionner...</option>';
+    CATEGORIES.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category.id;
+        option.textContent = category.name;
+        select.appendChild(option);
+    });
+}
+
 function renderCategories() {
     // Deux familles distinctes : le STOCK qu'on compte au quotidien, et le
     // SUIVI — les trois registres qui servent de preuve dans le temps.
@@ -701,7 +717,8 @@ function renderCategories() {
         'surgele': 'surgelé',
         'consommables': 'consommables',
         'boissons': 'boissons',
-        'legumes': 'legumes'
+        'legumes': 'legumes',
+        'hygiene': 'hygiene'
     };
 
     CATEGORIES.forEach(category => {
@@ -721,8 +738,8 @@ function renderCategories() {
         card.className = 'category-card';
         card.dataset.category = category.id;
         card.innerHTML = `
-            <img src="./images/categories/${categoryImages[category.id]}.webp"
-                 onerror="this.onerror=null; this.src='./images/categories/${categoryImages[category.id]}.png';"
+            <img src="./images/categories/${categoryImages[category.id]}.webp?v=${VERSION_VISUELS}"
+                 onerror="this.onerror=null; this.src='./images/categories/${categoryImages[category.id]}.png?v=${VERSION_VISUELS}';"
                  alt="${category.name}" class="category-image">
             <div class="category-badges">
                 ${alertCount > 0 ? `<div class="category-badge alerts" title="${alertCount} en alerte">${alertCount}</div>` : ''}
@@ -744,8 +761,8 @@ function renderCategories() {
     // L'illustration porte déjà sa légende « sushi frit », comme les six
     // autres cartes : pas de texte ajouté par-dessus, sinon il ferait doublon.
     frozenCard.innerHTML = `
-<img src="./images/categories/sushi-frit.webp"
-             onerror="this.onerror=null; this.src='./images/categories/sushi-frit.png';"
+<img src="./images/categories/sushi-frit.webp?v=${VERSION_VISUELS}"
+             onerror="this.onerror=null; this.src='./images/categories/sushi-frit.png?v=${VERSION_VISUELS}';"
              alt="Sushi frit" class="category-image">
     `;
     frozenCard.addEventListener('click', () => {
@@ -758,7 +775,7 @@ function renderCategories() {
     const fishCard = document.createElement('div');
     fishCard.className = 'frozen-card';
     fishCard.innerHTML = `
-        <img src="./images/categories/surgelation.webp" alt="Surgélation" class="category-image" onerror="this.onerror=null; this.src='./images/categories/surgelation.png';">
+        <img src="./images/categories/surgelation.webp?v=${VERSION_VISUELS}" alt="Surgélation" class="category-image" onerror="this.onerror=null; this.src='./images/categories/surgelation.png?v=${VERSION_VISUELS}';">
     `;
     fishCard.addEventListener('click', () => {
         showPage('fish-page');
@@ -772,8 +789,8 @@ function renderCategories() {
     const tracabiliteCard = document.createElement('div');
     tracabiliteCard.className = 'frozen-card';
     tracabiliteCard.innerHTML = `
-        <img src="./images/categories/tracabilite.webp"
-             onerror="this.onerror=null; this.src='./images/categories/tracabilite.png';"
+        <img src="./images/categories/tracabilite.webp?v=${VERSION_VISUELS}"
+             onerror="this.onerror=null; this.src='./images/categories/tracabilite.png?v=${VERSION_VISUELS}';"
              alt="Traçabilité" class="category-image">
     `;
     tracabiliteCard.addEventListener('click', () => {

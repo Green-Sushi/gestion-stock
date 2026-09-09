@@ -16,6 +16,12 @@ const ALERT_CONFIG = {
     whatsappNumber: '' // ex: +596696123456
 };
 
+// Numéro de version des illustrations. Sans lui, remplacer une image sans
+// changer son nom de fichier ne servait à rien : le téléphone gardait
+// l'ancienne en mémoire, parfois plusieurs jours. À incrémenter à CHAQUE
+// remplacement d'illustration, comme on le fait déjà pour les scripts.
+const VERSION_VISUELS = '20261006';
+
 // Catégories fixes du restaurant
 const CATEGORIES = [
     { id: 'frais', name: 'Stock Frais', icon: '🧀' },
@@ -23,7 +29,8 @@ const CATEGORIES = [
     { id: 'surgele', name: 'Stock Surgelé', icon: '❄️' },
     { id: 'consommables', name: 'Stock Consommable', icon: '🥢' },
     { id: 'boissons', name: 'Stock Boissons', icon: '🧃' },
-    { id: 'legumes', name: 'Légumes', icon: '🥬' }
+    { id: 'legumes', name: 'Légumes', icon: '🥬' },
+    { id: 'hygiene', name: 'Hygiène', icon: '🧽' }
 ];
 
 

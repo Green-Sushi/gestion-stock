@@ -464,7 +464,7 @@ class DatabaseManager {
         try {
             const { data, error } = await this.supabase
                 .from('stock_movements')
-                .insert([movementData])
+                .insert([{ ...movementData, user_name: this.currentUser?.name || null }])
                 .select()
                 .single();
 
@@ -483,7 +483,7 @@ class DatabaseManager {
                 .select(`
                     *,
                     product:products(name),
-                    user:users(name, role)
+                    user_name
                 `)
                 .order('created_at', { ascending: false })
                 .limit(limit);
@@ -597,6 +597,7 @@ class DatabaseManager {
                 .from('message_history')
                 .insert([{
                     user_id: this.currentUser?.id,
+                    user_name: this.currentUser?.name || null,
                     send_method: messageData.send_method,
                     recipient: messageData.recipient,
                     message_content: messageData.message_content,
@@ -619,7 +620,7 @@ class DatabaseManager {
                 .from('message_history')
                 .select(`
                     *,
-                    user:users(name, role)
+                    user_name
                 `)
                 .order('sent_at', { ascending: false })
                 .limit(limit);
@@ -638,7 +639,7 @@ class DatabaseManager {
                 .from('message_history')
                 .select(`
                     *,
-                    user:users(name, role)
+                    user_name
                 `)
                 .eq('id', messageId)
                 .single();
@@ -681,7 +682,7 @@ class DatabaseManager {
                     frozen_at,
                     expiry_date,
                     sushi_type:sushi_types(id, name, category),
-                    user:users(id, name)
+                    user_name
                 `)
                 .order('frozen_at', { ascending: false });
 
@@ -708,11 +709,15 @@ class DatabaseManager {
         }
     }
 
+    // Le nom de l'auteur est inscrit SUR la ligne. La table `users` étant
+    // fermée, une jointure vers elle ferait échouer toute la requête —
+    // c'est ce qui avait cassé quatre écrans.
     async createFrozenSushi(data) {
         try {
             const insertData = {
                 sushi_type_id: data.sushi_type_id,
                 fish_type: data.fish_type || null,
+                user_name: this.currentUser?.name || null,
                 quantity: data.quantity,
                 user_id: data.user_id
             };
@@ -732,7 +737,7 @@ class DatabaseManager {
                     frozen_at,
                     expiry_date,
                     sushi_type:sushi_types(id, name, category),
-                    user:users(id, name)
+                    user_name
                 `)
                 .single();
 
@@ -776,7 +781,7 @@ class DatabaseManager {
                     frozen_at,
                     expiry_date,
                     sushi_type:sushi_types(id, name, category),
-                    user:users(id, name)
+                    user_name
                 `)
                 .gte('frozen_at', startDate)
                 .lt('frozen_at', endDate)

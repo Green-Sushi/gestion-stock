@@ -896,37 +896,6 @@ class DatabaseManager {
         }
     }
 
-    async getFrozenFishForExport(month, year) {
-        try {
-            // Utiliser la même logique que getFrozenFish mais avec filtres obligatoires
-            const startDate = `${year}-${month.padStart(2, '0')}-01`;
-            const endMonth = parseInt(month) === 12 ? 1 : parseInt(month) + 1;
-            const endYear = parseInt(month) === 12 ? parseInt(year) + 1 : year;
-            const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
-
-            const { data, error } = await this.supabase
-                .from('frozen_fish')
-                .select(`
-                    id,
-                    fish_type,
-                    quantity,
-                    unit,
-                    frozen_at,
-                    expiry_date,
-                    note,
-                    user_name
-                `)
-                .gte('frozen_at', startDate)
-                .lt('frozen_at', endDate)
-                .order('frozen_at', { ascending: false });
-
-            if (error) throw error;
-            return { success: true, data };
-        } catch (error) {
-            console.error('Erreur récupération surgélations poisson pour export:', error);
-            return { success: false, error: error.message };
-        }
-    }
 }
 
 // Instance globale

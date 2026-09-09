@@ -667,7 +667,7 @@ function renderCategories() {
     frozenCard.className = 'frozen-card';
     frozenCard.innerHTML = `
         <div class="frozen-card-icon">🧊</div>
-        <div class="frozen-card-label">Congélation</div>
+        <div class="frozen-card-label">Sushi frit</div>
     `;
     frozenCard.addEventListener('click', () => {
         showPage('frozen-page');
@@ -2073,7 +2073,7 @@ function renderFrozenList() {
         container.innerHTML = `
             <div class="empty-state">
                 <div class="empty-state-icon">🧊</div>
-                <div class="empty-state-text">Aucune congélation enregistrée</div>
+                <div class="empty-state-text">Aucun sushi frit enregistré</div>
             </div>
         `;
         return;
@@ -2201,7 +2201,7 @@ async function handleFrozenSubmit(e) {
         await loadFrozenSushi();
         renderFrozenList();
     } else {
-        signalerEchec('Congélation', result.error);
+        signalerEchec('Sushi frit', result.error);
     }
 }
 
@@ -2270,6 +2270,14 @@ async function loadFrozenFish() {
     const result = await db.getFrozenFish();
     if (result.success) {
         AppState.frozenFish = result.data;
+        AppState.frozenFishLu = true;
+    } else {
+        // Ne PAS laisser croire que le registre est vide alors qu'on n'a
+        // simplement pas pu le lire : sur un registre sanitaire, c'est le
+        // pire des messages.
+        AppState.frozenFish = [];
+        AppState.frozenFishLu = false;
+        signalerEchec('Surgélations', result.error);
     }
 }
 
@@ -2353,8 +2361,10 @@ function renderFishList() {
     if (filtered.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
-                <div class="empty-state-icon">🐟</div>
-                <div class="empty-state-text">Aucune surgélation enregistrée</div>
+                <div class="empty-state-icon">${AppState.frozenFishLu === false ? '⚠️' : '🐟'}</div>
+                <div class="empty-state-text">${AppState.frozenFishLu === false
+                    ? 'Lecture impossible — vérifiez la connexion'
+                    : 'Aucune surgélation enregistrée'}</div>
             </div>
         `;
         return;
@@ -2389,7 +2399,7 @@ function renderFishList() {
                         <div class="frozen-item-qty-value">${item.quantity}</div>
                         <div class="frozen-item-qty-label">${item.unit}</div>
                     </div>
-                    <button type="button" class="btn btn-small btn-icon btn-danger" onclick="deleteFrozenFish('${item.id}')">🗑️</button>
+                    ${db.isPatron() ? `<button type="button" class="btn btn-small btn-icon btn-danger" onclick="deleteFrozenFish('${item.id}')" title="Supprimer">🗑️</button>` : ''}
                 </div>
             </div>
         `;

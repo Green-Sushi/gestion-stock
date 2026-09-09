@@ -1,1 +1,4 @@
+.DS_Store
 docs/BRIEF-RELAIS-LOT3.md
+migration-copy-frozen-data.sql
+migration-frozen-sushi-v2.sql

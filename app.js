@@ -3497,6 +3497,16 @@ function relevesManquants() {
 // Un relevé saisi le lendemain n'a rien d'anormal : on rattrape. Au-delà de
 // 72 h, en revanche, la ligne le dit — un contrôleur préfère un retard
 // assumé à une valeur qui prétend avoir été prise sur le moment.
+// Les thermomètres du restaurant n'affichent pas de décimale. On ne montre
+// donc « 2 » et non « 2.0 » — mais si quelqu'un saisit un jour 2,5 avec une
+// sonde plus fine, la décimale est conservée telle quelle.
+function formatTemp(valeur) {
+    if (valeur === null || valeur === undefined || valeur === '') return '';
+    const n = Number(valeur);
+    if (Number.isNaN(n)) return String(valeur);
+    return String(n);
+}
+
 const DELAI_RETARD_MS = 72 * 60 * 60 * 1000;
 
 function releveEnRetard(releve) {
@@ -3560,11 +3570,11 @@ function renderReleveSaisie() {
             <div class="releve-ligne" data-equipement="${e.id}">
                 <div class="releve-ligne-nom">
                     ${e.nom}${source}
-                    <span class="releve-ligne-seuil">${e.seuil_min} à ${e.seuil_max} °C</span>
+                    <span class="releve-ligne-seuil">${formatTemp(e.seuil_min)} à ${formatTemp(e.seuil_max)} °C</span>
                 </div>
-                <input type="number" step="0.1" inputmode="decimal"
+                <input type="number" step="1" inputmode="decimal"
                        class="releve-ligne-champ" data-min="${e.seuil_min}" data-max="${e.seuil_max}"
-                       value="${valeur !== undefined && valeur !== null ? valeur : ''}">
+                       value="${formatTemp(valeur)}">
             </div>
         `;
     }).join('');
@@ -3721,7 +3731,7 @@ async function renderReleveHistorique() {
         const lignes = Object.keys(bloc.enceintes).sort().map(nom => {
             const e = bloc.enceintes[nom];
             const cellule = (r) => r
-                ? `<span class="v${r.hors_seuil ? ' hs' : ''}">${r.temperature}°</span>`
+                ? `<span class="v${r.hors_seuil ? ' hs' : ''}">${formatTemp(r.temperature)}°</span>`
                 : `<span class="v">—</span>`;
             return `<span>${nom}</span>${cellule(e.matin)}${cellule(e.soir)}`;
         }).join('');
@@ -3808,8 +3818,8 @@ async function exportReleveList() {
             const e = parEnceinte[nom];
             const v = (r) => {
                 if (!r) return '—';
-                if (r.hors_seuil) { horsSeuilTotal++; return `${r.temperature}° ⚠️`; }
-                return `${r.temperature}°`;
+                if (r.hors_seuil) { horsSeuilTotal++; return `${formatTemp(r.temperature)}° ⚠️`; }
+                return `${formatTemp(r.temperature)}°`;
             };
             texte += `  ${nom} : matin ${v(e.matin)} | soir ${v(e.soir)}\n`;
         });

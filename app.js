@@ -2399,7 +2399,7 @@ function renderFishList() {
                         <div class="frozen-item-qty-value">${item.quantity}</div>
                         <div class="frozen-item-qty-label">${item.unit}</div>
                     </div>
-                    ${db.isPatron() ? `<button type="button" class="btn btn-small btn-icon btn-danger" onclick="deleteFrozenFish('${item.id}')" title="Supprimer">🗑️</button>` : ''}
+                    <button type="button" class="btn btn-small btn-icon btn-danger" onclick="deleteFrozenFish('${item.id}')" title="Supprimer">🗑️</button>
                 </div>
             </div>
         `;
@@ -2496,7 +2496,13 @@ async function handleFishSubmit(e) {
 }
 
 async function deleteFrozenFish(id) {
-    if (!confirm('⚠️ Supprimer cette entrée de surgélation ?')) {
+    const entree = (AppState.frozenFish || []).find(f => f.id === id);
+    const quoi = entree
+        ? `${entree.fish_type} — ${entree.quantity} ${entree.unit}, surgelé le ` +
+          new Date(entree.frozen_at).toLocaleDateString('fr-FR')
+        : 'cette entrée';
+
+    if (!confirm(`⚠️ Supprimer définitivement :\n\n${quoi}\n\nCette ligne du registre sera perdue.`)) {
         return;
     }
 

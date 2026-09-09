@@ -1460,12 +1460,128 @@
             border: 2px solid transparent;
             aspect-ratio: 1;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
         }
 
         .frozen-card:active {
             transform: scale(0.98);
+        }
+
+        /* Carte Traçabilité : aucune illustration disponible, icône +
+           libellé au lieu de l'image des autres cartes de ce type. */
+        .frozen-card-icon {
+            font-size: 3rem;
+            line-height: 1;
+        }
+
+        .frozen-card-label {
+            margin-top: 8px;
+            font-weight: 700;
+            color: #088F8F;
+            font-size: 0.95rem;
+            text-align: center;
+        }
+
+        /* === TRAÇABILITÉ (RÉCEPTIONS) === */
+        .reception-photos-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+
+        .reception-photo-thumb-view {
+            width: 56px;
+            height: 56px;
+            border-radius: 10px;
+            object-fit: cover;
+            flex: none;
+            cursor: pointer;
+            background: #eee;
+        }
+
+        .reception-photo-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .reception-photo-thumb {
+            position: relative;
+            width: 72px;
+            height: 72px;
+            border-radius: 13px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .reception-photo-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .reception-photo-remove {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            border: none;
+            font-size: 0.9rem;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        .reception-upload-progress {
+            margin-top: 15px;
+            padding: 10px 15px;
+            background: #f0f7f7;
+            border-radius: 13px;
+            color: #088F8F;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .photo-viewer-content {
+            position: relative;
+            max-width: 100%;
+            max-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #photo-viewer-image {
+            max-width: 100%;
+            max-height: 85vh;
+            border-radius: 13px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+
+        .photo-viewer-close {
+            position: absolute;
+            top: -14px;
+            right: -14px;
+            background: white;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            color: #333;
+            font-size: 1.3rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
     </style>
@@ -1649,6 +1765,40 @@
 
             <div id="fish-list"></div>
             <button class="fab" id="add-fish-btn">+</button>
+        </div>
+
+        <!-- PAGE TRAÇABILITÉ (RÉCEPTIONS) -->
+        <div id="tracabilite-page" class="page">
+            <div class="page-header">
+                <button id="back-to-home-tracabilite" class="back-button">←</button>
+                <h2 class="page-title">📋 Traçabilité</h2>
+                <button class="btn btn-small" id="export-reception-btn">📤</button>
+            </div>
+
+            <!-- Filtres -->
+            <div class="frozen-filters">
+                <select class="form-select" id="reception-month-filter">
+                    <option value="">Tous les mois</option>
+                    <option value="01">Janvier</option>
+                    <option value="02">Février</option>
+                    <option value="03">Mars</option>
+                    <option value="04">Avril</option>
+                    <option value="05">Mai</option>
+                    <option value="06">Juin</option>
+                    <option value="07">Juillet</option>
+                    <option value="08">Août</option>
+                    <option value="09">Septembre</option>
+                    <option value="10">Octobre</option>
+                    <option value="11">Novembre</option>
+                    <option value="12">Décembre</option>
+                </select>
+                <select class="form-select" id="reception-year-filter">
+                    <!-- Sera rempli dynamiquement -->
+                </select>
+            </div>
+
+            <div id="receptions-list"></div>
+            <button class="fab" id="add-reception-btn">+</button>
         </div>
 
         <!-- PAGE DES FOURNISSEURS -->
@@ -2039,6 +2189,51 @@
         </div>
     </div>
 
+    <!-- MODAL RÉCEPTION (TRAÇABILITÉ) -->
+    <div class="modal" id="reception-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">📋 Nouvelle réception</h3>
+                <button class="close-modal" data-modal="reception-modal">×</button>
+            </div>
+            <form id="reception-form">
+                <div class="form-group">
+                    <label class="form-label">Fournisseur</label>
+                    <select class="form-select" id="reception-supplier">
+                        <option value="">Non précisé</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date et heure</label>
+                    <input type="datetime-local" class="form-input" id="reception-datetime">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Note</label>
+                    <textarea class="form-textarea" id="reception-note" placeholder="bon de livraison, n° de lot…"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Photos</label>
+                    <button type="button" class="btn btn-secondary btn-full" id="reception-photo-btn">📷 Prendre une photo</button>
+                    <input type="file" id="reception-photo-input" accept="image/*" capture="environment" multiple style="display: none;">
+                    <div id="reception-photo-preview" class="reception-photo-preview"></div>
+                </div>
+                <div id="reception-upload-progress" class="reception-upload-progress" style="display: none;"></div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary close-modal" data-modal="reception-modal">Annuler</button>
+                    <button type="submit" class="btn" id="reception-submit-btn">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL VISIONNEUSE PHOTO -->
+    <div class="modal" id="photo-viewer-modal">
+        <div class="photo-viewer-content">
+            <button class="close-modal photo-viewer-close" data-modal="photo-viewer-modal">×</button>
+            <img id="photo-viewer-image" src="" alt="Photo de réception">
+        </div>
+    </div>
+
     <!-- NAVIGATION -->
     <nav>
         <div class="tab" data-page="home-page">
@@ -2092,8 +2287,8 @@
     <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
-<script src="config.js?v=20260923"></script>
-    <script src="database.js?v=20260923"></script>
-    <script src="app.js?v=20260923"></script>
+<script src="config.js?v=20260924"></script>
+    <script src="database.js?v=20260924"></script>
+    <script src="app.js?v=20260924"></script>
 </body>
 </html>

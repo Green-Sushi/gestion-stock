@@ -21,8 +21,16 @@ const AppState = {
     sushiTypes: [],
     frozenSushi: [],
     editingFrozen: null,
-    frozenFish: []
+    frozenFish: [],
+    receptions: [],
+    receptionsLu: undefined,
+    pendingReceptionPhotos: []
 };
+
+// Adresses signées des photos de réception, en mémoire pour la session.
+// Une entrée par photo (clé = storage_path) : redessiner la liste ne
+// redemande jamais la même adresse.
+const receptionPhotoUrlCache = new Map();
 
 // ====================
 // INITIALISATION
@@ -202,6 +210,10 @@ function showPage(pageId) {
 
     if (pageId === 'fish-page') {
         loadFrozenFish().then(() => renderFishList());
+    }
+
+    if (pageId === 'tracabilite-page') {
+        loadReceptions().then(() => renderReceptionsList());
     }
 }
 
@@ -610,6 +622,23 @@ function setupGlobalListeners() {
     document.getElementById('export-fish-btn').addEventListener('click', exportFishList);
     document.getElementById('fish-month-filter').addEventListener('change', renderFishList);
     document.getElementById('fish-year-filter').addEventListener('change', renderFishList);
+
+    // Traçabilité (réceptions)
+    document.getElementById('back-to-home-tracabilite').addEventListener('click', () => {
+        showPage('home-page');
+        updateActiveTab('home-page');
+        renderCategories();
+    });
+
+    document.getElementById('add-reception-btn').addEventListener('click', openReceptionModal);
+    document.getElementById('reception-form').addEventListener('submit', handleReceptionSubmit);
+    document.getElementById('export-reception-btn').addEventListener('click', exportReceptionList);
+    document.getElementById('reception-month-filter').addEventListener('change', renderReceptionsList);
+    document.getElementById('reception-year-filter').addEventListener('change', renderReceptionsList);
+    document.getElementById('reception-photo-btn').addEventListener('click', () => {
+        document.getElementById('reception-photo-input').click();
+    });
+    document.getElementById('reception-photo-input').addEventListener('change', handleReceptionPhotoInputChange);
 }
 
 // ====================
@@ -694,6 +723,21 @@ function renderCategories() {
         showPage('fish-page');
     });
     container.appendChild(fishCard);
+
+    // Carte Traçabilité — aucune illustration disponible : icône + libellé,
+    // sur la même structure que l'ancienne carte de congélation (avant
+    // l'ajout des images). showPage() déclenche lui-même le chargement de
+    // la liste, comme pour les deux cartes ci-dessus.
+    const tracabiliteCard = document.createElement('div');
+    tracabiliteCard.className = 'frozen-card';
+    tracabiliteCard.innerHTML = `
+        <div class="frozen-card-icon">📋</div>
+        <div class="frozen-card-label">Traçabilité</div>
+    `;
+    tracabiliteCard.addEventListener('click', () => {
+        showPage('tracabilite-page');
+    });
+    container.appendChild(tracabiliteCard);
 
     updateStockOverview();
 }
@@ -2606,6 +2650,420 @@ function exportFishList() {
 }
 
 // ====================
+// TRAÇABILITÉ (RÉCEPTIONS)
+// ====================
+
+// Compresse une photo AVANT tout envoi (photo iPhone ~3 Mo -> ~300 Ko visés,
+// sinon l'espace gratuit Supabase, 1 Go, serait plein en 300 photos au lieu
+// de 3 000). Redimensionne au plus grand côté 1600 px (jamais d'agrandissement
+// d'une image plus petite), exporte en JPEG qualité 0.8. Si la compression
+// échoue, renvoie le fichier D'ORIGINE plutôt que de perdre la photo —
+// `compressee: false` permet à l'appelant de prévenir l'utilisateur.
+function compresserImage(fichier) {
+    return new Promise((resolve) => {
+        const TAILLE_MAX = 1600;
+        let url;
+
+        const echec = () => {
+            if (url) URL.revokeObjectURL(url);
+            resolve({ blob: fichier, compressee: false });
+        };
+
+        try {
+            url = URL.createObjectURL(fichier);
+        } catch (e) {
+            resolve({ blob: fichier, compressee: false });
+            return;
+        }
+
+        const image = new Image();
+        image.onload = () => {
+            try {
+                let { width, height } = image;
+                const plusGrandCote = Math.max(width, height);
+
+                if (plusGrandCote > TAILLE_MAX) {
+                    const ratio = TAILLE_MAX / plusGrandCote;
+                    width = Math.round(width * ratio);
+                    height = Math.round(height * ratio);
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) { echec(); return; }
+                ctx.drawImage(image, 0, 0, width, height);
+
+                canvas.toBlob((blob) => {
+                    URL.revokeObjectURL(url);
+                    if (blob) {
+                        resolve({ blob, compressee: true });
+                    } else {
+                        resolve({ blob: fichier, compressee: false });
+                    }
+                }, 'image/jpeg', 0.8);
+            } catch (e) {
+                echec();
+            }
+        };
+        image.onerror = echec;
+        image.src = url;
+    });
+}
+
+// Renvoie l'adresse signée d'une photo, mise en cache pour la session : on
+// ne la redemande jamais pour la même photo, même si la liste est redessinée
+// plusieurs fois (ex. changement de filtre). L'adresse expire au bout d'1 h
+// côté Supabase — un cache figé plus longtemps que ça n'est pas géré ici.
+async function getCachedPhotoUrl(storagePath) {
+    if (receptionPhotoUrlCache.has(storagePath)) {
+        return receptionPhotoUrlCache.get(storagePath);
+    }
+    const result = await db.getPhotoUrl(storagePath);
+    if (result.success) {
+        receptionPhotoUrlCache.set(storagePath, result.data);
+        return result.data;
+    }
+    return null;
+}
+
+async function loadReceptions() {
+    const result = await db.getReceptions();
+    if (result.success) {
+        AppState.receptions = result.data;
+        AppState.receptionsLu = true;
+    } else {
+        // Ne PAS laisser croire que le registre est vide alors qu'on n'a
+        // simplement pas pu le lire : sur un registre sanitaire, c'est le
+        // pire des messages.
+        AppState.receptions = [];
+        AppState.receptionsLu = false;
+        signalerEchec('Réceptions', result.error);
+    }
+}
+
+function renderReceptionsList() {
+    const container = document.getElementById('receptions-list');
+    const monthFilter = document.getElementById('reception-month-filter').value;
+    const yearFilter = document.getElementById('reception-year-filter').value;
+
+    // Initialiser le select année si vide
+    const yearSelect = document.getElementById('reception-year-filter');
+    if (yearSelect.options.length <= 1) {
+        const currentYear = new Date().getFullYear();
+        yearSelect.innerHTML = '<option value="">Toutes années</option>';
+        for (let y = currentYear; y >= currentYear - 3; y--) {
+            yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
+        }
+    }
+
+    let filtered = [...(AppState.receptions || [])];
+
+    if (monthFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.received_at);
+            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
+        });
+    }
+
+    if (yearFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.received_at);
+            return String(date.getFullYear()) === yearFilter;
+        });
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">${AppState.receptionsLu === false ? '⚠️' : '📋'}</div>
+                <div class="empty-state-text">${AppState.receptionsLu === false
+                    ? 'Lecture impossible — vérifiez la connexion'
+                    : 'Aucune réception enregistrée'}</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = filtered.map(item => {
+        const date = new Date(item.received_at);
+        const dateStr = date.toLocaleDateString('fr-FR');
+        const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const photos = item.photos || [];
+        const supplierLabel = item.supplier_name || 'Non précisé';
+
+        const photosHtml = photos.length > 0
+            ? `<div class="reception-photos-row">` + photos.map(p =>
+                `<img class="reception-photo-thumb-view" data-storage-path="${p.storage_path}" alt="Photo réception">`
+              ).join('') + `</div>`
+            : '';
+
+        return `
+            <div class="list-item reception-item">
+                <div class="list-item-header">
+                    <div class="list-item-title">${supplierLabel}</div>
+                    <div class="list-item-actions">
+                        <button type="button" class="btn btn-small btn-icon btn-danger" onclick="deleteReception('${item.id}')" title="Supprimer">🗑️</button>
+                    </div>
+                </div>
+                <div class="list-item-info">📅 ${dateStr} à ${timeStr}</div>
+                ${item.note ? `<div class="list-item-info">📝 ${item.note}</div>` : ''}
+                <div class="list-item-info">🖼️ ${photos.length} photo${photos.length > 1 ? 's' : ''}</div>
+                ${photosHtml}
+            </div>
+        `;
+    }).join('');
+
+    // Résoudre les vignettes : une adresse signée demandée au plus une fois
+    // par photo (voir getCachedPhotoUrl), même si cette liste est redessinée.
+    container.querySelectorAll('.reception-photo-thumb-view').forEach((img) => {
+        const storagePath = img.dataset.storagePath;
+        getCachedPhotoUrl(storagePath).then(url => {
+            if (url) img.src = url;
+        });
+        img.addEventListener('click', () => openPhotoViewer(storagePath));
+    });
+}
+
+async function openPhotoViewer(storagePath) {
+    const modal = document.getElementById('photo-viewer-modal');
+    const img = document.getElementById('photo-viewer-image');
+    img.src = '';
+    modal.classList.add('active');
+
+    const url = await getCachedPhotoUrl(storagePath);
+    if (url) {
+        img.src = url;
+    } else {
+        notifier('Photo introuvable', 'err');
+        closeModal('photo-viewer-modal');
+    }
+}
+
+function renderReceptionPhotoPreview() {
+    const container = document.getElementById('reception-photo-preview');
+    container.innerHTML = AppState.pendingReceptionPhotos.map((p, index) => `
+        <div class="reception-photo-thumb">
+            <img src="${p.previewUrl}" alt="Photo à envoyer">
+            <button type="button" class="reception-photo-remove" data-index="${index}" title="Retirer">×</button>
+        </div>
+    `).join('');
+
+    container.querySelectorAll('.reception-photo-remove').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const index = parseInt(btn.dataset.index, 10);
+            const [removed] = AppState.pendingReceptionPhotos.splice(index, 1);
+            if (removed) URL.revokeObjectURL(removed.previewUrl);
+            renderReceptionPhotoPreview();
+        });
+    });
+}
+
+function handleReceptionPhotoInputChange(e) {
+    const files = Array.from(e.target.files || []);
+    files.forEach(file => {
+        AppState.pendingReceptionPhotos.push({
+            file,
+            previewUrl: URL.createObjectURL(file)
+        });
+    });
+    renderReceptionPhotoPreview();
+    // Vide l'input : sans ça, resélectionner exactement le même fichier ne
+    // redéclenche pas l'événement 'change'.
+    e.target.value = '';
+}
+
+function openReceptionModal() {
+    const modal = document.getElementById('reception-modal');
+    const form = document.getElementById('reception-form');
+    const supplierSelect = document.getElementById('reception-supplier');
+    const datetimeInput = document.getElementById('reception-datetime');
+
+    form.reset();
+
+    AppState.pendingReceptionPhotos.forEach(p => URL.revokeObjectURL(p.previewUrl));
+    AppState.pendingReceptionPhotos = [];
+    renderReceptionPhotoPreview();
+
+    const progressEl = document.getElementById('reception-upload-progress');
+    progressEl.style.display = 'none';
+    progressEl.textContent = '';
+
+    supplierSelect.innerHTML = '<option value="">Non précisé</option>';
+    AppState.suppliers.forEach(supplier => {
+        const option = document.createElement('option');
+        option.value = supplier.id;
+        option.textContent = supplier.name;
+        supplierSelect.appendChild(option);
+    });
+
+    const now = new Date();
+    const localDatetime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    datetimeInput.value = localDatetime;
+
+    modal.classList.add('active');
+}
+
+// Crée d'abord la réception, PUIS envoie les photos une par une. Si une
+// photo échoue, la réception reste enregistrée — elle ne doit jamais être
+// perdue à cause d'une photo. Fermer la fenêtre pendant l'envoi ne l'annule
+// pas : la boucle continue en arrière-plan jusqu'à son terme, seule la
+// barre de progression cesse d'être visible.
+async function handleReceptionSubmit(e) {
+    e.preventDefault();
+
+    const supplierId = document.getElementById('reception-supplier').value || null;
+    const supplier = supplierId ? AppState.suppliers.find(s => s.id === supplierId) : null;
+    const datetime = document.getElementById('reception-datetime').value;
+    const note = document.getElementById('reception-note').value.trim();
+    const photosASayer = [...AppState.pendingReceptionPhotos];
+
+    const submitBtn = document.getElementById('reception-submit-btn');
+    const progressEl = document.getElementById('reception-upload-progress');
+
+    const receptionData = {
+        supplier_id: supplierId,
+        // Recopié depuis le fournisseur sélectionné, tel qu'il est
+        // actuellement chargé dans AppState.suppliers : un fournisseur
+        // renommé ou supprimé plus tard ne doit pas réécrire cette réception.
+        supplier_name: supplier ? supplier.name : null,
+        note: note || null,
+        received_at: datetime ? new Date(datetime).toISOString() : new Date().toISOString(),
+        user_id: db.currentUser?.id
+    };
+
+    submitBtn.disabled = true;
+    showLoading(true);
+    const result = await db.createReception(receptionData);
+    showLoading(false);
+
+    if (!result.success) {
+        submitBtn.disabled = false;
+        signalerEchec('Réception', result.error);
+        return;
+    }
+
+    const receptionId = result.data.id;
+
+    let envoyees = 0;
+    let compressionEchouee = false;
+    if (photosASayer.length > 0) {
+        progressEl.style.display = 'block';
+        for (let i = 0; i < photosASayer.length; i++) {
+            progressEl.textContent = `Envoi de la photo ${i + 1} sur ${photosASayer.length}…`;
+            const { blob, compressee } = await compresserImage(photosASayer[i].file);
+            if (!compressee) compressionEchouee = true;
+            const uploadResult = await db.uploadReceptionPhoto(receptionId, blob);
+            if (uploadResult.success) envoyees++;
+        }
+        progressEl.style.display = 'none';
+        progressEl.textContent = '';
+    }
+
+    submitBtn.disabled = false;
+
+    AppState.pendingReceptionPhotos.forEach(p => URL.revokeObjectURL(p.previewUrl));
+    AppState.pendingReceptionPhotos = [];
+
+    closeModal('reception-modal');
+
+    if (compressionEchouee) {
+        notifier('Compression impossible pour une photo — envoi de l\'original', 'info', 4000);
+    }
+
+    if (photosASayer.length > 0 && envoyees < photosASayer.length) {
+        notifier(`Réception enregistrée — ${envoyees} photo${envoyees > 1 ? 's' : ''} sur ${photosASayer.length} envoyée${envoyees > 1 ? 's' : ''}`, 'err', 5000);
+    } else {
+        notifier('Réception enregistrée');
+    }
+
+    await loadReceptions();
+    renderReceptionsList();
+}
+
+async function deleteReception(id) {
+    const entree = (AppState.receptions || []).find(r => r.id === id);
+    const photoCount = entree?.photos?.length || 0;
+    const quoi = entree
+        ? `${entree.supplier_name || 'Non précisé'} — ` +
+          new Date(entree.received_at).toLocaleDateString('fr-FR') +
+          (photoCount > 0 ? ` (${photoCount} photo${photoCount > 1 ? 's' : ''} perdue${photoCount > 1 ? 's' : ''})` : '')
+        : 'cette réception';
+
+    if (!confirm(`⚠️ Supprimer définitivement :\n\n${quoi}\n\nCette ligne du registre sera perdue.`)) {
+        return;
+    }
+
+    showLoading(true);
+    const result = await db.deleteReception(id);
+    showLoading(false);
+
+    if (result.success) {
+        notifier('Réception supprimée');
+        await loadReceptions();
+        renderReceptionsList();
+    } else {
+        signalerEchec('Suppression', result.error);
+    }
+}
+
+function exportReceptionList() {
+    const monthFilter = document.getElementById('reception-month-filter').value;
+    const yearFilter = document.getElementById('reception-year-filter').value;
+
+    let filtered = [...(AppState.receptions || [])];
+
+    if (monthFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.received_at);
+            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
+        });
+    }
+
+    if (yearFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.received_at);
+            return String(date.getFullYear()) === yearFilter;
+        });
+    }
+
+    if (filtered.length === 0) {
+        notifier('Aucune donnée à exporter', 'err');
+        return;
+    }
+
+    const monthNames = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    const periodLabel = monthFilter ? `${monthNames[parseInt(monthFilter)]} ${yearFilter || ''}` : (yearFilter || 'Tout');
+
+    let exportText = `📋 HISTORIQUE TRAÇABILITÉ - Green Sushi\n`;
+    exportText += `📅 Période: ${periodLabel}\n`;
+    exportText += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    filtered.forEach(item => {
+        const date = new Date(item.received_at);
+        const dateStr = date.toLocaleDateString('fr-FR');
+        const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const photoCount = (item.photos || []).length;
+
+        exportText += `• ${item.supplier_name || 'Non précisé'}\n`;
+        exportText += `  ${dateStr} ${timeStr} | ${photoCount} photo${photoCount > 1 ? 's' : ''}\n`;
+        if (item.note) exportText += `  Note: ${item.note}\n`;
+        exportText += `\n`;
+    });
+
+    exportText += `━━━━━━━━━━━━━━━━━━━━\n`;
+    exportText += `📊 Total: ${filtered.length} entrée(s)`;
+
+    const emailRecipient = 'greensushi.mq@gmail.com';
+    const subject = encodeURIComponent(`📋 Historique Traçabilité - ${periodLabel}`);
+    const body = encodeURIComponent(exportText);
+    const mailtoUrl = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
+
+    window.location.href = mailtoUrl;
+}
+
+// ====================
 // FONCTIONS GLOBALES (appelées depuis HTML onclick)
 // ====================
 
@@ -2613,3 +3071,4 @@ window.openSupplierModal = openSupplierModal;
 window.openUserModal = openUserModal;
 window.deleteUser = deleteUser;
 window.deleteFrozenFish = deleteFrozenFish;
+window.deleteReception = deleteReception;

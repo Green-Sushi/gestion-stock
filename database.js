@@ -899,6 +899,191 @@ class DatabaseManager {
         }
     }
 
+    // ===== GESTION DE LA TRAÇABILITÉ (RÉCEPTIONS) =====
+
+    // Chaque réception embarque ses photos via la jointure `reception_photos`.
+    // JAMAIS de jointure vers `users` : la table est fermée, le nom est déjà
+    // inscrit sur la ligne au moment de la création.
+    async getReceptions(filters = {}) {
+        try {
+            let query = this.supabase
+                .from('receptions')
+                .select(`
+                    id,
+                    received_at,
+                    supplier_id,
+                    supplier_name,
+                    note,
+                    user_name,
+                    photos:reception_photos(id, storage_path, taille_octets)
+                `)
+                .order('received_at', { ascending: false });
+
+            // Mêmes filtres mois/année que les autres registres.
+            if (filters.month && filters.year) {
+                const startDate = `${filters.year}-${filters.month.padStart(2, '0')}-01`;
+                const endMonth = parseInt(filters.month) === 12 ? 1 : parseInt(filters.month) + 1;
+                const endYear = parseInt(filters.month) === 12 ? parseInt(filters.year) + 1 : filters.year;
+                const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+                query = query
+                    .gte('received_at', startDate)
+                    .lt('received_at', endDate);
+            }
+
+            const { data, error } = await query;
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Erreur récupération réceptions:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // supplier_name est recopié tel que fourni par l'appelant (déjà résolu
+    // depuis AppState.suppliers, chargée au démarrage) : un fournisseur
+    // renommé ou supprimé plus tard ne doit pas réécrire l'histoire de cette
+    // réception. user_name est, lui, rempli ICI depuis la session en cours.
+    async createReception(data) {
+        try {
+            const insertData = {
+                supplier_id: data.supplier_id || null,
+                supplier_name: data.supplier_name || null,
+                note: data.note || null,
+                user_name: this.currentUser?.name || null,
+                user_id: data.user_id
+            };
+
+            if (data.received_at) {
+                insertData.received_at = data.received_at;
+            }
+
+            const { data: result, error } = await this.supabase
+                .from('receptions')
+                .insert([insertData])
+                .select(`
+                    id,
+                    received_at,
+                    supplier_id,
+                    supplier_name,
+                    note,
+                    user_name
+                `)
+                .single();
+
+            if (error) throw error;
+            return { success: true, data: result };
+        } catch (error) {
+            console.error('Erreur création réception:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Les fichiers de l'espace de stockage ne suivent PAS la suppression en
+    // cascade de la base : seules les lignes `reception_photos` disparaissent
+    // avec la réception, jamais les fichiers eux-mêmes. On les efface donc
+    // ICI, avant de supprimer la réception — sinon ils resteraient orphelins
+    // et occuperaient l'espace pour toujours.
+    async deleteReception(id) {
+        try {
+            const { data: photos, error: photosError } = await this.supabase
+                .from('reception_photos')
+                .select('storage_path')
+                .eq('reception_id', id);
+
+            if (photosError) throw photosError;
+
+            if (photos && photos.length > 0) {
+                const { error: removeError } = await this.supabase.storage
+                    .from('receptions')
+                    .remove(photos.map(p => p.storage_path));
+                // On ne bloque pas la suppression de la réception si l'effacement
+                // des fichiers échoue : mieux vaut un fichier orphelin qu'une
+                // réception impossible à supprimer.
+                if (removeError) console.error('Erreur suppression fichiers réception:', removeError);
+            }
+
+            const { error } = await this.supabase
+                .from('receptions')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            return { success: true };
+        } catch (error) {
+            console.error('Erreur suppression réception:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Chemin `<receptionId>/<horodatage>-<aléatoire>.jpg` : `fichier` est déjà
+    // compressé en JPEG par l'appelant (voir compresserImage dans app.js),
+    // sauf repli sur l'original si la compression a échoué.
+    async uploadReceptionPhoto(receptionId, fichier) {
+        try {
+            const chemin = `${receptionId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+
+            const { error: uploadError } = await this.supabase.storage
+                .from('receptions')
+                .upload(chemin, fichier);
+
+            if (uploadError) throw uploadError;
+
+            const { data, error } = await this.supabase
+                .from('reception_photos')
+                .insert([{
+                    reception_id: receptionId,
+                    storage_path: chemin,
+                    taille_octets: fichier.size || null
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Erreur envoi photo réception:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // L'espace `receptions` N'EST PAS public : une adresse publique ne
+    // mènerait nulle part. Adresse SIGNÉE, valable 1 heure, à la place.
+    async getPhotoUrl(storagePath) {
+        try {
+            const { data, error } = await this.supabase.storage
+                .from('receptions')
+                .createSignedUrl(storagePath, 3600);
+
+            if (error) throw error;
+            return { success: true, data: data.signedUrl };
+        } catch (error) {
+            console.error('Erreur génération adresse photo:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async deleteReceptionPhoto(id, storagePath) {
+        try {
+            const { error: removeError } = await this.supabase.storage
+                .from('receptions')
+                .remove([storagePath]);
+            if (removeError) throw removeError;
+
+            const { error } = await this.supabase
+                .from('reception_photos')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            return { success: true };
+        } catch (error) {
+            console.error('Erreur suppression photo réception:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
 }
 
 // Instance globale

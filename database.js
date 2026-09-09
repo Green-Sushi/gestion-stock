@@ -449,8 +449,11 @@ class DatabaseManager {
 
             if (error) throw error;
 
-            // Filtrer les produits avec stock bas
-            const lowStock = data.filter(p => p.quantity <= p.alert_threshold);
+            // Ruptures ET limites. Les limites servent à anticiper : les
+            // exclure d'ici les rendait invisibles sur l'écran Alertes, alors
+            // que ce sont elles qui permettent de commander AVANT de manquer.
+            // Le compteur de l'onglet, lui, ne compte que les ruptures.
+            const lowStock = data.filter(p => p.quantity <= p.alert_threshold * 2);
             return { success: true, data: lowStock };
         } catch (error) {
             console.error('Erreur récupération produits en stock bas:', error);

@@ -1291,7 +1291,10 @@ async function updateAlertCount() {
     const result = await db.getLowStockProducts();
     if (result.success) {
         AppState.lowStockProducts = result.data;
-        document.getElementById('alert-count').textContent = result.data.length;
+        // La pastille rouge ne compte QUE les ruptures : un compteur rouge
+        // gonflé de produits non urgents perdrait son sens.
+        const { ruptures } = separerNiveaux(result.data);
+        document.getElementById('alert-count').textContent = ruptures.length;
     }
 }
 
@@ -1319,8 +1322,21 @@ function renderAlerts() {
         'legumes': '#27ae60'
     };
 
+    // Deux groupes distincts. Sans séparation, les produits en limite se
+    // noieraient parmi les ruptures et l'écran perdrait son sens : ce qui
+    // manque MAINTENANT d'un côté, ce qu'il faut prévoir de l'autre.
+    const { ruptures, limites } = separerNiveaux(AppState.lowStockProducts);
+
+    const enTete = (texte, couleur, nombre) => {
+        const t = document.createElement('div');
+        t.className = 'alerts-section-title';
+        t.style.color = couleur;
+        t.textContent = texte + ' (' + nombre + ')';
+        return t;
+    };
+
     // Trier par catégorie puis alphabétique
-    const sortedProducts = [...AppState.lowStockProducts].sort((a, b) => {
+    const trier = (liste) => [...liste].sort((a, b) => {
         // D'abord par catégorie
         const categoryOrder = ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'legumes'];
         const catIndexA = categoryOrder.indexOf(a.category);
@@ -1332,7 +1348,13 @@ function renderAlerts() {
         return a.name.localeCompare(b.name);
     });
 
-    sortedProducts.forEach(product => {
+    const groupes = [];
+    if (ruptures.length > 0) groupes.push({ titre: '🔴 À commander', couleur: '#e74c3c', produits: trier(ruptures) });
+    if (limites.length > 0) groupes.push({ titre: '🟠 À prévoir', couleur: '#e67e22', produits: trier(limites) });
+
+    groupes.forEach(groupe => {
+    container.appendChild(enTete(groupe.titre, groupe.couleur, groupe.produits.length));
+    groupe.produits.forEach(product => {
         const categoryName = CATEGORIES.find(c => c.id === product.category)?.name || product.category;
         const borderColor = categoryColors[product.category] || '#999';
 
@@ -1372,9 +1394,30 @@ function renderAlerts() {
 
         container.appendChild(item);
     });
+    });
 }
 
 // Générer le message récapitulatif formaté
+// Sépare la liste en ruptures et limites. La liste contient désormais les
+// deux : les limites servent à anticiper, les ruptures à commander.
+function separerNiveaux(produits) {
+    const ruptures = [], limites = [];
+    (produits || []).forEach(p => {
+        const { stockLevel } = calculateStockLevel(p.quantity, p.alert_threshold);
+        if (stockLevel === 'stock-critical') ruptures.push(p);
+        else if (stockLevel === 'stock-warning') limites.push(p);
+    });
+    return { ruptures, limites };
+}
+
+// Quantité à commander pour revenir au stock optimal. Ce champ ne servait plus
+// à rien depuis le passage à trois niveaux : il retrouve ici son usage.
+function quantiteACommander(p) {
+    if (!p.optimal_stock) return null;
+    const manque = Math.round((p.optimal_stock - p.quantity) * 100) / 100;
+    return manque > 0 ? manque : null;
+}
+
 function generateAlertMessage() {
     const now = new Date();
     const dateStr = now.toLocaleDateString('fr-FR', {
@@ -1406,47 +1449,42 @@ function generateAlertMessage() {
         'legumes': '\uD83E\uDD6C'      // 🥬
     };
 
-    let message = '\uD83D\uDEA8 ALERTE STOCK - Green Sushi\n'; // 🚨
-    message += '\uD83D\uDCC5 ' + dateStr + ' \u00E0 ' + timeStr + '\n'; // 📅 à
-    message += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n';
+    // Une ligne par produit au lieu de trois : le message était jugé trop
+    // chargé, et il s'allonge encore avec la seconde section.
+    const ligne = (p) => {
+        const aCommander = quantiteACommander(p);
+        return '\u2022 ' + p.name + ' : ' + p.quantity + ' ' + p.unit
+             + (aCommander ? ' \u2192 commander ' + aCommander : '') + '\n';
+    };
 
-    // Regrouper par catégorie
-    const byCategory = {};
-    AppState.lowStockProducts.forEach(product => {
-        if (!byCategory[product.category]) {
-            byCategory[product.category] = [];
-        }
-        byCategory[product.category].push(product);
-    });
-
-    // Ordre des catégories
-    const categoryOrder = ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'legumes'];
-
-    categoryOrder.forEach(catId => {
-        if (!byCategory[catId] || byCategory[catId].length === 0) return;
-
-        const category = CATEGORIES.find(c => c.id === catId);
-        const catLabel = categoryEmojis[catId] || '[LEGUMES]';
-
-        message += catLabel + ' ' + category.name.toUpperCase() + '\n';
-        message += '\u2500'.repeat(30) + '\n';
-
-        byCategory[catId].forEach(product => {
-            const { stockLevel } = calculateStockLevel(
-                product.quantity,
-                product.alert_threshold
-            );
-            const levelIndicator = levelIndicators[stockLevel] || '[OK]';
-
-            message += levelIndicator + ' ' + product.name + '\n';
-            message += '   Stock: ' + product.quantity + ' ' + product.unit + '\n\n';
+    const bloc = (titre, produits) => {
+        if (produits.length === 0) return '';
+        let t = titre + '\n';
+        const parCategorie = {};
+        produits.forEach(p => {
+            (parCategorie[p.category] = parCategorie[p.category] || []).push(p);
         });
-        message += '\n';
-    });
+        ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'legumes'].forEach(catId => {
+            const liste = parCategorie[catId];
+            if (!liste || liste.length === 0) return;
+            const categorie = CATEGORIES.find(c => c.id === catId);
+            t += '\n' + (categoryEmojis[catId] || '') + ' ' + (categorie ? categorie.name : catId) + '\n';
+            liste.forEach(p => { t += ligne(p); });
+        });
+        return t + '\n';
+    };
 
-    // Total
-    message += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
-    message += '\uD83D\uDCCA TOTAL: ' + AppState.lowStockProducts.length + ' produit' + (AppState.lowStockProducts.length > 1 ? 's' : '') + ' en alerte'; // 📊
+    const { ruptures, limites } = separerNiveaux(AppState.lowStockProducts);
+
+    let message = '\uD83D\uDEA8 ALERTE STOCK - Green Sushi\n'; // 🚨
+    message += '\uD83D\uDCC5 ' + dateStr + ' \u00E0 ' + timeStr + '\n';  // 📅 à
+
+    message += '\n' + bloc('\uD83D\uDD34 \u00C0 COMMANDER', ruptures);   // 🔴
+    message += bloc('\uD83D\uDFE0 \u00C0 PR\u00C9VOIR', limites);        // 🟠
+
+    message += '\u2501'.repeat(20) + '\n';
+    message += ruptures.length + ' \u00E0 commander';
+    if (limites.length > 0) message += ' \u00B7 ' + limites.length + ' \u00E0 pr\u00E9voir';
 
     return message;
 }

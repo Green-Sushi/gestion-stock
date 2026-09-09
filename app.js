@@ -724,15 +724,16 @@ function renderCategories() {
     });
     container.appendChild(fishCard);
 
-    // Carte Traçabilité — aucune illustration disponible : icône + libellé,
-    // sur la même structure que l'ancienne carte de congélation (avant
-    // l'ajout des images). showPage() déclenche lui-même le chargement de
-    // la liste, comme pour les deux cartes ci-dessus.
+    // Carte Traçabilité — illustration fournie par l'utilisateur, légende
+    // incluse dans l'image comme pour les autres cartes : aucun texte
+    // ajouté par-dessus. showPage() déclenche lui-même le chargement de la
+    // liste, comme pour les deux cartes ci-dessus.
     const tracabiliteCard = document.createElement('div');
     tracabiliteCard.className = 'frozen-card';
     tracabiliteCard.innerHTML = `
-        <div class="frozen-card-icon">📋</div>
-        <div class="frozen-card-label">Traçabilité</div>
+        <img src="./images/categories/tracabilite.webp"
+             onerror="this.onerror=null; this.src='./images/categories/tracabilite.png';"
+             alt="Traçabilité" class="category-image">
     `;
     tracabiliteCard.addEventListener('click', () => {
         showPage('tracabilite-page');
@@ -2712,20 +2713,30 @@ function compresserImage(fichier) {
     });
 }
 
-// Renvoie l'adresse signée d'une photo, mise en cache pour la session : on
-// ne la redemande jamais pour la même photo, même si la liste est redessinée
-// plusieurs fois (ex. changement de filtre). L'adresse expire au bout d'1 h
-// côté Supabase — un cache figé plus longtemps que ça n'est pas géré ici.
+// Renvoie l'adresse signée d'une photo, mise en cache pour ne pas la
+// redemander à chaque redessin de la liste.
+//
+// L'adresse expire au bout d'1 h côté Supabase, alors qu'une session dure
+// 12 h : un cache qui ne vieillirait jamais afficherait des vignettes
+// mortes tout l'après-midi. On la considère donc périmée au bout de
+// 50 minutes, avec 10 minutes de marge avant l'expiration réelle.
+const DUREE_ADRESSE_PHOTO_MS = 50 * 60 * 1000;
+
 async function getCachedPhotoUrl(storagePath) {
-    if (receptionPhotoUrlCache.has(storagePath)) {
-        return receptionPhotoUrlCache.get(storagePath);
+    const enCache = receptionPhotoUrlCache.get(storagePath);
+    if (enCache && (Date.now() - enCache.obtenueA) < DUREE_ADRESSE_PHOTO_MS) {
+        return enCache.url;
     }
+
     const result = await db.getPhotoUrl(storagePath);
     if (result.success) {
-        receptionPhotoUrlCache.set(storagePath, result.data);
+        receptionPhotoUrlCache.set(storagePath, { url: result.data, obtenueA: Date.now() });
         return result.data;
     }
-    return null;
+
+    // En cas d'échec, mieux vaut une adresse périmée que rien : l'image
+    // s'affichera peut-être encore, et on réessaiera au prochain passage.
+    return enCache ? enCache.url : null;
 }
 
 async function loadReceptions() {

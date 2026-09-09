@@ -23,6 +23,16 @@ les mêmes raisons.
 
 Empreinte SHA-256 (32 premiers caractères) : `fbde52aab1700a3b308087ae78b41fb5`
 
+Pour vérifier que le fichier n'a pas été altéré, depuis le dossier du projet :
+
+```
+shasum -a 256 vendor/supabase-js-2.116.0.js
+```
+
+Les 32 premiers caractères doivent correspondre à l'empreinte ci-dessus.
+S'ils diffèrent, **ne pas publier** : le fichier n'est plus celui qui a été
+validé.
+
 ## Monter de version — la marche à suivre
 
 Ce n'est **pas** une opération anodine : si le fichier est mauvais,

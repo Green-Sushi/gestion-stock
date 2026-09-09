@@ -1437,13 +1437,6 @@ function generateAlertMessage() {
         minute: '2-digit'
     });
 
-    // Indicateurs par niveau de stock (paires de substitution UTF-16)
-    const levelIndicators = {
-        'stock-critical': '\uD83D\uDD34', // 🔴
-        'stock-warning': '\uD83D\uDFE0',  // 🟠
-        'stock-attention': '\uD83D\uDFE1', // 🟡
-        'stock-ok': '\uD83D\uDFE2'        // 🟢
-    };
 
     // Emoji par catégorie (paires de substitution UTF-16)
     const categoryEmojis = {
@@ -1457,13 +1450,15 @@ function generateAlertMessage() {
 
     // Une ligne par produit au lieu de trois : le message était jugé trop
     // chargé, et il s'allonge encore avec la seconde section.
-    const ligne = (p) => {
-        const aCommander = quantiteACommander(p);
+    // Le verbe DOIT suivre la section : écrire « commander » sous un titre
+    // « À prévoir » ferait livrer les 55 produits au lieu des 36 attendus.
+    const ligne = (p, verbe) => {
+        const quantite = quantiteACommander(p);
         return '\u2022 ' + p.name + ' : ' + p.quantity + ' ' + p.unit
-             + (aCommander ? ' \u2192 commander ' + aCommander : '') + '\n';
+             + (quantite ? ' \u2192 ' + verbe + ' ' + quantite : '') + '\n';
     };
 
-    const bloc = (titre, produits) => {
+    const bloc = (titre, produits, verbe) => {
         if (produits.length === 0) return '';
         let t = titre + '\n';
         const parCategorie = {};
@@ -1475,7 +1470,7 @@ function generateAlertMessage() {
             if (!liste || liste.length === 0) return;
             const categorie = CATEGORIES.find(c => c.id === catId);
             t += '\n' + (categoryEmojis[catId] || '') + ' ' + (categorie ? categorie.name : catId) + '\n';
-            liste.forEach(p => { t += ligne(p); });
+            liste.forEach(p => { t += ligne(p, verbe); });
         });
         return t + '\n';
     };
@@ -1485,8 +1480,8 @@ function generateAlertMessage() {
     let message = '\uD83D\uDEA8 ALERTE STOCK - Green Sushi\n'; // 🚨
     message += '\uD83D\uDCC5 ' + dateStr + ' \u00E0 ' + timeStr + '\n';  // 📅 à
 
-    message += '\n' + bloc('\uD83D\uDD34 \u00C0 COMMANDER', ruptures);   // 🔴
-    message += bloc('\uD83D\uDFE0 \u00C0 PR\u00C9VOIR', limites);        // 🟠
+    message += '\n' + bloc('\uD83D\uDD34 \u00C0 COMMANDER', ruptures, 'commander');  // 🔴
+    message += bloc('\uD83D\uDFE0 \u00C0 PR\u00C9VOIR', limites, 'pr\u00E9voir');     // 🟠
 
     message += '\u2501'.repeat(20) + '\n';
     message += ruptures.length + ' \u00E0 commander';

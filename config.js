@@ -20,7 +20,7 @@ const ALERT_CONFIG = {
 // changer son nom de fichier ne servait à rien : le téléphone gardait
 // l'ancienne en mémoire, parfois plusieurs jours. À incrémenter à CHAQUE
 // remplacement d'illustration, comme on le fait déjà pour les scripts.
-const VERSION_VISUELS = '20261006';
+const VERSION_VISUELS = '20261007';
 
 // Catégories fixes du restaurant
 const CATEGORIES = [

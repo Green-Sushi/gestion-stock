@@ -1193,6 +1193,95 @@ class DatabaseManager {
         }
     }
 
+    // ====================
+    // RELEVÉS DE TEMPÉRATURE
+    // ====================
+
+    async getEquipements() {
+        try {
+            const { data, error } = await this.supabase
+                .from('equipements')
+                .select('id, nom, type, seuil_min, seuil_max, ordre, actif')
+                .eq('actif', true)
+                .order('ordre');
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Erreur récupération équipements:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Les relevés d'une période. Les bornes sont des dates NUES : la colonne
+    // `jour` en est une aussi, donc aucun fuseau n'intervient ici.
+    async getReleves(jourDebut, jourFin) {
+        try {
+            const { data, error } = await this.supabase
+                .from('releves_temperature')
+                .select('id, equipement_id, equipement_nom, jour, moment, temperature, hors_seuil, origine, user_name, created_at')
+                .gte('jour', jourDebut)
+                .lte('jour', jourFin)
+                .order('jour', { ascending: false });
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Erreur récupération relevés:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Le dernier relevé connu de chaque enceinte, pour pré-remplir la saisie
+    // du jour. Sans ça, il faudrait taper treize nombres deux fois par jour.
+    async getDerniersReleves() {
+        try {
+            const { data, error } = await this.supabase
+                .from('releves_temperature')
+                .select('equipement_id, temperature, jour, moment')
+                .order('jour', { ascending: false })
+                .order('moment', { ascending: false })
+                .limit(400);
+            if (error) throw error;
+
+            const parEquipement = {};
+            (data || []).forEach(r => {
+                if (!parEquipement[r.equipement_id]) parEquipement[r.equipement_id] = r.temperature;
+            });
+            return { success: true, data: parEquipement };
+        } catch (error) {
+            console.error('Erreur dernier relevé:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Enregistre les relevés d'un moment en UNE fois. `upsert` sur la clé
+    // (équipement, jour, moment) : corriger une valeur déjà saisie remplace
+    // la ligne au lieu d'en créer une deuxième.
+    async saveReleves(lignes) {
+        try {
+            const aEcrire = lignes.map(l => ({
+                equipement_id: l.equipement_id,
+                equipement_nom: l.equipement_nom,
+                jour: l.jour,
+                moment: l.moment,
+                temperature: l.temperature,
+                hors_seuil: l.hors_seuil,
+                // Une valeur saisie ICI n'est plus une reprise, même si elle
+                // remplace une ligne qui venait d'Hygie.
+                origine: 'saisie',
+                user_name: this.currentUser?.name || null
+            }));
+
+            const { error } = await this.supabase
+                .from('releves_temperature')
+                .upsert(aEcrire, { onConflict: 'equipement_id,jour,moment' });
+            if (error) throw error;
+            return { success: true };
+        } catch (error) {
+            console.error('Erreur enregistrement relevés:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
 }
 
 // Instance globale

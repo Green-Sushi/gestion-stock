@@ -176,3 +176,71 @@ COMMIT;
 --   ALTER TABLE public.products ADD CONSTRAINT products_category_check
 --     CHECK (category IN ('frais','sec','surgele','consommables','boissons','autre'));
 --   ⚠️ Le retour arrière recasse Légumes. À ne faire qu'avec un retour du code.
+
+-- =====================================================================
+-- RELEVÉ DE TEMPÉRATURES — 2026-09-09
+-- =====================================================================
+-- Registre quotidien des enceintes froides, matin et soir. Il fait foi au
+-- même titre que les autres : dates à l'heure du restaurant, valeurs figées.
+--
+-- Un frigo à congélateur intégré compte pour DEUX enceintes : ce sont deux
+-- températures distinctes à relever.
+--
+-- La colonne `origine` sépare deux choses qui ne doivent JAMAIS se
+-- confondre :
+--   'saisie' = relevé pris dans cette application ;
+--   'hygie'  = valeur reconstituée, l'original étant dans le système Hygie
+--              qui refuse l'export. Elle porte la mention « voir Hygie »
+--              partout où elle apparaît, écran et export compris. Les
+--              relevés d'origine restent ce qui fait foi.
+--
+-- L'unicité (équipement, jour, moment) fait qu'une correction REMPLACE la
+-- valeur au lieu d'empiler deux lignes contradictoires.
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS public.equipements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nom TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('positif','negatif')),
+    seuil_min NUMERIC(4,1) NOT NULL,
+    seuil_max NUMERIC(4,1) NOT NULL,
+    ordre INTEGER NOT NULL DEFAULT 0,
+    actif BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (seuil_min < seuil_max)
+);
+
+CREATE TABLE IF NOT EXISTS public.releves_temperature (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    equipement_id UUID REFERENCES public.equipements(id) ON DELETE SET NULL,
+    equipement_nom TEXT NOT NULL,
+    jour DATE NOT NULL,
+    moment TEXT NOT NULL CHECK (moment IN ('matin','soir')),
+    temperature NUMERIC(4,1) NOT NULL,
+    hors_seuil BOOLEAN NOT NULL DEFAULT false,
+    origine TEXT NOT NULL DEFAULT 'saisie' CHECK (origine IN ('saisie','hygie')),
+    user_name TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (equipement_id, jour, moment)
+);
+
+CREATE INDEX IF NOT EXISTS idx_releves_jour ON public.releves_temperature (jour DESC, moment);
+CREATE INDEX IF NOT EXISTS idx_releves_equipement ON public.releves_temperature (equipement_id, jour DESC);
+
+ALTER TABLE public.equipements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.releves_temperature ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS equipements_all ON public.equipements;
+CREATE POLICY equipements_all ON public.equipements FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS releves_all ON public.releves_temperature;
+CREATE POLICY releves_all ON public.releves_temperature FOR ALL USING (true) WITH CHECK (true);
+
+-- Consultation : les journées incomplètes du mois écoulé.
+--   SELECT jour, moment, COUNT(*) FROM public.releves_temperature
+--   WHERE jour > CURRENT_DATE - 30 GROUP BY jour, moment HAVING COUNT(*) < 13
+--   ORDER BY jour DESC;
+
+-- Retour arrière :
+--   DROP TABLE public.releves_temperature;
+--   DROP TABLE public.equipements;

@@ -1402,6 +1402,179 @@
             }
         }
 
+        /* === RELEVÉ DE TEMPÉRATURES === */
+        .releve-barre {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .releve-barre .form-input { flex: 1; }
+
+        .releve-moments {
+            display: flex;
+            background: #e0f0f0;
+            border-radius: 999px;
+            padding: 3px;
+            flex: none;
+        }
+
+        .releve-moment {
+            border: none;
+            background: none;
+            border-radius: 999px;
+            padding: 0 16px;
+            min-height: 38px;
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: .78rem;
+            font-weight: 700;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            color: #4a6161;
+            cursor: pointer;
+        }
+
+        .releve-moment.active {
+            background: #088F8F;
+            color: white;
+        }
+
+        .releve-ligne {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: white;
+            border-radius: 13px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .releve-ligne-nom {
+            flex: 1;
+            min-width: 0;
+            font-size: .92rem;
+            font-weight: 600;
+            color: #162626;
+        }
+
+        .releve-ligne-seuil {
+            display: block;
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: .68rem;
+            font-weight: 700;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            color: #8aa0a0;
+            margin-top: 2px;
+        }
+
+        /* Champ large et haut : on le remplit debout, devant un congélateur,
+           parfois avec des gants. */
+        .releve-ligne-champ {
+            flex: none;
+            width: 92px;
+            min-height: 44px;
+            text-align: center;
+            font-size: 1.05rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            border: 2px solid #d5e3e3;
+            border-radius: 13px;
+            padding: 0 6px;
+            color: #162626;
+            background: #fbfdfd;
+        }
+
+        .releve-ligne-champ:focus {
+            outline: none;
+            border-color: #088F8F;
+        }
+
+        /* Hors des bornes : signalé AVANT l'enregistrement, pas après. */
+        .releve-ligne.alerte { background: #fdecea; }
+        .releve-ligne.alerte .releve-ligne-champ {
+            border-color: #e74c3c;
+            color: #c0392b;
+        }
+
+        .releve-source {
+            display: inline-block;
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: .62rem;
+            font-weight: 700;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            background: #eae3f5;
+            color: #6c4ba6;
+            border-radius: 999px;
+            padding: 2px 8px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        .releve-source.retard {
+            background: #fdf1e3;
+            color: #8a5219;
+        }
+
+        .releve-manquant {
+            background: #fdf1e3;
+            color: #8a5219;
+            border-radius: 13px;
+            padding: 10px 14px;
+            font-size: .86rem;
+            font-weight: 600;
+            margin-bottom: 14px;
+        }
+
+        .releve-manquant ul { margin: 6px 0 0; padding-left: 18px; font-weight: 500; }
+
+        .releve-historique-titre {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: .74rem;
+            font-weight: 700;
+            letter-spacing: .09em;
+            text-transform: uppercase;
+            color: #7b8c8c;
+            margin: 28px 2px 10px;
+        }
+
+        .releve-jour-bloc {
+            background: white;
+            border-radius: 13px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .releve-jour-titre {
+            font-weight: 700;
+            font-size: .94rem;
+            margin-bottom: 8px;
+            color: #162626;
+        }
+
+        .releve-jour-valeurs {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 4px 10px;
+            font-size: .84rem;
+            color: #4a6161;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .releve-jour-valeurs .v { text-align: right; font-weight: 600; }
+        .releve-jour-valeurs .v.hs { color: #c0392b; }
+        .releve-jour-entete {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: .64rem;
+            font-weight: 700;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            color: #8aa0a0;
+        }
+
         /* === CONGÉLATION === */
         .frozen-filters {
             display: flex;
@@ -1724,13 +1897,13 @@
             </div>
             <div class="categories-grid">
                 <div class="category-card" id="carte-stock">
-                    <img src="./images/categories/section-stock.webp?v=20261006"
-                         onerror="this.onerror=null; this.src='./images/categories/section-stock.png?v=20261006';"
+                    <img src="./images/categories/section-stock.webp?v=20261007"
+                         onerror="this.onerror=null; this.src='./images/categories/section-stock.png?v=20261007';"
                          alt="Stock" class="category-image">
                 </div>
                 <div class="category-card" id="carte-suivi">
-                    <img src="./images/categories/section-suivi.webp?v=20261006"
-                         onerror="this.onerror=null; this.src='./images/categories/section-suivi.png?v=20261006';"
+                    <img src="./images/categories/section-suivi.webp?v=20261007"
+                         onerror="this.onerror=null; this.src='./images/categories/section-suivi.png?v=20261007';"
                          alt="Suivi" class="category-image">
                 </div>
             </div>
@@ -1879,6 +2052,48 @@
         </div>
 
         <!-- PAGE DES FOURNISSEURS -->
+        <!-- PAGE RELEVÉ DE TEMPÉRATURES -->
+        <div id="releve-page" class="page">
+            <div class="page-header">
+                <button id="back-to-suivi-releve" class="back-button">Retour</button>
+                <h2 class="page-title">🌡️ Relevé</h2>
+                <button class="btn btn-small" id="export-releve-btn">📤</button>
+            </div>
+
+            <!-- Ce qui n'a pas été relevé ces derniers jours. Un trou dans un
+                 registre se remarque ; encore faut-il le voir à temps. -->
+            <div id="releve-manquants"></div>
+
+            <div class="releve-barre">
+                <input type="date" class="form-input" id="releve-jour">
+                <div class="releve-moments">
+                    <button type="button" class="releve-moment active" data-moment="matin">Matin</button>
+                    <button type="button" class="releve-moment" data-moment="soir">Soir</button>
+                </div>
+            </div>
+
+            <div id="releve-liste"></div>
+
+            <button class="btn btn-full" id="releve-save-btn">Enregistrer le relevé</button>
+
+            <div class="releve-historique-titre">Historique</div>
+            <div class="frozen-filters">
+                <select class="form-select" id="releve-filter-month">
+                    <option value="">Tous les mois</option>
+                    <option value="01">Janvier</option><option value="02">Février</option>
+                    <option value="03">Mars</option><option value="04">Avril</option>
+                    <option value="05">Mai</option><option value="06">Juin</option>
+                    <option value="07">Juillet</option><option value="08">Août</option>
+                    <option value="09">Septembre</option><option value="10">Octobre</option>
+                    <option value="11">Novembre</option><option value="12">Décembre</option>
+                </select>
+                <select class="form-select" id="releve-filter-year">
+                    <option value="">Toutes années</option>
+                </select>
+            </div>
+            <div id="releve-historique"></div>
+        </div>
+
         <div id="suppliers-page" class="page">
             <div class="page-header">
                 <h2 class="page-title">Fournisseurs</h2>
@@ -2372,8 +2587,8 @@
     <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
-<script src="config.js?v=20261006"></script>
-    <script src="database.js?v=20261006"></script>
-    <script src="app.js?v=20261006"></script>
+<script src="config.js?v=20261007"></script>
+    <script src="database.js?v=20261007"></script>
+    <script src="app.js?v=20261007"></script>
 </body>
 </html>

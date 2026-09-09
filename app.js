@@ -30,7 +30,10 @@ const AppState = {
     // ouverture de la fenêtre : un envoi de photos parti avec l'ancien
     // numéro sait qu'il ne doit plus toucher à l'écran.
     receptionSaisieId: 0,
-    productsLu: undefined
+    productsLu: undefined,
+    equipements: [],
+    derniersReleves: {},
+    relevesRecents: []
 };
 
 // Adresses signées des photos de réception, en mémoire pour la session.
@@ -243,6 +246,18 @@ function showPage(pageId) {
 
     if (pageId === 'tracabilite-page') {
         loadReceptions().then(() => renderReceptionsList());
+    }
+
+    if (pageId === 'releve-page') {
+        // Le jour proposé est celui du RESTAURANT, pas celui de l'appareil.
+        const champJour = document.getElementById('releve-jour');
+        if (!champJour.value) champJour.value = aujourdhuiRestaurant();
+
+        loadReleveEcran().then(() => {
+            renderReleveManquants();
+            renderReleveSaisie();
+            renderReleveHistorique();
+        });
     }
 }
 
@@ -657,6 +672,23 @@ function setupGlobalListeners() {
         renderCategories();
     });
 
+    document.getElementById('back-to-suivi-releve').addEventListener('click', () => showPage('suivi-page'));
+    document.getElementById('releve-save-btn').addEventListener('click', handleReleveSave);
+    document.getElementById('export-releve-btn').addEventListener('click', exportReleveList);
+
+    document.getElementById('releve-jour').addEventListener('change', renderReleveSaisie);
+
+    document.querySelectorAll('.releve-moment').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.releve-moment').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderReleveSaisie();
+        });
+    });
+
+    document.getElementById('releve-filter-month').addEventListener('change', renderReleveHistorique);
+    document.getElementById('releve-filter-year').addEventListener('change', renderReleveHistorique);
+
     document.getElementById('carte-stock').addEventListener('click', () => showPage('stock-page'));
     document.getElementById('carte-suivi').addEventListener('click', () => showPage('suivi-page'));
 
@@ -797,6 +829,20 @@ function renderCategories() {
         showPage('tracabilite-page');
     });
     grilleSuivi.appendChild(tracabiliteCard);
+
+    // Carte Relevé de températures — même construction que les trois autres,
+    // légende incluse dans l'illustration.
+    const releveCard = document.createElement('div');
+    releveCard.className = 'frozen-card';
+    releveCard.innerHTML = `
+        <img src="./images/categories/releve.webp?v=${VERSION_VISUELS}"
+             onerror="this.onerror=null; this.src='./images/categories/releve.png?v=${VERSION_VISUELS}';"
+             alt="Relevé" class="category-image">
+    `;
+    releveCard.addEventListener('click', () => {
+        showPage('releve-page');
+    });
+    grilleSuivi.appendChild(releveCard);
 
     updateStockOverview();
 }
@@ -3390,6 +3436,398 @@ function exportReceptionList() {
     const mailtoUrl = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
 
     window.location.href = mailtoUrl;
+}
+
+// ====================
+// RELEVÉ DE TEMPÉRATURES
+// ====================
+
+// Nombre de jours regardés en arrière pour signaler les relevés oubliés.
+// Au-delà, ce n'est plus un rattrapage, c'est de l'archéologie.
+const FENETRE_OUBLIS_JOURS = 7;
+
+function jourMoinsN(jourNu, n) {
+    const [a, m, j] = jourNu.split('-').map(Number);
+    const d = new Date(Date.UTC(a, m - 1, j - n));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+async function loadReleveEcran() {
+    const aujourdhui = aujourdhuiRestaurant();
+
+    const [equip, derniers, recents] = await Promise.all([
+        db.getEquipements(),
+        db.getDerniersReleves(),
+        // On charge la fenêtre des oublis ET le jour affiché, qui peut être
+        // antérieur si l'on rattrape un relevé.
+        db.getReleves(jourMoinsN(aujourdhui, FENETRE_OUBLIS_JOURS), aujourdhui)
+    ]);
+
+    if (!equip.success) {
+        signalerEchec('Équipements', equip.error);
+        AppState.equipements = [];
+        return;
+    }
+
+    AppState.equipements = equip.data;
+    AppState.derniersReleves = derniers.success ? derniers.data : {};
+    AppState.relevesRecents = recents.success ? recents.data : [];
+}
+
+// Les couples (jour, moment) des derniers jours pour lesquels AUCUN relevé
+// n'existe. Un trou dans un registre se remarque toujours ; mieux vaut le
+// voir soi-même, à temps, que devant un contrôleur.
+function relevesManquants() {
+    const aujourdhui = aujourdhuiRestaurant();
+    const faits = new Set((AppState.relevesRecents || []).map(r => `${r.jour}|${r.moment}`));
+    const manquants = [];
+
+    for (let i = 0; i < FENETRE_OUBLIS_JOURS; i++) {
+        const jour = jourMoinsN(aujourdhui, i);
+        ['matin', 'soir'].forEach(moment => {
+            // Le relevé du soir du jour même n'est pas « oublié » : la
+            // journée n'est pas finie.
+            if (i === 0 && moment === 'soir' && Number(partiesDateRestaurant(new Date()).heure) < 18) return;
+            if (!faits.has(`${jour}|${moment}`)) manquants.push({ jour, moment });
+        });
+    }
+    return manquants;
+}
+
+// Un relevé saisi le lendemain n'a rien d'anormal : on rattrape. Au-delà de
+// 72 h, en revanche, la ligne le dit — un contrôleur préfère un retard
+// assumé à une valeur qui prétend avoir été prise sur le moment.
+const DELAI_RETARD_MS = 72 * 60 * 60 * 1000;
+
+function releveEnRetard(releve) {
+    // Les lignes reprises d'Hygie portent déjà leur propre mention : les
+    // marquer « en retard » en plus n'apprendrait rien.
+    if (!releve || releve.origine !== 'saisie' || !releve.created_at) return false;
+
+    const [a, m, j] = releve.jour.split('-').map(Number);
+    const debutDuJour = instantRestaurant(a, m, j).getTime();
+    return (new Date(releve.created_at).getTime() - debutDuJour) > DELAI_RETARD_MS;
+}
+
+function renderReleveManquants() {
+    const box = document.getElementById('releve-manquants');
+    const manquants = relevesManquants();
+
+    if (manquants.length === 0) {
+        box.innerHTML = '';
+        return;
+    }
+
+    const lignes = manquants.slice(0, 8).map(m =>
+        `<li>${dateSeuleFr(m.jour)} — ${m.moment}</li>`).join('');
+    const reste = manquants.length > 8 ? `<li>… et ${manquants.length - 8} autre(s)</li>` : '';
+
+    box.innerHTML = `
+        <div class="releve-manquant">
+            ${manquants.length} relevé${manquants.length > 1 ? 's' : ''} non fait${manquants.length > 1 ? 's' : ''} sur les ${FENETRE_OUBLIS_JOURS} derniers jours :
+            <ul>${lignes}${reste}</ul>
+            Choisissez la date ci-dessous pour le saisir maintenant.
+        </div>
+    `;
+}
+
+function renderReleveSaisie() {
+    const container = document.getElementById('releve-liste');
+    const jour = document.getElementById('releve-jour').value;
+    const moment = document.querySelector('.releve-moment.active').dataset.moment;
+
+    if (!AppState.equipements || AppState.equipements.length === 0) {
+        container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🌡️</div>
+            <div class="empty-state-text">Aucun équipement — vérifiez la connexion</div></div>`;
+        return;
+    }
+
+    // Valeurs déjà enregistrées pour ce jour et ce moment : on les affiche
+    // telles quelles, c'est une correction, pas une nouvelle saisie.
+    const deja = {};
+    (AppState.relevesRecents || []).forEach(r => {
+        if (r.jour === jour && r.moment === moment) deja[r.equipement_id] = r;
+    });
+
+    container.innerHTML = AppState.equipements.map(e => {
+        const enregistre = deja[e.id];
+        const valeur = enregistre ? enregistre.temperature
+                     : (AppState.derniersReleves || {})[e.id];
+        const source = enregistre && enregistre.origine === 'hygie'
+            ? '<span class="releve-source">voir Hygie</span>' : '';
+
+        return `
+            <div class="releve-ligne" data-equipement="${e.id}">
+                <div class="releve-ligne-nom">
+                    ${e.nom}${source}
+                    <span class="releve-ligne-seuil">${e.seuil_min} à ${e.seuil_max} °C</span>
+                </div>
+                <input type="number" step="0.1" inputmode="decimal"
+                       class="releve-ligne-champ" data-min="${e.seuil_min}" data-max="${e.seuil_max}"
+                       value="${valeur !== undefined && valeur !== null ? valeur : ''}">
+            </div>
+        `;
+    }).join('');
+
+    container.querySelectorAll('.releve-ligne-champ').forEach(champ => {
+        const verifier = () => marquerHorsSeuil(champ);
+        champ.addEventListener('input', verifier);
+        verifier();
+    });
+}
+
+// Signale la sortie de bornes PENDANT la saisie, pas après l'enregistrement :
+// c'est encore le moment où l'on peut aller revérifier le thermomètre.
+function marquerHorsSeuil(champ) {
+    const ligne = champ.closest('.releve-ligne');
+    const v = champ.value.trim();
+    if (v === '') { ligne.classList.remove('alerte'); return false; }
+
+    const t = parseFloat(v.replace(',', '.'));
+    const hors = Number.isNaN(t) || t < parseFloat(champ.dataset.min) || t > parseFloat(champ.dataset.max);
+    ligne.classList.toggle('alerte', hors);
+    return hors;
+}
+
+async function handleReleveSave() {
+    const jour = document.getElementById('releve-jour').value;
+    const moment = document.querySelector('.releve-moment.active').dataset.moment;
+    const bouton = document.getElementById('releve-save-btn');
+
+    if (!jour) { notifier('Choisissez une date', 'err'); return; }
+
+    const lignes = [];
+    let horsSeuil = 0;
+    let vides = 0;
+
+    document.querySelectorAll('#releve-liste .releve-ligne').forEach(ligne => {
+        const champ = ligne.querySelector('.releve-ligne-champ');
+        const brut = champ.value.trim();
+        if (brut === '') { vides++; return; }
+
+        const t = parseFloat(brut.replace(',', '.'));
+        if (Number.isNaN(t)) { vides++; return; }
+
+        const hors = t < parseFloat(champ.dataset.min) || t > parseFloat(champ.dataset.max);
+        if (hors) horsSeuil++;
+
+        const equipement = AppState.equipements.find(e => e.id === ligne.dataset.equipement);
+        lignes.push({
+            equipement_id: equipement.id,
+            equipement_nom: equipement.nom,
+            jour, moment,
+            temperature: t,
+            hors_seuil: hors
+        });
+    });
+
+    if (lignes.length === 0) { notifier('Aucune température saisie', 'err'); return; }
+
+    // Un relevé partiel s'enregistre, mais on le DIT : c'est un trou de plus
+    // dans le registre, et il vaut mieux le savoir tout de suite.
+    if (vides > 0 && !confirm(`${vides} enceinte(s) sans température.\n\nEnregistrer quand même le relevé partiel ?`)) {
+        return;
+    }
+
+    bouton.disabled = true;
+    showLoading(true);
+    const result = await db.saveReleves(lignes);
+    showLoading(false);
+    bouton.disabled = false;
+
+    if (!result.success) { signalerEchec('Relevé', result.error); return; }
+
+    // Le jour visé est-il antérieur à aujourd'hui ? On le nomme, pour que
+    // l'auteur voie bien qu'il vient de saisir en retard.
+    const aujourdhui = aujourdhuiRestaurant();
+    const enRetard = jour < aujourdhui ? ` du ${dateSeuleFr(jour)}` : '';
+
+    if (horsSeuil > 0) {
+        notifier(`Relevé${enRetard} enregistré — ${horsSeuil} température HORS SEUIL`, 'err', 7000);
+    } else {
+        notifier(`Relevé${enRetard} enregistré`);
+    }
+
+    await loadReleveEcran();
+    renderReleveManquants();
+    renderReleveSaisie();
+    renderReleveHistorique();
+}
+
+async function renderReleveHistorique() {
+    const container = document.getElementById('releve-historique');
+    const mois = document.getElementById('releve-filter-month').value;
+    let annee = document.getElementById('releve-filter-year').value;
+
+    const yearSelect = document.getElementById('releve-filter-year');
+    if (yearSelect.options.length <= 1) {
+        const courante = Number(partiesDateRestaurant(new Date()).annee);
+        yearSelect.innerHTML = '<option value="">Toutes années</option>';
+        for (let y = courante; y >= courante - 3; y--) {
+            yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
+        }
+    }
+
+    // Comme pour la traçabilité : un mois seul vaut « ce mois-ci, cette
+    // année », sinon la demande partirait sans période.
+    if (mois && !annee) {
+        annee = partiesDateRestaurant(new Date()).annee;
+        if (Array.from(yearSelect.options).some(o => o.value === annee)) yearSelect.value = annee;
+    }
+
+    let debut, fin;
+    if (annee && mois) {
+        const dernierJour = new Date(Date.UTC(Number(annee), Number(mois), 0)).getUTCDate();
+        debut = `${annee}-${mois}-01`;
+        fin = `${annee}-${mois}-${dernierJour}`;
+    } else if (annee) {
+        debut = `${annee}-01-01`; fin = `${annee}-12-31`;
+    } else {
+        // Sans filtre, on ne descend pas trois ans d'un coup : le mois écoulé.
+        fin = aujourdhuiRestaurant();
+        debut = jourMoinsN(fin, 30);
+    }
+
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-text">Chargement…</div></div>';
+    const result = await db.getReleves(debut, fin);
+
+    if (!result.success) {
+        container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div>
+            <div class="empty-state-text">Lecture impossible — vérifiez la connexion</div></div>`;
+        return;
+    }
+
+    // Regroupement par jour, puis par enceinte, avec matin et soir côte à côte.
+    const parJour = {};
+    result.data.forEach(r => {
+        const j = (parJour[r.jour] = parJour[r.jour] || { origines: new Set(), enceintes: {} });
+        j.origines.add(r.origine);
+        const e = (j.enceintes[r.equipement_nom] = j.enceintes[r.equipement_nom] || {});
+        e[r.moment] = r;
+    });
+
+    const jours = Object.keys(parJour).sort().reverse();
+    if (jours.length === 0) {
+        container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🌡️</div>
+            <div class="empty-state-text">Aucun relevé sur cette période</div></div>`;
+        return;
+    }
+
+    container.innerHTML = jours.map(jour => {
+        const bloc = parJour[jour];
+        let source = bloc.origines.has('hygie')
+            ? '<span class="releve-source">voir Hygie</span>' : '';
+
+        const lignes = Object.keys(bloc.enceintes).sort().map(nom => {
+            const e = bloc.enceintes[nom];
+            const cellule = (r) => r
+                ? `<span class="v${r.hors_seuil ? ' hs' : ''}">${r.temperature}°</span>`
+                : `<span class="v">—</span>`;
+            return `<span>${nom}</span>${cellule(e.matin)}${cellule(e.soir)}`;
+        }).join('');
+
+        // Le retard se juge sur la journée, pas ligne par ligne : c'est le
+        // relevé entier qui a été rattrapé.
+        const rattrape = Object.values(bloc.enceintes)
+            .some(e => releveEnRetard(e.matin) || releveEnRetard(e.soir));
+        if (rattrape) source += '<span class="releve-source retard">saisi en retard</span>';
+
+        return `
+            <div class="releve-jour-bloc">
+                <div class="releve-jour-titre">${dateSeuleFr(jour)}${source}</div>
+                <div class="releve-jour-valeurs">
+                    <span class="releve-jour-entete">Enceinte</span>
+                    <span class="releve-jour-entete v">Matin</span>
+                    <span class="releve-jour-entete v">Soir</span>
+                    ${lignes}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function exportReleveList() {
+    const mois = document.getElementById('releve-filter-month').value;
+    let annee = document.getElementById('releve-filter-year').value;
+    if (mois && !annee) annee = partiesDateRestaurant(new Date()).annee;
+
+    if (!annee) {
+        notifier('Choisissez une année, ou un mois, avant d\'exporter', 'err', 5000);
+        return;
+    }
+
+    let debut, fin, periode;
+    const noms = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+                  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    if (mois) {
+        const dernierJour = new Date(Date.UTC(Number(annee), Number(mois), 0)).getUTCDate();
+        debut = `${annee}-${mois}-01`;
+        fin = `${annee}-${mois}-${dernierJour}`;
+        periode = `${noms[Number(mois)]} ${annee}`;
+    } else {
+        debut = `${annee}-01-01`; fin = `${annee}-12-31`; periode = annee;
+    }
+
+    showLoading(true);
+    const result = await db.getReleves(debut, fin);
+    showLoading(false);
+
+    if (!result.success) { signalerEchec('Export', result.error); return; }
+    if (result.data.length === 0) { notifier('Aucun relevé sur cette période', 'err'); return; }
+
+    const parJour = {};
+    result.data.forEach(r => {
+        const j = (parJour[r.jour] = parJour[r.jour] || []);
+        j.push(r);
+    });
+
+    let texte = `🌡️ RELEVÉ DE TEMPÉRATURES - Green Sushi\n`;
+    texte += `📅 Période: ${periode}\n`;
+    texte += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    let horsSeuilTotal = 0;
+    let reprisesTotal = 0;
+
+    Object.keys(parJour).sort().forEach(jour => {
+        const lignes = parJour[jour];
+        const reprise = lignes.some(r => r.origine === 'hygie');
+        const retard = lignes.some(r => releveEnRetard(r));
+        if (reprise) reprisesTotal++;
+
+        texte += `${dateSeuleFr(jour)}`;
+        if (reprise) texte += ` [valeurs reprises d'Hygie]`;
+        if (retard) texte += ` [saisi en retard]`;
+        texte += `\n`;
+
+        const parEnceinte = {};
+        lignes.forEach(r => {
+            (parEnceinte[r.equipement_nom] = parEnceinte[r.equipement_nom] || {})[r.moment] = r;
+        });
+
+        Object.keys(parEnceinte).sort().forEach(nom => {
+            const e = parEnceinte[nom];
+            const v = (r) => {
+                if (!r) return '—';
+                if (r.hors_seuil) { horsSeuilTotal++; return `${r.temperature}° ⚠️`; }
+                return `${r.temperature}°`;
+            };
+            texte += `  ${nom} : matin ${v(e.matin)} | soir ${v(e.soir)}\n`;
+        });
+        texte += `\n`;
+    });
+
+    texte += `━━━━━━━━━━━━━━━━━━━━\n`;
+    texte += `📊 ${Object.keys(parJour).length} jour(s), ${horsSeuilTotal} température(s) hors seuil\n`;
+
+    // Un export qui contient des valeurs reprises doit le dire en toutes
+    // lettres : elles n'ont pas été relevées dans cette application.
+    if (reprisesTotal > 0) {
+        texte += `\n⚠️ ${reprisesTotal} journée(s) portent des valeurs REPRISES du système Hygie.\n`;
+        texte += `Elles n'ont pas été saisies dans cette application. Les relevés d'origine font foi.`;
+    }
+
+    const sujet = encodeURIComponent(`🌡️ Relevé de températures - ${periode}`);
+    window.location.href = `mailto:greensushi.mq@gmail.com?subject=${sujet}&body=${encodeURIComponent(texte)}`;
 }
 
 // ====================

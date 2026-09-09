@@ -1419,76 +1419,57 @@ function separerNiveaux(produits) {
     return { ruptures, limites };
 }
 
-// Quantité à commander pour revenir au stock optimal. Ce champ ne servait plus
-// à rien depuis le passage à trois niveaux : il retrouve ici son usage.
-function quantiteACommander(p) {
-    if (!p.optimal_stock) return null;
-    const manque = Math.round((p.optimal_stock - p.quantity) * 100) / 100;
-    return manque > 0 ? manque : null;
-}
 
-function generateAlertMessage() {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('fr-FR', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-    const timeStr = now.toLocaleTimeString('fr-FR', {
-        hour: '2-digit',
-        minute: '2-digit'
+// Récapitulatif de stock. Il n'est PAS destiné aux fournisseurs mais au
+// patron : c'est l'employé qui le lui envoie quand le patron n'est pas au
+// restaurant. D'où le parti pris — ce qui compte est ce qu'il RESTE, pas les
+// quantités à commander, que le patron évalue lui-même.
+//
+// `gras` vaut vrai pour WhatsApp, qui met en gras entre astérisques ; faux
+// pour l'e-mail, qui part en texte brut par mailto et afficherait les
+// astérisques telles quelles.
+function generateAlertMessage(gras = true) {
+    const dateStr = new Date().toLocaleDateString('fr-FR', {
+        weekday: 'long', day: 'numeric', month: 'long'
     });
 
-
-    // Emoji par catégorie (paires de substitution UTF-16)
-    const categoryEmojis = {
-        'frais': '\uD83E\uDDC0',      // 🧀
-        'sec': '\uD83C\uDF3E',         // 🌾
-        'surgele': '\u2744\uFE0F',     // ❄️
-        'consommables': '\uD83E\uDD62', // 🥢
-        'boissons': '\uD83E\uDDC3',    // 🧃
-        'legumes': '\uD83E\uDD6C'      // 🥬
+    const emphase = (t) => gras ? '*' + t + '*' : t;
+    const nomCategorie = (id) => {
+        const c = CATEGORIES.find(x => x.id === id);
+        return (c ? c.name : id).replace(/^Stock /, '').toUpperCase();
     };
+    // Deux décimales au plus : la base stocke des nombres à virgule.
+    const quantite = (p) => Math.round(p.quantity * 100) / 100;
 
-    // Une ligne par produit au lieu de trois : le message était jugé trop
-    // chargé, et il s'allonge encore avec la seconde section.
-    // Le verbe DOIT suivre la section : écrire « commander » sous un titre
-    // « À prévoir » ferait livrer les 55 produits au lieu des 36 attendus.
-    const ligne = (p, verbe) => {
-        const quantite = quantiteACommander(p);
-        return '\u2022 ' + p.name + ' : ' + p.quantity + ' ' + p.unit
-             + (quantite ? ' \u2192 ' + verbe + ' ' + quantite : '') + '\n';
-    };
+    const { ruptures, limites } = separerNiveaux(AppState.lowStockProducts);
+    const ordre = ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'legumes'];
 
-    const bloc = (titre, produits, verbe) => {
+    const bloc = (titre, produits) => {
         if (produits.length === 0) return '';
-        let t = titre + '\n';
+        let t = '\n' + titre + ' (' + produits.length + ')\n';
         const parCategorie = {};
         produits.forEach(p => {
             (parCategorie[p.category] = parCategorie[p.category] || []).push(p);
         });
-        ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'legumes'].forEach(catId => {
+        ordre.forEach(catId => {
             const liste = parCategorie[catId];
             if (!liste || liste.length === 0) return;
-            const categorie = CATEGORIES.find(c => c.id === catId);
-            t += '\n' + (categoryEmojis[catId] || '') + ' ' + (categorie ? categorie.name : catId) + '\n';
-            liste.forEach(p => { t += ligne(p, verbe); });
+            t += '\n' + nomCategorie(catId) + '\n';
+            liste.sort((a, b) => a.name.localeCompare(b.name));
+            liste.forEach(p => {
+                t += '\u2022 ' + emphase(p.name) + ' ' + quantite(p) + '\n';
+            });
         });
-        return t + '\n';
+        return t;
     };
 
-    const { ruptures, limites } = separerNiveaux(AppState.lowStockProducts);
+    let message = emphase('STOCK') + ' \u2014 ' + dateStr + '\n';
+    // Le chiffre seul est ambigu : on le dit une fois, en tête, plutôt que
+    // de répéter l'unité sur chaque ligne.
+    message += 'Le chiffre indique ce qu\'il reste.\n';
 
-    let message = '\uD83D\uDEA8 ALERTE STOCK - Green Sushi\n'; // 🚨
-    message += '\uD83D\uDCC5 ' + dateStr + ' \u00E0 ' + timeStr + '\n';  // 📅 à
-
-    message += '\n' + bloc('\uD83D\uDD34 \u00C0 COMMANDER', ruptures, 'commander');  // 🔴
-    message += bloc('\uD83D\uDFE0 \u00C0 PR\u00C9VOIR', limites, 'pr\u00E9voir');     // 🟠
-
-    message += '\u2501'.repeat(20) + '\n';
-    message += ruptures.length + ' \u00E0 commander';
-    if (limites.length > 0) message += ' \u00B7 ' + limites.length + ' \u00E0 pr\u00E9voir';
+    message += bloc('\uD83D\uDD34 \u00C0 COMMANDER', ruptures);  // 🔴
+    message += bloc('\uD83D\uDFE0 \u00C0 PR\u00C9VOIR', limites); // 🟠
 
     return message;
 }
@@ -1498,12 +1479,6 @@ async function sendAlerts() {
         alert('ℹ️ Aucune alerte à envoyer');
         return;
     }
-
-    // DEBUG: Afficher le message généré dans la console
-    const testMessage = generateAlertMessage();
-    console.log('=== MESSAGE GÉNÉRÉ ===');
-    console.log(testMessage);
-    console.log('=== FIN MESSAGE ===');
 
     // Ouvrir la modale de choix
     const modal = document.getElementById('send-choice-modal');
@@ -1524,8 +1499,8 @@ async function sendViaWhatsApp() {
         return;
     }
 
-    // Générer le message formaté
-    const message = generateAlertMessage();
+    // WhatsApp met en gras entre astérisques.
+    const message = generateAlertMessage(true);
 
     // Envoyer par WhatsApp
     sendWhatsAppAlert(whatsappNumber, message);
@@ -1559,8 +1534,9 @@ async function sendViaEmail() {
         return;
     }
 
-    // Générer le message formaté
-    const message = generateAlertMessage();
+    // L'e-mail part en texte brut par mailto : les astérisques y
+    // apparaîtraient telles quelles.
+    const message = generateAlertMessage(false);
 
     // Envoyer par email
     await sendEmailAlert(emailRecipient, message);

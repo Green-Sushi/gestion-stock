@@ -633,6 +633,7 @@ function setupGlobalListeners() {
     document.getElementById('add-reception-btn').addEventListener('click', openReceptionModal);
     document.getElementById('reception-form').addEventListener('submit', handleReceptionSubmit);
     document.getElementById('export-reception-btn').addEventListener('click', exportReceptionList);
+    document.getElementById('reception-category').addEventListener('change', remplirProduitsReception);
     document.getElementById('reception-month-filter').addEventListener('change', renderReceptionsList);
     document.getElementById('reception-year-filter').addEventListener('change', renderReceptionsList);
     document.getElementById('reception-photo-btn').addEventListener('click', () => {
@@ -2802,7 +2803,10 @@ function renderReceptionsList() {
         const dateStr = date.toLocaleDateString('fr-FR');
         const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
         const photos = item.photos || [];
-        const supplierLabel = item.supplier_name || 'Non précisé';
+        // Les fiches saisies avant l'entonnoir n'ont pas de produit : on le
+        // dit, plutôt que d'afficher un titre vide.
+        const productLabel = (item.product_name || '').trim() || 'Produit non précisé';
+        const supplierLabel = (item.supplier_name || '').trim();
 
         const photosHtml = photos.length > 0
             ? `<div class="reception-photos-row">` + photos.map(p =>
@@ -2813,12 +2817,13 @@ function renderReceptionsList() {
         return `
             <div class="list-item reception-item">
                 <div class="list-item-header">
-                    <div class="list-item-title">${supplierLabel}</div>
+                    <div class="list-item-title">${productLabel}</div>
                     <div class="list-item-actions">
                         <button type="button" class="btn btn-small btn-icon btn-danger" onclick="deleteReception('${item.id}')" title="Supprimer">🗑️</button>
                     </div>
                 </div>
                 <div class="list-item-info">📅 ${dateStr} à ${timeStr}</div>
+                ${supplierLabel ? `<div class="list-item-info">🚚 ${supplierLabel}</div>` : ''}
                 ${item.note ? `<div class="list-item-info">📝 ${item.note}</div>` : ''}
                 <div class="list-item-info">🖼️ ${photos.length} photo${photos.length > 1 ? 's' : ''}</div>
                 ${photosHtml}
@@ -2885,13 +2890,60 @@ function handleReceptionPhotoInputChange(e) {
     e.target.value = '';
 }
 
+// Deuxième étage de l'entonnoir. Tant qu'aucune famille n'est choisie, la
+// liste des produits reste fermée : elle annonce quoi faire au lieu d'être
+// vide sans explication.
+function remplirProduitsReception() {
+    const categoryId = document.getElementById('reception-category').value;
+    const productSelect = document.getElementById('reception-product');
+
+    if (!categoryId) {
+        productSelect.innerHTML = '<option value="">Choisir d\'abord une famille</option>';
+        productSelect.disabled = true;
+        return;
+    }
+
+    const produits = (AppState.products || [])
+        .filter(p => p.category === categoryId)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr'));
+
+    if (produits.length === 0) {
+        productSelect.innerHTML = '<option value="">Aucun produit dans cette famille</option>';
+        productSelect.disabled = true;
+        return;
+    }
+
+    productSelect.innerHTML = '<option value="">Choisir un produit…</option>';
+    produits.forEach(produit => {
+        const option = document.createElement('option');
+        option.value = produit.id;
+        // Les noms sont nettoyés à l'affichage comme ailleurs dans l'app :
+        // des espaces en trop rendraient le titre de la fiche bancal.
+        option.textContent = (produit.name || '').trim();
+        productSelect.appendChild(option);
+    });
+    productSelect.disabled = false;
+}
+
 function openReceptionModal() {
     const modal = document.getElementById('reception-modal');
     const form = document.getElementById('reception-form');
     const supplierSelect = document.getElementById('reception-supplier');
+    const categorySelect = document.getElementById('reception-category');
     const datetimeInput = document.getElementById('reception-datetime');
 
     form.reset();
+
+    // Entonnoir : la famille d'abord, le produit ensuite. Avec près de cent
+    // produits au catalogue, une liste unique serait impraticable au comptoir.
+    categorySelect.innerHTML = '<option value="">Choisir une famille…</option>';
+    CATEGORIES.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category.id;
+        option.textContent = `${category.icon} ${category.name}`;
+        categorySelect.appendChild(option);
+    });
+    remplirProduitsReception();
 
     AppState.pendingReceptionPhotos.forEach(p => URL.revokeObjectURL(p.previewUrl));
     AppState.pendingReceptionPhotos = [];
@@ -2924,6 +2976,17 @@ function openReceptionModal() {
 async function handleReceptionSubmit(e) {
     e.preventDefault();
 
+    const productId = document.getElementById('reception-product').value || null;
+    const produit = productId ? (AppState.products || []).find(p => p.id === productId) : null;
+
+    // Le produit est le titre de la fiche : sans lui, la trace ne désigne
+    // rien. Le navigateur le bloque déjà (champ requis), cette garde couvre
+    // le cas où le produit aurait disparu du catalogue entre-temps.
+    if (!produit) {
+        notifier('Choisissez la famille puis le produit', 'err');
+        return;
+    }
+
     const supplierId = document.getElementById('reception-supplier').value || null;
     const supplier = supplierId ? AppState.suppliers.find(s => s.id === supplierId) : null;
     const datetime = document.getElementById('reception-datetime').value;
@@ -2934,6 +2997,11 @@ async function handleReceptionSubmit(e) {
     const progressEl = document.getElementById('reception-upload-progress');
 
     const receptionData = {
+        product_id: productId,
+        // Même principe que pour le fournisseur : le nom est figé ici. Un
+        // produit renommé ou retiré du catalogue ne doit pas réécrire une
+        // fiche qui sert de preuve sanitaire.
+        product_name: (produit.name || '').trim(),
         supplier_id: supplierId,
         // Recopié depuis le fournisseur sélectionné, tel qu'il est
         // actuellement chargé dans AppState.suppliers : un fournisseur
@@ -2997,7 +3065,7 @@ async function deleteReception(id) {
     const entree = (AppState.receptions || []).find(r => r.id === id);
     const photoCount = entree?.photos?.length || 0;
     const quoi = entree
-        ? `${entree.supplier_name || 'Non précisé'} — ` +
+        ? `${(entree.product_name || '').trim() || 'Produit non précisé'} — ` +
           new Date(entree.received_at).toLocaleDateString('fr-FR') +
           (photoCount > 0 ? ` (${photoCount} photo${photoCount > 1 ? 's' : ''} perdue${photoCount > 1 ? 's' : ''})` : '')
         : 'cette réception';
@@ -3057,8 +3125,11 @@ function exportReceptionList() {
         const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
         const photoCount = (item.photos || []).length;
 
-        exportText += `• ${item.supplier_name || 'Non précisé'}\n`;
+        const supplierLabel = (item.supplier_name || '').trim();
+
+        exportText += `• ${(item.product_name || '').trim() || 'Produit non précisé'}\n`;
         exportText += `  ${dateStr} ${timeStr} | ${photoCount} photo${photoCount > 1 ? 's' : ''}\n`;
+        if (supplierLabel) exportText += `  Fournisseur: ${supplierLabel}\n`;
         if (item.note) exportText += `  Note: ${item.note}\n`;
         exportText += `\n`;
     });

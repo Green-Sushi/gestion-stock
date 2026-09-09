@@ -107,3 +107,38 @@ COMMIT;
 -- L'offre gratuite Supabase donne 1 Go. Les photos étant compressées à
 -- environ 300 Ko, cela représente de l'ordre de 3 000 photos.
 -- =====================================================================
+
+-- =====================================================================
+-- COMPLÉMENT — 2026-09-09 : le produit devient le titre de la fiche
+-- =====================================================================
+-- À l'usage, une fiche de traçabilité ne décrit pas « une livraison »
+-- mais « l'étiquette de CE produit ». Le produit devient donc l'entrée
+-- principale, choisi en entonnoir : famille d'abord, produit ensuite —
+-- indispensable avec 98 produits au catalogue.
+--
+-- Le fournisseur reste, en information secondaire et facultative.
+--
+-- N'AJOUTE que deux colonnes. Les réceptions déjà saisies gardent un
+-- produit vide, ce qui est normal : elles sont antérieures.
+-- =====================================================================
+
+BEGIN;
+
+ALTER TABLE public.receptions
+  ADD COLUMN IF NOT EXISTS product_id UUID REFERENCES public.products(id) ON DELETE SET NULL;
+
+-- Nom conservé au moment de la saisie : un produit renommé ou supprimé ne
+-- doit pas réécrire une trace qui sert de preuve. Même raisonnement que
+-- pour le fournisseur et pour l'auteur.
+ALTER TABLE public.receptions
+  ADD COLUMN IF NOT EXISTS product_name TEXT;
+
+COMMENT ON COLUMN public.receptions.product_name IS
+  'Nom du produit AU MOMENT de la saisie. La fiche sert de preuve : un renommage ulterieur ne doit pas la reecrire.';
+
+COMMIT;
+
+-- Retour arrière :
+--   ALTER TABLE public.receptions DROP COLUMN IF EXISTS product_id;
+--   ALTER TABLE public.receptions DROP COLUMN IF EXISTS product_name;
+-- ⚠️ À n'exécuter qu'en même temps qu'un retour du code.

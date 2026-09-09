@@ -911,6 +911,8 @@ class DatabaseManager {
                 .select(`
                     id,
                     received_at,
+                    product_id,
+                    product_name,
                     supplier_id,
                     supplier_name,
                     note,
@@ -948,6 +950,8 @@ class DatabaseManager {
     async createReception(data) {
         try {
             const insertData = {
+                product_id: data.product_id || null,
+                product_name: data.product_name || null,
                 supplier_id: data.supplier_id || null,
                 supplier_name: data.supplier_name || null,
                 note: data.note || null,
@@ -965,6 +969,8 @@ class DatabaseManager {
                 .select(`
                     id,
                     received_at,
+                    product_id,
+                    product_name,
                     supplier_id,
                     supplier_name,
                     note,

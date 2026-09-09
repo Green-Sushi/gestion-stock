@@ -4,6 +4,10 @@ class DatabaseManager {
     // gener, et un telephone oublie ne reste pas ouvert indefiniment.
     static SESSION_DUREE_MS = 12 * 60 * 60 * 1000;
 
+    // Plafond de fiches de traçabilité lues d'un coup. Au-delà, l'écran
+    // invite à filtrer par mois — il ne cache jamais sans le dire.
+    static LIMITE_RECEPTIONS = 200;
+
     constructor() {
         this.supabase = null;
         this.currentUser = null;
@@ -919,9 +923,23 @@ class DatabaseManager {
                     user_name,
                     photos:reception_photos(id, storage_path, taille_octets)
                 `)
-                .order('received_at', { ascending: false });
+                .order('received_at', { ascending: false })
+                // Garde-fou : un registre sanitaire ne cesse jamais de
+                // grossir. Sans plafond, ouvrir la page téléchargerait un
+                // jour des années de fiches d'un coup, sur le réseau du
+                // comptoir. On en demande une de plus que la limite affichée
+                // pour savoir s'il y en avait davantage, et le dire.
+                .limit(DatabaseManager.LIMITE_RECEPTIONS + 1);
 
-            // Mêmes filtres mois/année que les autres registres.
+            // Mêmes filtres mois/année que les autres registres, appliqués
+            // ICI plutôt qu'après coup dans le navigateur : filtrer sur un
+            // mois doit ALLÉGER la requête, pas seulement l'affichage.
+            if (filters.year) {
+                const debutAnnee = `${filters.year}-01-01`;
+                const finAnnee = `${parseInt(filters.year) + 1}-01-01`;
+                query = query.gte('received_at', debutAnnee).lt('received_at', finAnnee);
+            }
+
             if (filters.month && filters.year) {
                 const startDate = `${filters.year}-${filters.month.padStart(2, '0')}-01`;
                 const endMonth = parseInt(filters.month) === 12 ? 1 : parseInt(filters.month) + 1;
@@ -936,7 +954,16 @@ class DatabaseManager {
             const { data, error } = await query;
 
             if (error) throw error;
-            return { success: true, data };
+
+            // On avait demandé une fiche de plus que la limite : si elle est
+            // là, c'est qu'il y en a d'autres. On la retire et on le signale,
+            // pour que l'écran puisse le DIRE au lieu de masquer en silence.
+            const tronque = (data || []).length > DatabaseManager.LIMITE_RECEPTIONS;
+            return {
+                success: true,
+                data: tronque ? data.slice(0, DatabaseManager.LIMITE_RECEPTIONS) : data,
+                tronque
+            };
         } catch (error) {
             console.error('Erreur récupération réceptions:', error);
             return { success: false, error: error.message };
@@ -963,10 +990,7 @@ class DatabaseManager {
                 insertData.received_at = data.received_at;
             }
 
-            const { data: result, error } = await this.supabase
-                .from('receptions')
-                .insert([insertData])
-                .select(`
+            const champs = `
                     id,
                     received_at,
                     product_id,
@@ -975,8 +999,29 @@ class DatabaseManager {
                     supplier_name,
                     note,
                     user_name
-                `)
+                `;
+
+            let { data: result, error } = await this.supabase
+                .from('receptions')
+                .insert([insertData])
+                .select(champs)
                 .single();
+
+            // 23503 = le produit visé n'existe plus (supprimé du catalogue
+            // depuis un autre téléphone pendant la saisie). On NE PERD PAS la
+            // fiche pour autant : le nom du produit est déjà recopié dans
+            // product_name, qui est ce qui fait foi. On rejoue donc sans le
+            // lien, plutôt que de renvoyer une erreur technique et de faire
+            // perdre les photos déjà prises.
+            if (error && error.code === '23503') {
+                console.warn('Produit absent du catalogue, réception enregistrée sans lien:', insertData.product_name);
+                insertData.product_id = null;
+                ({ data: result, error } = await this.supabase
+                    .from('receptions')
+                    .insert([insertData])
+                    .select(champs)
+                    .single());
+            }
 
             if (error) throw error;
             return { success: true, data: result };
@@ -989,33 +1034,40 @@ class DatabaseManager {
     // Les fichiers de l'espace de stockage ne suivent PAS la suppression en
     // cascade de la base : seules les lignes `reception_photos` disparaissent
     // avec la réception, jamais les fichiers eux-mêmes. On les efface donc
-    // ICI, avant de supprimer la réception — sinon ils resteraient orphelins
-    // et occuperaient l'espace pour toujours.
+    // ICI, juste APRÈS la ligne — sinon ils resteraient orphelins et
+    // occuperaient l'espace pour toujours.
     async deleteReception(id) {
         try {
+            // On relève les chemins AVANT de supprimer la ligne : la cascade
+            // effacera reception_photos, et on ne saurait plus quels fichiers
+            // sont à nettoyer. Un échec de lecture ne bloque pas la
+            // suppression — il ne coûte que des fichiers orphelins.
             const { data: photos, error: photosError } = await this.supabase
                 .from('reception_photos')
                 .select('storage_path')
                 .eq('reception_id', id);
 
-            if (photosError) throw photosError;
+            if (photosError) console.error('Erreur lecture photos avant suppression:', photosError);
 
-            if (photos && photos.length > 0) {
-                const { error: removeError } = await this.supabase.storage
-                    .from('receptions')
-                    .remove(photos.map(p => p.storage_path));
-                // On ne bloque pas la suppression de la réception si l'effacement
-                // des fichiers échoue : mieux vaut un fichier orphelin qu'une
-                // réception impossible à supprimer.
-                if (removeError) console.error('Erreur suppression fichiers réception:', removeError);
-            }
-
+            // La LIGNE d'abord, les FICHIERS ensuite. L'ordre inverse laisse,
+            // si la connexion tombe entre les deux, une réception qui annonce
+            // « 3 photos » dont les fichiers n'existent plus, sans le moindre
+            // message : sur un registre qui sert de preuve sanitaire, c'est
+            // pire qu'un fichier orphelin de quelques centaines de kilo-octets.
             const { error } = await this.supabase
                 .from('receptions')
                 .delete()
                 .eq('id', id);
 
             if (error) throw error;
+
+            if (photos && photos.length > 0) {
+                const { error: removeError } = await this.supabase.storage
+                    .from('receptions')
+                    .remove(photos.map(p => p.storage_path));
+                if (removeError) console.error('Erreur suppression fichiers réception:', removeError);
+            }
+
             return { success: true };
         } catch (error) {
             console.error('Erreur suppression réception:', error);
@@ -1066,6 +1118,38 @@ class DatabaseManager {
             return { success: true, data: data.signedUrl };
         } catch (error) {
             console.error('Erreur génération adresse photo:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Une seule requête pour TOUTES les vignettes d'un écran, au lieu d'un
+    // appel réseau par photo : au comptoir, sur un réseau médiocre, la
+    // différence entre 1 et 300 appels simultanés est celle entre une page
+    // qui s'affiche et une page qui reste blanche.
+    async getPhotoUrls(storagePaths) {
+        try {
+            if (!storagePaths || storagePaths.length === 0) {
+                return { success: true, data: {} };
+            }
+
+            const { data, error } = await this.supabase.storage
+                .from('receptions')
+                .createSignedUrls(storagePaths, 3600);
+
+            if (error) throw error;
+
+            // Supabase renvoie une entrée par chemin, chacune avec sa propre
+            // erreur éventuelle : une photo manquante ne doit pas emporter
+            // les autres.
+            const parChemin = {};
+            (data || []).forEach(entree => {
+                if (entree.signedUrl && !entree.error) {
+                    parChemin[entree.path] = entree.signedUrl;
+                }
+            });
+            return { success: true, data: parChemin };
+        } catch (error) {
+            console.error('Erreur génération adresses photos:', error);
             return { success: false, error: error.message };
         }
     }

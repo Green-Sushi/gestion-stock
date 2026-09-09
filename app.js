@@ -24,13 +24,26 @@ const AppState = {
     frozenFish: [],
     receptions: [],
     receptionsLu: undefined,
-    pendingReceptionPhotos: []
+    receptionsTronque: false,
+    pendingReceptionPhotos: [],
+    // Numéro de la saisie de réception en cours. Incrémenté à chaque
+    // ouverture de la fenêtre : un envoi de photos parti avec l'ancien
+    // numéro sait qu'il ne doit plus toucher à l'écran.
+    receptionSaisieId: 0,
+    productsLu: undefined
 };
 
 // Adresses signées des photos de réception, en mémoire pour la session.
 // Une entrée par photo (clé = storage_path) : redessiner la liste ne
 // redemande jamais la même adresse.
 const receptionPhotoUrlCache = new Map();
+
+// Limites du dossier de stockage `receptions`, telles que posées par
+// migration-receptions.sql. Les répéter ici permet de refuser une photo
+// AVANT de l'envoyer, avec un message compréhensible, au lieu de laisser
+// la base la rejeter sans explication.
+const TAILLE_PHOTO_MAX_OCTETS = 5 * 1024 * 1024;
+const FORMATS_PHOTO_ACCEPTES = ['image/jpeg', 'image/png', 'image/webp'];
 
 // ====================
 // INITIALISATION
@@ -634,8 +647,9 @@ function setupGlobalListeners() {
     document.getElementById('reception-form').addEventListener('submit', handleReceptionSubmit);
     document.getElementById('export-reception-btn').addEventListener('click', exportReceptionList);
     document.getElementById('reception-category').addEventListener('change', remplirProduitsReception);
-    document.getElementById('reception-month-filter').addEventListener('change', renderReceptionsList);
-    document.getElementById('reception-year-filter').addEventListener('change', renderReceptionsList);
+    const rechargerReceptions = () => loadReceptions().then(renderReceptionsList);
+    document.getElementById('reception-month-filter').addEventListener('change', rechargerReceptions);
+    document.getElementById('reception-year-filter').addEventListener('change', rechargerReceptions);
     document.getElementById('reception-photo-btn').addEventListener('click', () => {
         document.getElementById('reception-photo-input').click();
     });
@@ -797,6 +811,12 @@ async function loadProducts() {
     const result = await db.getProducts();
     if (result.success) {
         AppState.products = result.data;
+        AppState.productsLu = true;
+    } else {
+        // On garde le catalogue précédent s'il y en avait un, mais on note
+        // l'échec : un écran qui a besoin des produits doit pouvoir dire
+        // « catalogue non chargé » plutôt que « aucun produit ».
+        AppState.productsLu = false;
     }
 }
 
@@ -2741,16 +2761,25 @@ async function getCachedPhotoUrl(storagePath) {
 }
 
 async function loadReceptions() {
-    const result = await db.getReceptions();
+    // Les filtres partent au SERVEUR : choisir un mois doit alléger la
+    // requête, pas seulement l'affichage. Sur un registre qui ne cesse de
+    // grossir, c'est la différence entre une page qui s'ouvre et une page
+    // qui rame un peu plus chaque mois.
+    const result = await db.getReceptions({
+        month: document.getElementById('reception-month-filter').value || null,
+        year: document.getElementById('reception-year-filter').value || null
+    });
     if (result.success) {
         AppState.receptions = result.data;
         AppState.receptionsLu = true;
+        AppState.receptionsTronque = result.tronque === true;
     } else {
         // Ne PAS laisser croire que le registre est vide alors qu'on n'a
         // simplement pas pu le lire : sur un registre sanitaire, c'est le
         // pire des messages.
         AppState.receptions = [];
         AppState.receptionsLu = false;
+        AppState.receptionsTronque = false;
         signalerEchec('Réceptions', result.error);
     }
 }
@@ -2798,7 +2827,11 @@ function renderReceptionsList() {
         return;
     }
 
-    container.innerHTML = filtered.map(item => {
+    const avisTronque = AppState.receptionsTronque
+        ? `<div class="registre-avis">Registre trop long : seules les fiches les plus récentes ont été chargées. Choisissez une année, ou un mois, pour consulter les périodes plus anciennes.</div>`
+        : '';
+
+    container.innerHTML = avisTronque + filtered.map(item => {
         const date = new Date(item.received_at);
         const dateStr = date.toLocaleDateString('fr-FR');
         const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -2831,15 +2864,54 @@ function renderReceptionsList() {
         `;
     }).join('');
 
-    // Résoudre les vignettes : une adresse signée demandée au plus une fois
-    // par photo (voir getCachedPhotoUrl), même si cette liste est redessinée.
     container.querySelectorAll('.reception-photo-thumb-view').forEach((img) => {
-        const storagePath = img.dataset.storagePath;
-        getCachedPhotoUrl(storagePath).then(url => {
-            if (url) img.src = url;
-        });
-        img.addEventListener('click', () => openPhotoViewer(storagePath));
+        img.addEventListener('click', () => openPhotoViewer(img.dataset.storagePath));
     });
+    resoudreVignettesReception(container);
+}
+
+// Demande les adresses signées de TOUTES les vignettes de l'écran en une
+// seule requête, au lieu d'une par photo. Sur le réseau du comptoir, trois
+// cents appels lancés ensemble laissent la page blanche.
+async function resoudreVignettesReception(container) {
+    const images = Array.from(container.querySelectorAll('.reception-photo-thumb-view'));
+    if (images.length === 0) return;
+
+    const maintenant = Date.now();
+    const aDemander = [];
+
+    images.forEach(img => {
+        const chemin = img.dataset.storagePath;
+        const enCache = receptionPhotoUrlCache.get(chemin);
+        if (enCache && (maintenant - enCache.obtenueA) < DUREE_ADRESSE_PHOTO_MS) {
+            img.src = enCache.url;
+        } else if (!aDemander.includes(chemin)) {
+            aDemander.push(chemin);
+        }
+    });
+
+    // Par paquets : une requête portant plusieurs centaines de chemins
+    // finirait par se faire refuser par le serveur.
+    const TAILLE_PAQUET = 100;
+    for (let i = 0; i < aDemander.length; i += TAILLE_PAQUET) {
+        const paquet = aDemander.slice(i, i + TAILLE_PAQUET);
+        const result = await db.getPhotoUrls(paquet);
+        if (!result.success) continue;
+
+        Object.entries(result.data).forEach(([chemin, url]) => {
+            receptionPhotoUrlCache.set(chemin, { url, obtenueA: Date.now() });
+        });
+
+        // On ne pose que ce qui manque : une vignette déjà affichée ne doit
+        // pas être rechargée.
+        paquet.forEach(chemin => {
+            const enCache = receptionPhotoUrlCache.get(chemin);
+            if (!enCache) return;
+            images.forEach(img => {
+                if (img.dataset.storagePath === chemin && !img.src) img.src = enCache.url;
+            });
+        });
+    }
 }
 
 async function openPhotoViewer(storagePath) {
@@ -2908,7 +2980,12 @@ function remplirProduitsReception() {
         .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr'));
 
     if (produits.length === 0) {
-        productSelect.innerHTML = '<option value="">Aucun produit dans cette famille</option>';
+        // Distinction essentielle : « il n'y a rien dans cette famille » et
+        // « je n'ai pas pu lire le catalogue » demandent deux gestes
+        // opposés de la part de l'employé.
+        productSelect.innerHTML = (AppState.products || []).length === 0
+            ? '<option value="">Catalogue non chargé — vérifiez la connexion</option>'
+            : '<option value="">Aucun produit dans cette famille</option>';
         productSelect.disabled = true;
         return;
     }
@@ -2925,14 +3002,31 @@ function remplirProduitsReception() {
     productSelect.disabled = false;
 }
 
-function openReceptionModal() {
+async function openReceptionModal() {
     const modal = document.getElementById('reception-modal');
     const form = document.getElementById('reception-form');
     const supplierSelect = document.getElementById('reception-supplier');
     const categorySelect = document.getElementById('reception-category');
     const datetimeInput = document.getElementById('reception-datetime');
 
+    // Le catalogue est chargé au démarrage de l'application, mais si cette
+    // lecture-là avait échoué (réseau du comptoir), l'entonnoir serait vide
+    // sans que personne comprenne pourquoi. On retente une fois, ici.
+    if ((AppState.products || []).length === 0) {
+        showLoading(true);
+        await loadProducts();
+        showLoading(false);
+        if ((AppState.products || []).length === 0) {
+            notifier('Catalogue produits non chargé — vérifiez la connexion', 'err', 5000);
+        }
+    }
+
     form.reset();
+
+    // Nouvelle saisie : tout envoi de photos encore en cours perd le droit
+    // de toucher à cette fenêtre (voir le jeton dans handleReceptionSubmit).
+    AppState.receptionSaisieId++;
+    document.getElementById('reception-submit-btn').disabled = false;
 
     // Entonnoir : la famille d'abord, le produit ensuite. Avec près de cent
     // produits au catalogue, une liste unique serait impraticable au comptoir.
@@ -2980,8 +3074,12 @@ async function handleReceptionSubmit(e) {
     const produit = productId ? (AppState.products || []).find(p => p.id === productId) : null;
 
     // Le produit est le titre de la fiche : sans lui, la trace ne désigne
-    // rien. Le navigateur le bloque déjà (champ requis), cette garde couvre
-    // le cas où le produit aurait disparu du catalogue entre-temps.
+    // rien. Le navigateur le bloque déjà (champ requis) ; cette garde couvre
+    // le cas où la liste n'aurait pas pu se remplir.
+    //
+    // Elle ne couvre PAS le produit supprimé depuis un autre téléphone
+    // pendant la saisie : ce catalogue-ci est celui chargé à l'ouverture.
+    // Ce cas-là est rattrapé à l'écriture, dans db.createReception.
     if (!produit) {
         notifier('Choisissez la famille puis le produit', 'err');
         return;
@@ -2992,6 +3090,15 @@ async function handleReceptionSubmit(e) {
     const datetime = document.getElementById('reception-datetime').value;
     const note = document.getElementById('reception-note').value.trim();
     const photosASayer = [...AppState.pendingReceptionPhotos];
+    const nomProduit = (produit.name || '').trim();
+
+    // Jeton de la saisie en cours. L'envoi des photos peut durer une minute
+    // sur le réseau du comptoir ; pendant ce temps, l'employé a le droit de
+    // refermer la fenêtre et d'enchaîner sur la réception suivante. Sans ce
+    // jeton, la fin de l'envoi précédent viendrait refermer la NOUVELLE
+    // fenêtre et jeter les photos qui venaient d'y être prises.
+    const saisieId = AppState.receptionSaisieId;
+    const memeSaisie = () => AppState.receptionSaisieId === saisieId;
 
     const submitBtn = document.getElementById('reception-submit-btn');
     const progressEl = document.getElementById('reception-upload-progress');
@@ -3001,7 +3108,7 @@ async function handleReceptionSubmit(e) {
         // Même principe que pour le fournisseur : le nom est figé ici. Un
         // produit renommé ou retiré du catalogue ne doit pas réécrire une
         // fiche qui sert de preuve sanitaire.
-        product_name: (produit.name || '').trim(),
+        product_name: nomProduit,
         supplier_id: supplierId,
         // Recopié depuis le fournisseur sélectionné, tel qu'il est
         // actuellement chargé dans AppState.suppliers : un fournisseur
@@ -3027,34 +3134,70 @@ async function handleReceptionSubmit(e) {
 
     let envoyees = 0;
     let compressionEchouee = false;
-    if (photosASayer.length > 0) {
-        progressEl.style.display = 'block';
+    let refusees = 0;
+
+    try {
         for (let i = 0; i < photosASayer.length; i++) {
-            progressEl.textContent = `Envoi de la photo ${i + 1} sur ${photosASayer.length}…`;
+            // La barre de progression appartient à la fenêtre : on cesse de
+            // l'écrire dès qu'une autre saisie a pris la main, sinon elle
+            // annoncerait « photo 2 sur 3 » dans un formulaire vierge.
+            if (memeSaisie()) {
+                progressEl.style.display = 'block';
+                progressEl.textContent = `Envoi de la photo ${i + 1} sur ${photosASayer.length}…`;
+            }
+
             const { blob, compressee } = await compresserImage(photosASayer[i].file);
-            if (!compressee) compressionEchouee = true;
+
+            // Le repli « on envoie l'original » ne sauve la photo que si la
+            // base l'accepte : le dossier refuse au-delà de 5 Mo et tout ce
+            // qui n'est pas JPEG/PNG/WebP. Une photo iPhone brute dépasse
+            // souvent 5 Mo, et une image prise dans la photothèque peut être
+            // en HEIC. Autant le dire clairement plutôt que de laisser la
+            // base la rejeter sans explication.
+            if (!compressee) {
+                compressionEchouee = true;
+                if (blob.size > TAILLE_PHOTO_MAX_OCTETS || !FORMATS_PHOTO_ACCEPTES.includes(blob.type)) {
+                    refusees++;
+                    continue;
+                }
+            }
+
             const uploadResult = await db.uploadReceptionPhoto(receptionId, blob);
             if (uploadResult.success) envoyees++;
         }
-        progressEl.style.display = 'none';
-        progressEl.textContent = '';
+    } finally {
+        // Quoi qu'il arrive dans la boucle, la fenêtre ne doit pas rester
+        // bloquée avec son bouton Enregistrer éteint.
+        if (memeSaisie()) {
+            progressEl.style.display = 'none';
+            progressEl.textContent = '';
+            submitBtn.disabled = false;
+        }
     }
 
-    submitBtn.disabled = false;
+    // Les aperçus de CETTE saisie sont à libérer dans tous les cas.
+    photosASayer.forEach(p => URL.revokeObjectURL(p.previewUrl));
 
-    AppState.pendingReceptionPhotos.forEach(p => URL.revokeObjectURL(p.previewUrl));
-    AppState.pendingReceptionPhotos = [];
+    if (memeSaisie()) {
+        AppState.pendingReceptionPhotos = [];
+        closeModal('reception-modal');
+    }
 
-    closeModal('reception-modal');
+    // Si une autre saisie est en cours, on nomme le produit : sans ça, un
+    // « Réception enregistrée » laisserait croire que c'est la saisie
+    // affichée à l'écran qui vient de partir.
+    const suffixe = memeSaisie() ? '' : ` : ${nomProduit}`;
 
-    if (compressionEchouee) {
+    if (refusees > 0) {
+        notifier(`${refusees} photo${refusees > 1 ? 's' : ''} trop lourde${refusees > 1 ? 's' : ''} ou dans un format non accepté — reprenez-la avec l'appareil photo`, 'err', 6000);
+    } else if (compressionEchouee) {
         notifier('Compression impossible pour une photo — envoi de l\'original', 'info', 4000);
     }
 
     if (photosASayer.length > 0 && envoyees < photosASayer.length) {
-        notifier(`Réception enregistrée — ${envoyees} photo${envoyees > 1 ? 's' : ''} sur ${photosASayer.length} envoyée${envoyees > 1 ? 's' : ''}`, 'err', 5000);
+        notifier(`Réception enregistrée${suffixe} — ${envoyees} photo${envoyees > 1 ? 's' : ''} sur ${photosASayer.length} envoyée${envoyees > 1 ? 's' : ''}`, 'err', 5000);
     } else {
-        notifier('Réception enregistrée');
+        notifier(`Réception enregistrée${suffixe}`);
     }
 
     await loadReceptions();
@@ -3136,6 +3279,13 @@ function exportReceptionList() {
 
     exportText += `━━━━━━━━━━━━━━━━━━━━\n`;
     exportText += `📊 Total: ${filtered.length} entrée(s)`;
+
+    // Un export partiel qui ne se présente pas comme tel serait pris pour
+    // le registre complet devant un contrôle.
+    if (AppState.receptionsTronque) {
+        exportText += `\n⚠️ EXPORT PARTIEL : seules les fiches les plus récentes sont incluses.\n`;
+        exportText += `Filtrez par mois pour exporter les périodes plus anciennes.`;
+    }
 
     const emailRecipient = 'greensushi.mq@gmail.com';
     const subject = encodeURIComponent(`📋 Historique Traçabilité - ${periodLabel}`);

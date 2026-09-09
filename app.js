@@ -2292,8 +2292,26 @@ function getFishExpiryStatus(expiryDate) {
 // + 6 mois calculé sur les composants locaux de la date (année/mois/jour),
 // jamais via toISOString() : une surgélation saisie en soirée en Martinique
 // (UTC-4) verrait sa date basculer au lendemain une fois repassée par l'UTC.
+// Ajoute des mois SANS déborder sur le mois suivant.
+//
+// Le comportement natif de JavaScript reporte : le 31 août + 6 mois donne
+// le 3 mars, parce que février n'a pas 31 jours. Pour une date de
+// péremption alimentaire, c'est le MAUVAIS sens — le poisson paraîtrait
+// consommable trois jours de trop. On ramène donc au dernier jour du mois
+// visé : 31 août -> 28 (ou 29) février, 31 décembre -> 30 juin.
+//
+// On travaille uniquement sur année / mois / jour locaux : la Martinique
+// est en UTC-4, et passer par une conversion UTC ferait basculer au jour
+// suivant toute saisie faite en soirée.
 function addMonthsToDateOnly(date, months) {
-    const d = new Date(date.getFullYear(), date.getMonth() + months, date.getDate());
+    const annee = date.getFullYear();
+    const mois = date.getMonth() + months;
+    const jour = date.getDate();
+
+    // Le jour 0 du mois suivant = dernier jour du mois visé.
+    const dernierJourDuMois = new Date(annee, mois + 1, 0).getDate();
+    const d = new Date(annee, mois, Math.min(jour, dernierJourDuMois));
+
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');

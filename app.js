@@ -20,7 +20,8 @@ const AppState = {
     pendingSendConfirmation: false,
     sushiTypes: [],
     frozenSushi: [],
-    editingFrozen: null
+    editingFrozen: null,
+    frozenFish: []
 };
 
 // ====================
@@ -197,6 +198,10 @@ function showPage(pageId) {
 
     if (pageId === 'frozen-page') {
         loadFrozenSushi().then(() => renderFrozenList());
+    }
+
+    if (pageId === 'fish-page') {
+        loadFrozenFish().then(() => renderFishList());
     }
 }
 
@@ -589,6 +594,22 @@ function setupGlobalListeners() {
     document.getElementById('export-frozen-btn').addEventListener('click', exportFrozenList);
     document.getElementById('frozen-filter-month').addEventListener('change', renderFrozenList);
     document.getElementById('frozen-filter-year').addEventListener('change', renderFrozenList);
+
+    // Surgélation du poisson
+    document.getElementById('back-to-home-fish').addEventListener('click', () => {
+        showPage('home-page');
+        updateActiveTab('home-page');
+        renderCategories();
+    });
+
+    document.getElementById('add-fish-btn').addEventListener('click', openFishModal);
+    document.getElementById('fish-form').addEventListener('submit', handleFishSubmit);
+    document.getElementById('fish-type').addEventListener('change', handleFishTypeChange);
+    document.getElementById('fish-qty-minus').addEventListener('click', () => adjustFishQty(-1));
+    document.getElementById('fish-qty-plus').addEventListener('click', () => adjustFishQty(1));
+    document.getElementById('export-fish-btn').addEventListener('click', exportFishList);
+    document.getElementById('fish-month-filter').addEventListener('change', renderFishList);
+    document.getElementById('fish-year-filter').addEventListener('change', renderFishList);
 }
 
 // ====================
@@ -600,13 +621,17 @@ function renderCategories() {
     container.innerHTML = '';
 
     // Mapping des catégories vers les noms de fichiers images
+    // Images en WebP : 512 px suffisent (la carte fait ~175 px, x3 sur un
+    // écran d'iPhone). Les PNG d'origine faisaient 800 px et 6,8 Mo au total,
+    // pour 164 Ko désormais. Ils sont conservés comme repli au cas où un
+    // appareil ne lirait pas ce format — ils ne sont alors jamais téléchargés.
     const categoryImages = {
-        'frais': 'frais.png',
-        'sec': 'sec.png',
-        'surgele': 'surgelé.png',
-        'consommables': 'consommables.png',
-        'boissons': 'boissons.png',
-        'legumes': 'legumes.png'
+        'frais': 'frais',
+        'sec': 'sec',
+        'surgele': 'surgelé',
+        'consommables': 'consommables',
+        'boissons': 'boissons',
+        'legumes': 'legumes'
     };
 
     CATEGORIES.forEach(category => {
@@ -626,7 +651,9 @@ function renderCategories() {
         card.className = 'category-card';
         card.dataset.category = category.id;
         card.innerHTML = `
-            <img src="./images/categories/${categoryImages[category.id]}" alt="${category.name}" class="category-image">
+            <img src="./images/categories/${categoryImages[category.id]}.webp"
+                 onerror="this.onerror=null; this.src='./images/categories/${categoryImages[category.id]}.png';"
+                 alt="${category.name}" class="category-image">
             <div class="category-badges">
                 ${alertCount > 0 ? `<div class="category-badge alerts" title="${alertCount} en alerte">${alertCount}</div>` : ''}
                 ${warningCount > 0 ? `<div class="category-badge warning" title="${warningCount} en limite">${warningCount}</div>` : ''}
@@ -644,14 +671,29 @@ function renderCategories() {
     // Carte Congélation
     const frozenCard = document.createElement('div');
     frozenCard.className = 'frozen-card';
+    // L'illustration porte déjà sa légende « sushi frit », comme les six
+    // autres cartes : pas de texte ajouté par-dessus, sinon il ferait doublon.
     frozenCard.innerHTML = `
-        <div class="frozen-card-icon">🧊</div>
-        <div class="frozen-card-label">Congélation</div>
+<img src="./images/categories/sushi-frit.webp"
+             onerror="this.onerror=null; this.src='./images/categories/sushi-frit.png';"
+             alt="Sushi frit" class="category-image">
     `;
     frozenCard.addEventListener('click', () => {
         showPage('frozen-page');
     });
     container.appendChild(frozenCard);
+
+    // Carte Surgélation du poisson — légende incluse dans l'image, pas de
+    // texte ajouté par-dessus.
+    const fishCard = document.createElement('div');
+    fishCard.className = 'frozen-card';
+    fishCard.innerHTML = `
+        <img src="./images/categories/surgelation.webp" alt="Surgélation" class="category-image" onerror="this.onerror=null; this.src='./images/categories/surgelation.png';">
+    `;
+    fishCard.addEventListener('click', () => {
+        showPage('fish-page');
+    });
+    container.appendChild(fishCard);
 
     updateStockOverview();
 }
@@ -1112,7 +1154,9 @@ async function handleProductSubmit(e) {
     e.preventDefault();
 
     const productData = {
-        name: document.getElementById('product-name').value,
+        // Nettoyé à l'enregistrement : une espace en fin de nom casse la mise
+        // en gras du récapitulatif et fausse les tris alphabétiques.
+        name: document.getElementById('product-name').value.trim(),
         category: document.getElementById('product-category').value,
         supplier_id: document.getElementById('product-supplier').value || null,
         quantity: parseFloat(document.getElementById('product-quantity').value),
@@ -1291,7 +1335,10 @@ async function updateAlertCount() {
     const result = await db.getLowStockProducts();
     if (result.success) {
         AppState.lowStockProducts = result.data;
-        document.getElementById('alert-count').textContent = result.data.length;
+        // La pastille rouge ne compte QUE les ruptures : un compteur rouge
+        // gonflé de produits non urgents perdrait son sens.
+        const { ruptures } = separerNiveaux(result.data);
+        document.getElementById('alert-count').textContent = ruptures.length;
     }
 }
 
@@ -1319,8 +1366,21 @@ function renderAlerts() {
         'legumes': '#27ae60'
     };
 
+    // Deux groupes distincts. Sans séparation, les produits en limite se
+    // noieraient parmi les ruptures et l'écran perdrait son sens : ce qui
+    // manque MAINTENANT d'un côté, ce qu'il faut prévoir de l'autre.
+    const { ruptures, limites } = separerNiveaux(AppState.lowStockProducts);
+
+    const enTete = (texte, couleur, nombre) => {
+        const t = document.createElement('div');
+        t.className = 'alerts-section-title';
+        t.style.color = couleur;
+        t.textContent = texte + ' (' + nombre + ')';
+        return t;
+    };
+
     // Trier par catégorie puis alphabétique
-    const sortedProducts = [...AppState.lowStockProducts].sort((a, b) => {
+    const trier = (liste) => [...liste].sort((a, b) => {
         // D'abord par catégorie
         const categoryOrder = ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'legumes'];
         const catIndexA = categoryOrder.indexOf(a.category);
@@ -1332,7 +1392,13 @@ function renderAlerts() {
         return a.name.localeCompare(b.name);
     });
 
-    sortedProducts.forEach(product => {
+    const groupes = [];
+    if (ruptures.length > 0) groupes.push({ titre: '🔴 À commander', couleur: '#e74c3c', produits: trier(ruptures) });
+    if (limites.length > 0) groupes.push({ titre: '🟠 À prévoir', couleur: '#e67e22', produits: trier(limites) });
+
+    groupes.forEach(groupe => {
+    container.appendChild(enTete(groupe.titre, groupe.couleur, groupe.produits.length));
+    groupe.produits.forEach(product => {
         const categoryName = CATEGORIES.find(c => c.id === product.category)?.name || product.category;
         const borderColor = categoryColors[product.category] || '#999';
 
@@ -1372,81 +1438,79 @@ function renderAlerts() {
 
         container.appendChild(item);
     });
+    });
 }
 
 // Générer le message récapitulatif formaté
-function generateAlertMessage() {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('fr-FR', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
+// Sépare la liste en ruptures et limites. La liste contient désormais les
+// deux : les limites servent à anticiper, les ruptures à commander.
+function separerNiveaux(produits) {
+    const ruptures = [], limites = [];
+    (produits || []).forEach(p => {
+        const { stockLevel } = calculateStockLevel(p.quantity, p.alert_threshold);
+        if (stockLevel === 'stock-critical') ruptures.push(p);
+        else if (stockLevel === 'stock-warning') limites.push(p);
     });
-    const timeStr = now.toLocaleTimeString('fr-FR', {
-        hour: '2-digit',
-        minute: '2-digit'
+    return { ruptures, limites };
+}
+
+
+// Récapitulatif de stock. Il n'est PAS destiné aux fournisseurs mais au
+// patron : c'est l'employé qui le lui envoie quand le patron n'est pas au
+// restaurant. D'où le parti pris — ce qui compte est ce qu'il RESTE, pas les
+// quantités à commander, que le patron évalue lui-même.
+//
+// `gras` vaut vrai pour WhatsApp, qui met en gras entre astérisques ; faux
+// pour l'e-mail, qui part en texte brut par mailto et afficherait les
+// astérisques telles quelles.
+function generateAlertMessage(gras = true) {
+    const dateStr = new Date().toLocaleDateString('fr-FR', {
+        weekday: 'long', day: 'numeric', month: 'long'
     });
 
-    // Indicateurs par niveau de stock (paires de substitution UTF-16)
-    const levelIndicators = {
-        'stock-critical': '\uD83D\uDD34', // 🔴
-        'stock-warning': '\uD83D\uDFE0',  // 🟠
-        'stock-attention': '\uD83D\uDFE1', // 🟡
-        'stock-ok': '\uD83D\uDFE2'        // 🟢
+    // WhatsApp n'applique le gras que si l'astérisque de fermeture colle au
+    // dernier caractère. Un nom terminé par une espace — 15 produits sont
+    // dans ce cas — affichait « *Mochi - Matcha * » en toutes lettres.
+    const emphase = (t) => {
+        const propre = String(t).trim();
+        return gras ? '*' + propre + '*' : propre;
     };
-
-    // Emoji par catégorie (paires de substitution UTF-16)
-    const categoryEmojis = {
-        'frais': '\uD83E\uDDC0',      // 🧀
-        'sec': '\uD83C\uDF3E',         // 🌾
-        'surgele': '\u2744\uFE0F',     // ❄️
-        'consommables': '\uD83E\uDD62', // 🥢
-        'boissons': '\uD83E\uDDC3',    // 🧃
-        'legumes': '\uD83E\uDD6C'      // 🥬
+    const nomCategorie = (id) => {
+        const c = CATEGORIES.find(x => x.id === id);
+        return (c ? c.name : id).replace(/^Stock /, '').toUpperCase();
     };
+    // Deux décimales au plus : la base stocke des nombres à virgule.
+    const quantite = (p) => Math.round(p.quantity * 100) / 100;
 
-    let message = '\uD83D\uDEA8 ALERTE STOCK - Green Sushi\n'; // 🚨
-    message += '\uD83D\uDCC5 ' + dateStr + ' \u00E0 ' + timeStr + '\n'; // 📅 à
-    message += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n';
+    const { ruptures, limites } = separerNiveaux(AppState.lowStockProducts);
+    const ordre = ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'legumes'];
 
-    // Regrouper par catégorie
-    const byCategory = {};
-    AppState.lowStockProducts.forEach(product => {
-        if (!byCategory[product.category]) {
-            byCategory[product.category] = [];
-        }
-        byCategory[product.category].push(product);
-    });
-
-    // Ordre des catégories
-    const categoryOrder = ['frais', 'sec', 'surgele', 'consommables', 'boissons', 'legumes'];
-
-    categoryOrder.forEach(catId => {
-        if (!byCategory[catId] || byCategory[catId].length === 0) return;
-
-        const category = CATEGORIES.find(c => c.id === catId);
-        const catLabel = categoryEmojis[catId] || '[LEGUMES]';
-
-        message += catLabel + ' ' + category.name.toUpperCase() + '\n';
-        message += '\u2500'.repeat(30) + '\n';
-
-        byCategory[catId].forEach(product => {
-            const { stockLevel } = calculateStockLevel(
-                product.quantity,
-                product.alert_threshold
-            );
-            const levelIndicator = levelIndicators[stockLevel] || '[OK]';
-
-            message += levelIndicator + ' ' + product.name + '\n';
-            message += '   Stock: ' + product.quantity + ' ' + product.unit + '\n\n';
+    const bloc = (titre, produits) => {
+        if (produits.length === 0) return '';
+        let t = '\n' + titre + ' (' + produits.length + ')\n';
+        const parCategorie = {};
+        produits.forEach(p => {
+            (parCategorie[p.category] = parCategorie[p.category] || []).push(p);
         });
-        message += '\n';
-    });
+        ordre.forEach(catId => {
+            const liste = parCategorie[catId];
+            if (!liste || liste.length === 0) return;
+            t += '\n' + nomCategorie(catId) + '\n';
+            liste.sort((a, b) => a.name.localeCompare(b.name));
+            liste.forEach(p => {
+                t += '\u2022 ' + emphase(p.name) + ' ' + quantite(p) + '\n';
+            });
+        });
+        return t;
+    };
 
-    // Total
-    message += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
-    message += '\uD83D\uDCCA TOTAL: ' + AppState.lowStockProducts.length + ' produit' + (AppState.lowStockProducts.length > 1 ? 's' : '') + ' en alerte'; // 📊
+    let message = emphase('STOCK') + ' \u2014 ' + dateStr + '\n';
+    // Le chiffre seul est ambigu : on le dit une fois, en tête, plutôt que
+    // de répéter l'unité sur chaque ligne.
+    message += 'Le chiffre indique ce qu\'il reste.\n';
+
+    message += bloc('\uD83D\uDD34 \u00C0 COMMANDER', ruptures);  // 🔴
+    message += bloc('\uD83D\uDFE0 \u00C0 PR\u00C9VOIR', limites); // 🟠
 
     return message;
 }
@@ -1456,12 +1520,6 @@ async function sendAlerts() {
         alert('ℹ️ Aucune alerte à envoyer');
         return;
     }
-
-    // DEBUG: Afficher le message généré dans la console
-    const testMessage = generateAlertMessage();
-    console.log('=== MESSAGE GÉNÉRÉ ===');
-    console.log(testMessage);
-    console.log('=== FIN MESSAGE ===');
 
     // Ouvrir la modale de choix
     const modal = document.getElementById('send-choice-modal');
@@ -1482,8 +1540,8 @@ async function sendViaWhatsApp() {
         return;
     }
 
-    // Générer le message formaté
-    const message = generateAlertMessage();
+    // WhatsApp met en gras entre astérisques.
+    const message = generateAlertMessage(true);
 
     // Envoyer par WhatsApp
     sendWhatsAppAlert(whatsappNumber, message);
@@ -1517,8 +1575,9 @@ async function sendViaEmail() {
         return;
     }
 
-    // Générer le message formaté
-    const message = generateAlertMessage();
+    // L'e-mail part en texte brut par mailto : les astérisques y
+    // apparaîtraient telles quelles.
+    const message = generateAlertMessage(false);
 
     // Envoyer par email
     await sendEmailAlert(emailRecipient, message);
@@ -2040,7 +2099,7 @@ function renderFrozenList() {
         container.innerHTML = `
             <div class="empty-state">
                 <div class="empty-state-icon">🧊</div>
-                <div class="empty-state-text">Aucune congélation enregistrée</div>
+                <div class="empty-state-text">Aucun sushi frit enregistré</div>
             </div>
         `;
         return;
@@ -2163,12 +2222,12 @@ async function handleFrozenSubmit(e) {
     showLoading(false);
 
     if (result.success) {
-        notifier('Congélation enregistrée');
+        notifier('Sushi frit enregistré');
         closeModal('frozen-modal');
         await loadFrozenSushi();
         renderFrozenList();
     } else {
-        signalerEchec('Congélation', result.error);
+        signalerEchec('Sushi frit', result.error);
     }
 }
 
@@ -2202,7 +2261,7 @@ function exportFrozenList() {
     const monthNames = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
     const periodLabel = monthFilter ? `${monthNames[parseInt(monthFilter)]} ${yearFilter || ''}` : (yearFilter || 'Tout');
 
-    let exportText = `🧊 HISTORIQUE CONGÉLATION - Green Sushi\n`;
+    let exportText = `🧊 HISTORIQUE SUSHI FRIT - Green Sushi\n`;
     exportText += `📅 Période: ${periodLabel}\n`;
     exportText += `━━━━━━━━━━━━━━━━━━━━\n\n`;
 
@@ -2222,7 +2281,324 @@ function exportFrozenList() {
 
     // Envoyer par email
     const emailRecipient = 'greensushi.mq@gmail.com';
-    const subject = encodeURIComponent(`🧊 Historique Congélation - ${periodLabel}`);
+    const subject = encodeURIComponent(`🧊 Historique Sushi Frit - ${periodLabel}`);
+    const body = encodeURIComponent(exportText);
+    const mailtoUrl = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
+
+    window.location.href = mailtoUrl;
+}
+
+// ====================
+// SURGÉLATION DU POISSON
+// ====================
+
+async function loadFrozenFish() {
+    const result = await db.getFrozenFish();
+    if (result.success) {
+        AppState.frozenFish = result.data;
+        AppState.frozenFishLu = true;
+    } else {
+        // Ne PAS laisser croire que le registre est vide alors qu'on n'a
+        // simplement pas pu le lire : sur un registre sanitaire, c'est le
+        // pire des messages.
+        AppState.frozenFish = [];
+        AppState.frozenFishLu = false;
+        signalerEchec('Surgélations', result.error);
+    }
+}
+
+// Distance en jours calendaires entre aujourd'hui et la date limite, sans
+// tenir compte de l'heure : deux dates seulement, jamais de fuseau horaire.
+function getFishExpiryStatus(expiryDate) {
+    if (!expiryDate) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const expiry = new Date(expiryDate + 'T00:00:00');
+    const diffDays = Math.round((expiry - today) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return 'expired';
+    if (diffDays <= 30) return 'soon';
+    return null;
+}
+
+// + 6 mois calculé sur les composants locaux de la date (année/mois/jour),
+// jamais via toISOString() : une surgélation saisie en soirée en Martinique
+// (UTC-4) verrait sa date basculer au lendemain une fois repassée par l'UTC.
+// Ajoute des mois SANS déborder sur le mois suivant.
+//
+// Le comportement natif de JavaScript reporte : le 31 août + 6 mois donne
+// le 3 mars, parce que février n'a pas 31 jours. Pour une date de
+// péremption alimentaire, c'est le MAUVAIS sens — le poisson paraîtrait
+// consommable trois jours de trop. On ramène donc au dernier jour du mois
+// visé : 31 août -> 28 (ou 29) février, 31 décembre -> 30 juin.
+//
+// On travaille uniquement sur année / mois / jour locaux : la Martinique
+// est en UTC-4, et passer par une conversion UTC ferait basculer au jour
+// suivant toute saisie faite en soirée.
+function addMonthsToDateOnly(date, months) {
+    const annee = date.getFullYear();
+    const mois = date.getMonth() + months;
+    const jour = date.getDate();
+
+    // Le jour 0 du mois suivant = dernier jour du mois visé.
+    const dernierJourDuMois = new Date(annee, mois + 1, 0).getDate();
+    const d = new Date(annee, mois, Math.min(jour, dernierJourDuMois));
+
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+function renderFishList() {
+    const container = document.getElementById('fish-list');
+    const monthFilter = document.getElementById('fish-month-filter').value;
+    const yearFilter = document.getElementById('fish-year-filter').value;
+
+    // Initialiser le select année si vide
+    const yearSelect = document.getElementById('fish-year-filter');
+    if (yearSelect.options.length <= 1) {
+        const currentYear = new Date().getFullYear();
+        yearSelect.innerHTML = '<option value="">Toutes années</option>';
+        for (let y = currentYear; y >= currentYear - 3; y--) {
+            yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
+        }
+    }
+
+    // Filtrer les données
+    let filtered = [...AppState.frozenFish];
+
+    if (monthFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
+        });
+    }
+
+    if (yearFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getFullYear()) === yearFilter;
+        });
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">${AppState.frozenFishLu === false ? '⚠️' : '🐟'}</div>
+                <div class="empty-state-text">${AppState.frozenFishLu === false
+                    ? 'Lecture impossible — vérifiez la connexion'
+                    : 'Aucune surgélation enregistrée'}</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = filtered.map(item => {
+        const date = new Date(item.frozen_at);
+        const dateStr = date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+        const expiryStr = item.expiry_date
+            ? new Date(item.expiry_date + 'T00:00:00').toLocaleDateString('fr-FR')
+            : '—';
+
+        const status = getFishExpiryStatus(item.expiry_date);
+        let badge = '';
+        if (status === 'expired') badge = '<span class="frozen-category-badge expired">Expiré</span>';
+        else if (status === 'soon') badge = '<span class="frozen-category-badge soon">Expire bientôt</span>';
+
+        return `
+            <div class="frozen-item">
+                <div class="frozen-item-info">
+                    <div class="frozen-item-name">
+                        ${item.fish_type || 'Poisson'}
+                        ${badge}
+                    </div>
+                    <div class="frozen-item-details">
+                        Surgelé le ${dateStr} · limite ${expiryStr}
+                        ${item.note ? ` · ${item.note}` : ''}
+                    </div>
+                </div>
+                <div class="frozen-item-actions">
+                    <div class="frozen-item-qty">
+                        <div class="frozen-item-qty-value">${item.quantity}</div>
+                        <div class="frozen-item-qty-label">${item.unit}</div>
+                    </div>
+                    <button type="button" class="btn btn-small btn-icon btn-danger" onclick="deleteFrozenFish('${item.id}')" title="Supprimer">🗑️</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function openFishModal() {
+    const modal = document.getElementById('fish-modal');
+    const form = document.getElementById('fish-form');
+    const datetimeInput = document.getElementById('fish-datetime');
+    const qtyInput = document.getElementById('fish-quantity');
+
+    // Reset form
+    form.reset();
+    qtyInput.value = 1;
+    document.getElementById('fish-type-other-group').style.display = 'none';
+    document.getElementById('fish-type-other').required = false;
+
+    // Pré-remplir date/heure avec maintenant
+    const now = new Date();
+    const localDatetime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    datetimeInput.value = localDatetime;
+
+    modal.classList.add('active');
+}
+
+function handleFishTypeChange() {
+    const type = document.getElementById('fish-type').value;
+    const otherGroup = document.getElementById('fish-type-other-group');
+    const otherInput = document.getElementById('fish-type-other');
+
+    if (type === 'Autre') {
+        otherGroup.style.display = 'block';
+        otherInput.required = true;
+    } else {
+        otherGroup.style.display = 'none';
+        otherInput.required = false;
+        otherInput.value = '';
+    }
+}
+
+function adjustFishQty(delta) {
+    const input = document.getElementById('fish-quantity');
+    let value = parseInt(input.value) || 1;
+    value = Math.max(1, value + delta);
+    input.value = value;
+}
+
+async function handleFishSubmit(e) {
+    e.preventDefault();
+
+    const fishTypeSelect = document.getElementById('fish-type').value;
+    const fishTypeOther = document.getElementById('fish-type-other').value.trim();
+    const quantity = parseInt(document.getElementById('fish-quantity').value) || 1;
+    const unit = document.getElementById('fish-unit').value;
+    const datetime = document.getElementById('fish-datetime').value;
+    const note = document.getElementById('fish-note').value.trim();
+
+    if (!fishTypeSelect) {
+        notifier('Sélectionnez un poisson', 'err');
+        return;
+    }
+
+    if (fishTypeSelect === 'Autre' && !fishTypeOther) {
+        notifier('Précisez le poisson', 'err');
+        return;
+    }
+
+    const fishType = fishTypeSelect === 'Autre' ? fishTypeOther : fishTypeSelect;
+    const frozenAt = datetime ? new Date(datetime) : new Date();
+
+    const fishData = {
+        fish_type: fishType,
+        quantity: quantity,
+        unit: unit,
+        note: note || null,
+        frozen_at: frozenAt.toISOString(),
+        expiry_date: addMonthsToDateOnly(frozenAt, 6),
+        user_id: db.currentUser?.id
+    };
+
+    showLoading(true);
+    const result = await db.createFrozenFish(fishData);
+    showLoading(false);
+
+    if (result.success) {
+        notifier('Surgélation enregistrée');
+        closeModal('fish-modal');
+        await loadFrozenFish();
+        renderFishList();
+    } else {
+        signalerEchec('Surgélation', result.error);
+    }
+}
+
+async function deleteFrozenFish(id) {
+    const entree = (AppState.frozenFish || []).find(f => f.id === id);
+    const quoi = entree
+        ? `${entree.fish_type} — ${entree.quantity} ${entree.unit}, surgelé le ` +
+          new Date(entree.frozen_at).toLocaleDateString('fr-FR')
+        : 'cette entrée';
+
+    if (!confirm(`⚠️ Supprimer définitivement :\n\n${quoi}\n\nCette ligne du registre sera perdue.`)) {
+        return;
+    }
+
+    showLoading(true);
+    const result = await db.deleteFrozenFish(id);
+    showLoading(false);
+
+    if (result.success) {
+        notifier('Surgélation supprimée');
+        await loadFrozenFish();
+        renderFishList();
+    } else {
+        signalerEchec('Suppression', result.error);
+    }
+}
+
+function exportFishList() {
+    const monthFilter = document.getElementById('fish-month-filter').value;
+    const yearFilter = document.getElementById('fish-year-filter').value;
+
+    // Filtrer les données
+    let filtered = [...AppState.frozenFish];
+
+    if (monthFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
+        });
+    }
+
+    if (yearFilter) {
+        filtered = filtered.filter(item => {
+            const date = new Date(item.frozen_at);
+            return String(date.getFullYear()) === yearFilter;
+        });
+    }
+
+    if (filtered.length === 0) {
+        notifier('Aucune donnée à exporter', 'err');
+        return;
+    }
+
+    // Générer le texte d'export
+    const monthNames = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    const periodLabel = monthFilter ? `${monthNames[parseInt(monthFilter)]} ${yearFilter || ''}` : (yearFilter || 'Tout');
+
+    let exportText = `🐟 HISTORIQUE SURGÉLATION POISSON - Green Sushi\n`;
+    exportText += `📅 Période: ${periodLabel}\n`;
+    exportText += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    filtered.forEach(item => {
+        const date = new Date(item.frozen_at);
+        const dateStr = date.toLocaleDateString('fr-FR');
+        const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const expiryStr = item.expiry_date
+            ? new Date(item.expiry_date + 'T00:00:00').toLocaleDateString('fr-FR')
+            : '—';
+
+        exportText += `• ${item.fish_type || 'Poisson'}\n`;
+        exportText += `  Qté: ${item.quantity} ${item.unit} | ${dateStr} ${timeStr} | limite ${expiryStr}\n`;
+        if (item.note) exportText += `  Note: ${item.note}\n`;
+        exportText += `\n`;
+    });
+
+    exportText += `━━━━━━━━━━━━━━━━━━━━\n`;
+    exportText += `📊 Total: ${filtered.length} entrée(s)`;
+
+    // Envoyer par email
+    const emailRecipient = 'greensushi.mq@gmail.com';
+    const subject = encodeURIComponent(`🐟 Historique Surgélation Poisson - ${periodLabel}`);
     const body = encodeURIComponent(exportText);
     const mailtoUrl = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
 
@@ -2236,3 +2612,4 @@ function exportFrozenList() {
 window.openSupplierModal = openSupplierModal;
 window.openUserModal = openUserModal;
 window.deleteUser = deleteUser;
+window.deleteFrozenFish = deleteFrozenFish;

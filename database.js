@@ -931,24 +931,28 @@ class DatabaseManager {
                 // pour savoir s'il y en avait davantage, et le dire.
                 .limit(DatabaseManager.LIMITE_RECEPTIONS + 1);
 
-            // Mêmes filtres mois/année que les autres registres, appliqués
-            // ICI plutôt qu'après coup dans le navigateur : filtrer sur un
-            // mois doit ALLÉGER la requête, pas seulement l'affichage.
+            // Filtres mois/année appliqués ICI plutôt qu'après coup dans le
+            // navigateur : filtrer sur un mois doit ALLÉGER la requête, pas
+            // seulement l'affichage.
+            //
+            // Les bornes sont construites en heure LOCALE puis converties,
+            // JAMAIS écrites en texte nu ('2026-03-01'). Le serveur est en
+            // temps universel et la Martinique a quatre heures de retard :
+            // une borne nue demanderait, en heure d'ici, du 28 février 20 h
+            // au 31 mars 20 h. Une fiche saisie le 31 mars à 20 h 30 — fin
+            // de service, on range et on photographie les étiquettes —
+            // sortait alors du mois de mars côté serveur tout en y restant
+            // côté navigateur : invisible dans les deux mois. Vérifié.
             if (filters.year) {
-                const debutAnnee = `${filters.year}-01-01`;
-                const finAnnee = `${parseInt(filters.year) + 1}-01-01`;
-                query = query.gte('received_at', debutAnnee).lt('received_at', finAnnee);
-            }
+                const annee = parseInt(filters.year);
+                const mois = filters.month ? parseInt(filters.month) : null;
 
-            if (filters.month && filters.year) {
-                const startDate = `${filters.year}-${filters.month.padStart(2, '0')}-01`;
-                const endMonth = parseInt(filters.month) === 12 ? 1 : parseInt(filters.month) + 1;
-                const endYear = parseInt(filters.month) === 12 ? parseInt(filters.year) + 1 : filters.year;
-                const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+                const debut = mois ? new Date(annee, mois - 1, 1) : new Date(annee, 0, 1);
+                const fin = mois ? new Date(annee, mois, 1) : new Date(annee + 1, 0, 1);
 
                 query = query
-                    .gte('received_at', startDate)
-                    .lt('received_at', endDate);
+                    .gte('received_at', debut.toISOString())
+                    .lt('received_at', fin.toISOString());
             }
 
             const { data, error } = await query;
@@ -1007,15 +1011,21 @@ class DatabaseManager {
                 .select(champs)
                 .single();
 
-            // 23503 = le produit visé n'existe plus (supprimé du catalogue
-            // depuis un autre téléphone pendant la saisie). On NE PERD PAS la
-            // fiche pour autant : le nom du produit est déjà recopié dans
-            // product_name, qui est ce qui fait foi. On rejoue donc sans le
-            // lien, plutôt que de renvoyer une erreur technique et de faire
-            // perdre les photos déjà prises.
+            // 23503 = l'une des trois références de la ligne ne pointe plus
+            // sur rien : produit, fournisseur ou compte supprimé depuis un
+            // autre téléphone pendant la saisie. Le code ne dit pas laquelle,
+            // et les trois listes chargées à l'ouverture de l'application
+            // sont périmées de la même façon — on les retire donc toutes.
+            //
+            // La fiche n'est PAS perdue pour autant : product_name,
+            // supplier_name et user_name sont déjà recopiés sur la ligne, et
+            // ce sont eux qui font foi. Mieux vaut une fiche sans lien qu'une
+            // erreur technique brute et des photos perdues.
             if (error && error.code === '23503') {
-                console.warn('Produit absent du catalogue, réception enregistrée sans lien:', insertData.product_name);
+                console.warn('Référence absente, réception enregistrée sans lien:', insertData.product_name, error.details);
                 insertData.product_id = null;
+                insertData.supplier_id = null;
+                insertData.user_id = null;
                 ({ data: result, error } = await this.supabase
                     .from('receptions')
                     .insert([insertData])

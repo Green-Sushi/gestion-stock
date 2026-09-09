@@ -647,7 +647,14 @@ function setupGlobalListeners() {
     document.getElementById('reception-form').addEventListener('submit', handleReceptionSubmit);
     document.getElementById('export-reception-btn').addEventListener('click', exportReceptionList);
     document.getElementById('reception-category').addEventListener('change', remplirProduitsReception);
-    const rechargerReceptions = () => loadReceptions().then(renderReceptionsList);
+    // Changer de filtre déclenche désormais un aller-retour réseau : sans
+    // voile, la liste se figerait quelques secondes sans rien dire.
+    const rechargerReceptions = async () => {
+        showLoading(true);
+        await loadReceptions();
+        showLoading(false);
+        renderReceptionsList();
+    };
     document.getElementById('reception-month-filter').addEventListener('change', rechargerReceptions);
     document.getElementById('reception-year-filter').addEventListener('change', rechargerReceptions);
     document.getElementById('reception-photo-btn').addEventListener('click', () => {
@@ -2760,15 +2767,39 @@ async function getCachedPhotoUrl(storagePath) {
     return enCache ? enCache.url : null;
 }
 
+// Le mois et l'année sont deux listes indépendantes à l'écran. Choisir un
+// mois SANS année laissait partir une demande sans période : le serveur
+// renvoyait les 200 dernières fiches toutes années confondues, le navigateur
+// n'en gardait que les « mars » qui s'y trouvaient, et l'écran concluait
+// « Aucune réception » sur un registre pourtant plein. Un mois seul vaut
+// donc « ce mois-ci, cette année ».
+//
+// Les trois usages — chargement, affichage, export — passent par ici, sinon
+// ils filtreraient chacun sur une période différente.
+function periodeReceptionChoisie() {
+    const mois = document.getElementById('reception-month-filter').value || null;
+    let annee = document.getElementById('reception-year-filter').value || null;
+    if (mois && !annee) annee = String(new Date().getFullYear());
+    return { mois, annee };
+}
+
+// Numéro du chargement en cours. Changer vite de mois puis d'année lance
+// deux requêtes ; sans ce numéro, la plus lente pourrait arriver en dernier
+// et laisser à l'écran une période qui n'est plus celle des listes.
+let chargementReceptionsId = 0;
+
 async function loadReceptions() {
     // Les filtres partent au SERVEUR : choisir un mois doit alléger la
     // requête, pas seulement l'affichage. Sur un registre qui ne cesse de
     // grossir, c'est la différence entre une page qui s'ouvre et une page
     // qui rame un peu plus chaque mois.
-    const result = await db.getReceptions({
-        month: document.getElementById('reception-month-filter').value || null,
-        year: document.getElementById('reception-year-filter').value || null
-    });
+    const monId = ++chargementReceptionsId;
+    const { mois, annee } = periodeReceptionChoisie();
+    const result = await db.getReceptions({ month: mois, year: annee });
+
+    // Une demande plus récente a pris la main : celle-ci n'a plus rien à dire.
+    if (monId !== chargementReceptionsId) return;
+
     if (result.success) {
         AppState.receptions = result.data;
         AppState.receptionsLu = true;
@@ -2784,10 +2815,31 @@ async function loadReceptions() {
     }
 }
 
+// Deuxième filet, après celui du serveur : la liste en mémoire peut avoir
+// été chargée sous une autre période (envoi d'une fiche, suppression).
+function filtrerReceptions(liste, mois, annee) {
+    return (liste || []).filter(item => {
+        const date = new Date(item.received_at);
+        if (annee && String(date.getFullYear()) !== String(annee)) return false;
+        if (mois && String(date.getMonth() + 1).padStart(2, '0') !== mois) return false;
+        return true;
+    });
+}
+
+// Le conseil doit tenir compte de ce qui est DÉJÀ sélectionné : proposer de
+// choisir un mois à quelqu'un qui vient d'en choisir un ne l'aide pas.
+function texteAvisTroncature(mois, annee) {
+    if (mois) {
+        return 'Ce mois contient plus de fiches que l\'écran ne peut en charger d\'un coup. Les plus récentes sont affichées.';
+    }
+    if (annee) {
+        return 'Cette année contient plus de fiches que l\'écran ne peut en charger d\'un coup. Choisissez un mois pour les voir toutes.';
+    }
+    return 'Registre trop long : seules les fiches les plus récentes ont été chargées. Choisissez une année, ou un mois, pour consulter les périodes plus anciennes.';
+}
+
 function renderReceptionsList() {
     const container = document.getElementById('receptions-list');
-    const monthFilter = document.getElementById('reception-month-filter').value;
-    const yearFilter = document.getElementById('reception-year-filter').value;
 
     // Initialiser le select année si vide
     const yearSelect = document.getElementById('reception-year-filter');
@@ -2799,24 +2851,19 @@ function renderReceptionsList() {
         }
     }
 
-    let filtered = [...(AppState.receptions || [])];
+    const { mois, annee } = periodeReceptionChoisie();
+    const filtered = filtrerReceptions(AppState.receptions, mois, annee);
 
-    if (monthFilter) {
-        filtered = filtered.filter(item => {
-            const date = new Date(item.received_at);
-            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
-        });
-    }
-
-    if (yearFilter) {
-        filtered = filtered.filter(item => {
-            const date = new Date(item.received_at);
-            return String(date.getFullYear()) === yearFilter;
-        });
-    }
+    // L'avis se construit AVANT le cas « liste vide » : c'est justement là
+    // qu'il est le plus utile. Sans lui, un registre plafonné annonçait
+    // « Aucune réception » pour un mois pourtant rempli, exactement ce que
+    // ce registre ne doit jamais faire.
+    const avisTronque = AppState.receptionsTronque
+        ? `<div class="registre-avis">${texteAvisTroncature(mois, annee)}</div>`
+        : '';
 
     if (filtered.length === 0) {
-        container.innerHTML = `
+        container.innerHTML = avisTronque + `
             <div class="empty-state">
                 <div class="empty-state-icon">${AppState.receptionsLu === false ? '⚠️' : '📋'}</div>
                 <div class="empty-state-text">${AppState.receptionsLu === false
@@ -2826,10 +2873,6 @@ function renderReceptionsList() {
         `;
         return;
     }
-
-    const avisTronque = AppState.receptionsTronque
-        ? `<div class="registre-avis">Registre trop long : seules les fiches les plus récentes ont été chargées. Choisissez une année, ou un mois, pour consulter les périodes plus anciennes.</div>`
-        : '';
 
     container.innerHTML = avisTronque + filtered.map(item => {
         const date = new Date(item.received_at);
@@ -2908,6 +2951,10 @@ async function resoudreVignettesReception(container) {
             const enCache = receptionPhotoUrlCache.get(chemin);
             if (!enCache) return;
             images.forEach(img => {
+                // La liste a pu être redessinée pendant l'attente (changement
+                // de mois) : inutile de télécharger des vignettes qui ne sont
+                // plus à l'écran.
+                if (!img.isConnected) return;
                 if (img.dataset.storagePath === chemin && !img.src) img.src = enCache.url;
             });
         });
@@ -3064,9 +3111,14 @@ async function openReceptionModal() {
 
 // Crée d'abord la réception, PUIS envoie les photos une par une. Si une
 // photo échoue, la réception reste enregistrée — elle ne doit jamais être
-// perdue à cause d'une photo. Fermer la fenêtre pendant l'envoi ne l'annule
-// pas : la boucle continue en arrière-plan jusqu'à son terme, seule la
-// barre de progression cesse d'être visible.
+// perdue à cause d'une photo.
+//
+// Fermer la fenêtre pendant l'envoi ne l'annule pas : la boucle continue en
+// arrière-plan jusqu'à son terme. Mais elle perd alors tout droit sur
+// l'écran — barre de progression, bouton Enregistrer, photos en attente,
+// fermeture de la fenêtre — car une autre saisie a pu commencer entre-temps.
+// C'est le rôle du jeton `saisieId` ci-dessous, et la notification finale
+// nomme le produit pour lever l'ambiguïté.
 async function handleReceptionSubmit(e) {
     e.preventDefault();
 
@@ -3231,27 +3283,15 @@ async function deleteReception(id) {
 }
 
 function exportReceptionList() {
-    const monthFilter = document.getElementById('reception-month-filter').value;
-    const yearFilter = document.getElementById('reception-year-filter').value;
-
-    let filtered = [...(AppState.receptions || [])];
-
-    if (monthFilter) {
-        filtered = filtered.filter(item => {
-            const date = new Date(item.received_at);
-            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
-        });
-    }
-
-    if (yearFilter) {
-        filtered = filtered.filter(item => {
-            const date = new Date(item.received_at);
-            return String(date.getFullYear()) === yearFilter;
-        });
-    }
+    const { mois: monthFilter, annee: yearFilter } = periodeReceptionChoisie();
+    const filtered = filtrerReceptions(AppState.receptions, monthFilter, yearFilter);
 
     if (filtered.length === 0) {
-        notifier('Aucune donnée à exporter', 'err');
+        // « Rien à exporter » et « rien n'a été chargé » sont deux choses
+        // différentes, et une seule des deux demande une action.
+        notifier(AppState.receptionsTronque
+            ? 'Rien à exporter sur cette période — le registre est trop long, affinez le filtre'
+            : 'Aucune donnée à exporter', 'err', 5000);
         return;
     }
 
@@ -3284,7 +3324,7 @@ function exportReceptionList() {
     // le registre complet devant un contrôle.
     if (AppState.receptionsTronque) {
         exportText += `\n⚠️ EXPORT PARTIEL : seules les fiches les plus récentes sont incluses.\n`;
-        exportText += `Filtrez par mois pour exporter les périodes plus anciennes.`;
+        exportText += texteAvisTroncature(monthFilter, yearFilter);
     }
 
     const emailRecipient = 'greensushi.mq@gmail.com';

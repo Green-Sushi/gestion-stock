@@ -672,6 +672,24 @@
         }
 
         /* Titres de section de l'écran Alertes : « à commander » / « à prévoir ». */
+        /* Deux familles à l'accueil : ce qu'on COMPTE (le stock) et ce qu'on
+           SUIT dans le temps (les registres : congélation, surgélation,
+           traçabilité). Les neuf cartes se ressemblaient trop pour qu'on
+           devine que trois d'entre elles ne servent pas au même usage. */
+        .accueil-section-titre {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: .74rem;
+            font-weight: 700;
+            letter-spacing: .09em;
+            text-transform: uppercase;
+            color: #7b8c8c;
+            margin: 22px 2px 10px;
+        }
+
+        #categories-container { margin-top: 20px; }
+        #categories-container .accueil-section-titre:first-child { margin-top: 0; }
+        #categories-container .categories-grid { margin-top: 0; }
+
         .alerts-section-title {
             font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
             font-size: .74rem;
@@ -1471,19 +1489,6 @@
 
         /* Carte Traçabilité : aucune illustration disponible, icône +
            libellé au lieu de l'image des autres cartes de ce type. */
-        .frozen-card-icon {
-            font-size: 3rem;
-            line-height: 1;
-        }
-
-        .frozen-card-label {
-            margin-top: 8px;
-            font-weight: 700;
-            color: #088F8F;
-            font-size: 0.95rem;
-            text-align: center;
-        }
-
         /* === TRAÇABILITÉ (RÉCEPTIONS) === */
         .reception-photos-row {
             display: flex;
@@ -1686,7 +1691,12 @@
                     <div class="stock-overview-bar ok"></div>
                 </div>
             </div>
-            <div class="categories-grid" id="categories-container"></div>
+            <div id="categories-container">
+                <h2 class="accueil-section-titre">Stock</h2>
+                <div class="categories-grid" id="grille-stock"></div>
+                <h2 class="accueil-section-titre">Suivi</h2>
+                <div class="categories-grid" id="grille-suivi"></div>
+            </div>
         </div>
 
         <!-- PAGE DE PRODUITS -->
@@ -2312,8 +2322,8 @@
     <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
-<script src="config.js?v=20260928"></script>
-    <script src="database.js?v=20260928"></script>
-    <script src="app.js?v=20260928"></script>
+<script src="config.js?v=20260929"></script>
+    <script src="database.js?v=20260929"></script>
+    <script src="app.js?v=20260929"></script>
 </body>
 </html>

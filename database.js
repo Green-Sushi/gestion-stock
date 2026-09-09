@@ -953,8 +953,11 @@ class DatabaseManager {
                 const annee = parseInt(filters.year);
                 const mois = filters.month ? parseInt(filters.month) : null;
 
-                const debut = mois ? new Date(annee, mois - 1, 1) : new Date(annee, 0, 1);
-                const fin = mois ? new Date(annee, mois, 1) : new Date(annee + 1, 0, 1);
+                // Bornes prises à l'heure DU RESTAURANT, pas à celle de
+                // l'appareil : un registre qui sert de preuve ne doit pas
+                // changer de contenu selon l'endroit d'où on le consulte.
+                const debut = mois ? instantRestaurant(annee, mois, 1) : instantRestaurant(annee, 1, 1);
+                const fin = mois ? instantRestaurant(annee, mois + 1, 1) : instantRestaurant(annee + 1, 1, 1);
 
                 query = query
                     .gte('received_at', debut.toISOString())

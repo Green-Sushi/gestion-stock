@@ -668,8 +668,12 @@ function setupGlobalListeners() {
 // ====================
 
 function renderCategories() {
-    const container = document.getElementById('categories-container');
-    container.innerHTML = '';
+    // Deux familles distinctes : le STOCK qu'on compte au quotidien, et le
+    // SUIVI — les trois registres qui servent de preuve dans le temps.
+    const grilleStock = document.getElementById('grille-stock');
+    const grilleSuivi = document.getElementById('grille-suivi');
+    grilleStock.innerHTML = '';
+    grilleSuivi.innerHTML = '';
 
     // Mapping des catégories vers les noms de fichiers images
     // Images en WebP : 512 px suffisent (la carte fait ~175 px, x3 sur un
@@ -716,7 +720,7 @@ function renderCategories() {
             showCategoryProducts(category);
         });
 
-        container.appendChild(card);
+        grilleStock.appendChild(card);
     });
 
     // Carte Congélation
@@ -732,7 +736,7 @@ function renderCategories() {
     frozenCard.addEventListener('click', () => {
         showPage('frozen-page');
     });
-    container.appendChild(frozenCard);
+    grilleSuivi.appendChild(frozenCard);
 
     // Carte Surgélation du poisson — légende incluse dans l'image, pas de
     // texte ajouté par-dessus.
@@ -744,7 +748,7 @@ function renderCategories() {
     fishCard.addEventListener('click', () => {
         showPage('fish-page');
     });
-    container.appendChild(fishCard);
+    grilleSuivi.appendChild(fishCard);
 
     // Carte Traçabilité — illustration fournie par l'utilisateur, légende
     // incluse dans l'image comme pour les autres cartes : aucun texte
@@ -760,7 +764,7 @@ function renderCategories() {
     tracabiliteCard.addEventListener('click', () => {
         showPage('tracabilite-page');
     });
-    container.appendChild(tracabiliteCard);
+    grilleSuivi.appendChild(tracabiliteCard);
 
     updateStockOverview();
 }
@@ -2144,7 +2148,7 @@ function renderFrozenList() {
     // Initialiser le select année si vide
     const yearSelect = document.getElementById('frozen-filter-year');
     if (yearSelect.options.length <= 1) {
-        const currentYear = new Date().getFullYear();
+        const currentYear = Number(partiesDateRestaurant(new Date()).annee);
         yearSelect.innerHTML = '<option value="">Toutes années</option>';
         for (let y = currentYear; y >= currentYear - 3; y--) {
             yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
@@ -2154,18 +2158,15 @@ function renderFrozenList() {
     // Filtrer les données
     let filtered = [...AppState.frozenSushi];
 
+    // Classement à l'heure DU RESTAURANT : une entrée de fin de service
+    // appartient au jour où elle a été faite ici, quel que soit l'appareil
+    // qui consulte le registre.
     if (monthFilter) {
-        filtered = filtered.filter(item => {
-            const date = new Date(item.frozen_at);
-            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
-        });
+        filtered = filtered.filter(item => partiesDateRestaurant(item.frozen_at).mois === monthFilter);
     }
 
     if (yearFilter) {
-        filtered = filtered.filter(item => {
-            const date = new Date(item.frozen_at);
-            return String(date.getFullYear()) === yearFilter;
-        });
+        filtered = filtered.filter(item => partiesDateRestaurant(item.frozen_at).annee === yearFilter);
     }
 
     if (filtered.length === 0) {
@@ -2183,8 +2184,8 @@ function renderFrozenList() {
         const category = sushiType.category || 'frit';
         const categoryLabels = { frit: 'Frit', vegi: 'Végi', duo: 'Duo', noel: 'Noël' };
         const date = new Date(item.frozen_at);
-        const dateStr = date.toLocaleDateString('fr-FR');
-        const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = dateRestaurant(date);
+        const timeStr = heureRestaurant(date);
         const userName = item.user_name || 'Auteur non enregistré';
 
         return `
@@ -2227,10 +2228,8 @@ function openFrozenModal() {
         sushiSelect.innerHTML += `<option value="${sushi.id}">${sushi.name} (${categoryLabels[sushi.category]})</option>`;
     });
 
-    // Pré-remplir date/heure avec maintenant
-    const now = new Date();
-    const localDatetime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-    datetimeInput.value = localDatetime;
+    // Pré-remplir avec l'heure DU RESTAURANT, pas celle de l'appareil.
+    datetimeInput.value = maintenantPourChampDateHeure();
 
     modal.classList.add('active');
 }
@@ -2286,7 +2285,8 @@ async function handleFrozenSubmit(e) {
         sushi_type_id: sushiTypeId,
         fish_type: fishType,
         quantity: quantity,
-        frozen_at: datetime ? new Date(datetime).toISOString() : new Date().toISOString(),
+        // Ce que l'employé a tapé est de l'heure du restaurant.
+        frozen_at: instantDepuisChampDateHeure(datetime).toISOString(),
         user_id: db.currentUser?.id
     };
 
@@ -2311,18 +2311,15 @@ function exportFrozenList() {
     // Filtrer les données
     let filtered = [...AppState.frozenSushi];
 
+    // Classement à l'heure DU RESTAURANT : une entrée de fin de service
+    // appartient au jour où elle a été faite ici, quel que soit l'appareil
+    // qui consulte le registre.
     if (monthFilter) {
-        filtered = filtered.filter(item => {
-            const date = new Date(item.frozen_at);
-            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
-        });
+        filtered = filtered.filter(item => partiesDateRestaurant(item.frozen_at).mois === monthFilter);
     }
 
     if (yearFilter) {
-        filtered = filtered.filter(item => {
-            const date = new Date(item.frozen_at);
-            return String(date.getFullYear()) === yearFilter;
-        });
+        filtered = filtered.filter(item => partiesDateRestaurant(item.frozen_at).annee === yearFilter);
     }
 
     if (filtered.length === 0) {
@@ -2341,8 +2338,8 @@ function exportFrozenList() {
     filtered.forEach(item => {
         const sushiType = item.sushi_type || {};
         const date = new Date(item.frozen_at);
-        const dateStr = date.toLocaleDateString('fr-FR');
-        const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = dateRestaurant(date);
+        const timeStr = heureRestaurant(date);
 
         exportText += `• ${sushiType.name || 'Sushi'}`;
         if (item.fish_type) exportText += ` (${item.fish_type})`;
@@ -2385,11 +2382,16 @@ async function loadFrozenFish() {
 function getFishExpiryStatus(expiryDate) {
     if (!expiryDate) return null;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const expiry = new Date(expiryDate + 'T00:00:00');
-    const diffDays = Math.round((expiry - today) / (1000 * 60 * 60 * 24));
+    // Deux dates nues comparées en jours, sans jamais construire d'instant :
+    // le seul fuseau qui intervient est celui qui donne LA DATE DU JOUR au
+    // restaurant. Avant, « aujourd'hui » venait de l'appareil — un téléphone
+    // en métropole après 20 h était déjà au lendemain et pouvait déclarer
+    // périmé un poisson qui ne l'était pas encore ici.
+    const enJours = (texte) => {
+        const [a, m, j] = String(texte).split('-').map(Number);
+        return Date.UTC(a, m - 1, j);
+    };
+    const diffDays = Math.round((enJours(expiryDate) - enJours(aujourdhuiRestaurant())) / 86400000);
 
     if (diffDays < 0) return 'expired';
     if (diffDays <= 30) return 'soon';
@@ -2410,18 +2412,24 @@ function getFishExpiryStatus(expiryDate) {
 // On travaille uniquement sur année / mois / jour locaux : la Martinique
 // est en UTC-4, et passer par une conversion UTC ferait basculer au jour
 // suivant toute saisie faite en soirée.
-function addMonthsToDateOnly(date, months) {
-    const annee = date.getFullYear();
-    const mois = date.getMonth() + months;
-    const jour = date.getDate();
+// Prend une date NUE (« 2026-08-31 ») et rend une date nue. Aucun instant
+// n'est construit, donc aucun fuseau ne peut décaler la DLC d'un jour : le
+// calcul se fait en temps universel de bout en bout, sur des nombres.
+//
+// Le rabotage sur le dernier jour du mois est délibéré : sans lui, 31 août
+// + 6 mois donnait le 3 mars — une DLC PLUS TARDIVE que prévu, exactement
+// le sens de l'erreur qu'un registre sanitaire ne peut pas se permettre.
+function addMonthsToDateOnly(dateNue, months) {
+    const [annee, moisDepart, jour] = String(dateNue).split('-').map(Number);
+    const mois = (moisDepart - 1) + months;
 
     // Le jour 0 du mois suivant = dernier jour du mois visé.
-    const dernierJourDuMois = new Date(annee, mois + 1, 0).getDate();
-    const d = new Date(annee, mois, Math.min(jour, dernierJourDuMois));
+    const dernierJourDuMois = new Date(Date.UTC(annee, mois + 1, 0)).getUTCDate();
+    const d = new Date(Date.UTC(annee, mois, Math.min(jour, dernierJourDuMois)));
 
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
 }
 
@@ -2433,7 +2441,7 @@ function renderFishList() {
     // Initialiser le select année si vide
     const yearSelect = document.getElementById('fish-year-filter');
     if (yearSelect.options.length <= 1) {
-        const currentYear = new Date().getFullYear();
+        const currentYear = Number(partiesDateRestaurant(new Date()).annee);
         yearSelect.innerHTML = '<option value="">Toutes années</option>';
         for (let y = currentYear; y >= currentYear - 3; y--) {
             yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
@@ -2443,18 +2451,15 @@ function renderFishList() {
     // Filtrer les données
     let filtered = [...AppState.frozenFish];
 
+    // Classement à l'heure DU RESTAURANT : une entrée de fin de service
+    // appartient au jour où elle a été faite ici, quel que soit l'appareil
+    // qui consulte le registre.
     if (monthFilter) {
-        filtered = filtered.filter(item => {
-            const date = new Date(item.frozen_at);
-            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
-        });
+        filtered = filtered.filter(item => partiesDateRestaurant(item.frozen_at).mois === monthFilter);
     }
 
     if (yearFilter) {
-        filtered = filtered.filter(item => {
-            const date = new Date(item.frozen_at);
-            return String(date.getFullYear()) === yearFilter;
-        });
+        filtered = filtered.filter(item => partiesDateRestaurant(item.frozen_at).annee === yearFilter);
     }
 
     if (filtered.length === 0) {
@@ -2471,9 +2476,9 @@ function renderFishList() {
 
     container.innerHTML = filtered.map(item => {
         const date = new Date(item.frozen_at);
-        const dateStr = date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+        const dateStr = dateRestaurant(date, { day: '2-digit', month: '2-digit' });
         const expiryStr = item.expiry_date
-            ? new Date(item.expiry_date + 'T00:00:00').toLocaleDateString('fr-FR')
+            ? dateSeuleFr(item.expiry_date)
             : '—';
 
         const status = getFishExpiryStatus(item.expiry_date);
@@ -2517,10 +2522,8 @@ function openFishModal() {
     document.getElementById('fish-type-other-group').style.display = 'none';
     document.getElementById('fish-type-other').required = false;
 
-    // Pré-remplir date/heure avec maintenant
-    const now = new Date();
-    const localDatetime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-    datetimeInput.value = localDatetime;
+    // Pré-remplir avec l'heure DU RESTAURANT, pas celle de l'appareil.
+    datetimeInput.value = maintenantPourChampDateHeure();
 
     modal.classList.add('active');
 }
@@ -2568,7 +2571,10 @@ async function handleFishSubmit(e) {
     }
 
     const fishType = fishTypeSelect === 'Autre' ? fishTypeOther : fishTypeSelect;
-    const frozenAt = datetime ? new Date(datetime) : new Date();
+    // Ce que l'employé a tapé est de l'heure du restaurant.
+    const frozenAt = instantDepuisChampDateHeure(datetime);
+    const pj = partiesDateRestaurant(frozenAt);
+    const jourSurgelationRestaurant = `${pj.annee}-${pj.mois}-${pj.jour}`;
 
     const fishData = {
         fish_type: fishType,
@@ -2576,7 +2582,8 @@ async function handleFishSubmit(e) {
         unit: unit,
         note: note || null,
         frozen_at: frozenAt.toISOString(),
-        expiry_date: addMonthsToDateOnly(frozenAt, 6),
+        // La DLC part du jour de surgélation TEL QU'IL EST AU RESTAURANT.
+        expiry_date: addMonthsToDateOnly(jourSurgelationRestaurant, 6),
         user_id: db.currentUser?.id
     };
 
@@ -2598,7 +2605,7 @@ async function deleteFrozenFish(id) {
     const entree = (AppState.frozenFish || []).find(f => f.id === id);
     const quoi = entree
         ? `${entree.fish_type} — ${entree.quantity} ${entree.unit}, surgelé le ` +
-          new Date(entree.frozen_at).toLocaleDateString('fr-FR')
+          dateRestaurant(entree.frozen_at)
         : 'cette entrée';
 
     if (!confirm(`⚠️ Supprimer définitivement :\n\n${quoi}\n\nCette ligne du registre sera perdue.`)) {
@@ -2625,18 +2632,15 @@ function exportFishList() {
     // Filtrer les données
     let filtered = [...AppState.frozenFish];
 
+    // Classement à l'heure DU RESTAURANT : une entrée de fin de service
+    // appartient au jour où elle a été faite ici, quel que soit l'appareil
+    // qui consulte le registre.
     if (monthFilter) {
-        filtered = filtered.filter(item => {
-            const date = new Date(item.frozen_at);
-            return String(date.getMonth() + 1).padStart(2, '0') === monthFilter;
-        });
+        filtered = filtered.filter(item => partiesDateRestaurant(item.frozen_at).mois === monthFilter);
     }
 
     if (yearFilter) {
-        filtered = filtered.filter(item => {
-            const date = new Date(item.frozen_at);
-            return String(date.getFullYear()) === yearFilter;
-        });
+        filtered = filtered.filter(item => partiesDateRestaurant(item.frozen_at).annee === yearFilter);
     }
 
     if (filtered.length === 0) {
@@ -2654,10 +2658,10 @@ function exportFishList() {
 
     filtered.forEach(item => {
         const date = new Date(item.frozen_at);
-        const dateStr = date.toLocaleDateString('fr-FR');
-        const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = dateRestaurant(date);
+        const timeStr = heureRestaurant(date);
         const expiryStr = item.expiry_date
-            ? new Date(item.expiry_date + 'T00:00:00').toLocaleDateString('fr-FR')
+            ? dateSeuleFr(item.expiry_date)
             : '—';
 
         exportText += `• ${item.fish_type || 'Poisson'}\n`;
@@ -2784,7 +2788,7 @@ function periodeReceptionChoisie() {
     let annee = anneeSelect.value || null;
 
     if (mois && !annee) {
-        annee = String(new Date().getFullYear());
+        annee = partiesDateRestaurant(new Date()).annee;
         // L'année forcée doit se VOIR. Sans cette ligne, l'écran affichait
         // « Mars » et « Toutes années » côte à côte alors qu'un seul mois de
         // mars était chargé : on croyait consulter tout son historique de
@@ -2838,9 +2842,11 @@ async function loadReceptions() {
 // un jour l'un d'eux le faisait, l'affichage resterait juste.
 function filtrerReceptions(liste, mois, annee) {
     return (liste || []).filter(item => {
-        const date = new Date(item.received_at);
-        if (annee && String(date.getFullYear()) !== String(annee)) return false;
-        if (mois && String(date.getMonth() + 1).padStart(2, '0') !== mois) return false;
+        // Classement à l'heure DU RESTAURANT : une fiche du 31 mars à 20 h 30
+        // appartient à mars, y compris consultée depuis la métropole.
+        const p = partiesDateRestaurant(item.received_at);
+        if (annee && p.annee !== String(annee)) return false;
+        if (mois && p.mois !== mois) return false;
         return true;
     });
 }
@@ -2863,7 +2869,7 @@ function renderReceptionsList() {
     // Initialiser le select année si vide
     const yearSelect = document.getElementById('reception-year-filter');
     if (yearSelect.options.length <= 1) {
-        const currentYear = new Date().getFullYear();
+        const currentYear = Number(partiesDateRestaurant(new Date()).annee);
         yearSelect.innerHTML = '<option value="">Toutes années</option>';
         for (let y = currentYear; y >= currentYear - 3; y--) {
             yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
@@ -2895,8 +2901,8 @@ function renderReceptionsList() {
 
     container.innerHTML = avisTronque + filtered.map(item => {
         const date = new Date(item.received_at);
-        const dateStr = date.toLocaleDateString('fr-FR');
-        const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = dateRestaurant(date);
+        const timeStr = heureRestaurant(date);
         const photos = item.photos || [];
         // Les fiches saisies avant l'entonnoir n'ont pas de produit : on le
         // dit, plutôt que d'afficher un titre vide.
@@ -3121,9 +3127,8 @@ async function openReceptionModal() {
         supplierSelect.appendChild(option);
     });
 
-    const now = new Date();
-    const localDatetime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-    datetimeInput.value = localDatetime;
+    // L'heure proposée est celle DU RESTAURANT, pas celle de l'appareil.
+    datetimeInput.value = maintenantPourChampDateHeure();
 
     modal.classList.add('active');
 }
@@ -3186,7 +3191,8 @@ async function handleReceptionSubmit(e) {
         // renommé ou supprimé plus tard ne doit pas réécrire cette réception.
         supplier_name: supplier ? supplier.name : null,
         note: note || null,
-        received_at: datetime ? new Date(datetime).toISOString() : new Date().toISOString(),
+        // Ce que l'employé a tapé est de l'heure du restaurant.
+        received_at: instantDepuisChampDateHeure(datetime).toISOString(),
         user_id: db.currentUser?.id
     };
 
@@ -3280,7 +3286,7 @@ async function deleteReception(id) {
     const photoCount = entree?.photos?.length || 0;
     const quoi = entree
         ? `${(entree.product_name || '').trim() || 'Produit non précisé'} — ` +
-          new Date(entree.received_at).toLocaleDateString('fr-FR') +
+          dateRestaurant(entree.received_at) +
           (photoCount > 0 ? ` (${photoCount} photo${photoCount > 1 ? 's' : ''} perdue${photoCount > 1 ? 's' : ''})` : '')
         : 'cette réception';
 
@@ -3323,8 +3329,8 @@ function exportReceptionList() {
 
     filtered.forEach(item => {
         const date = new Date(item.received_at);
-        const dateStr = date.toLocaleDateString('fr-FR');
-        const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = dateRestaurant(date);
+        const timeStr = heureRestaurant(date);
         const photoCount = (item.photos || []).length;
 
         const supplierLabel = (item.supplier_name || '').trim();

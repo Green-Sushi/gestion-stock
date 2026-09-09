@@ -657,6 +657,87 @@
             z-index: 30;
         }
 
+        /* Origine d'une fiche produit : « ajouté par X le ... ». */
+        .product-auteur {
+            font-size: .74rem;
+            color: #8b9a9a;
+            margin-top: 2px;
+            font-weight: 400;
+        }
+
+        /* === MESSAGES DE CONFIRMATION ===
+           L'application n'en avait AUCUN : rien ne disait jamais « c'est
+           enregistré ». Impossible de distinguer une saisie prise en compte
+           d'une saisie perdue. */
+        #toasts {
+            position: fixed;
+            left: 12px;
+            right: 12px;
+            bottom: 84px;            /* au-dessus de la barre d'onglets */
+            z-index: 300;            /* au-dessus du voile et des fenêtres */
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        .toast {
+            max-width: 420px;
+            width: 100%;
+            padding: 13px 16px;
+            border-radius: 13px;
+            font-size: .92rem;
+            font-weight: 600;
+            color: #fff;
+            box-shadow: 0 6px 20px rgba(8, 40, 40, .28);
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            animation: toast-entre .18s ease-out;
+        }
+
+        .toast.ok    { background: #27ae60; }
+        .toast.err   { background: #e74c3c; }
+        .toast.info  { background: #34515b; }
+
+        @keyframes toast-entre {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Bandeau permanent tant que le réseau manque. Sans lui, une saisie
+           faite hors ligne semblait enregistrée : le chiffre changeait à
+           l'écran et rien ne partait en base. */
+        #bandeau-hors-ligne {
+            display: none;
+            position: fixed;
+            top: 60px;               /* sous l'en-tête */
+            left: 0;
+            right: 0;
+            /* Sous les fenêtres (200) : une fenêtre ouverte hors ligne ne doit
+               pas se faire barrer le haut par le bandeau. */
+            z-index: 150;
+            background: #e67e22;
+            color: #fff;
+            text-align: center;
+            padding: 8px 14px;
+            font-size: .84rem;
+            font-weight: 600;
+            height: 33px;
+        }
+
+        #bandeau-hors-ligne.visible { display: block; }
+
+        /* Le contenu descend au lieu d'être recouvert : sans ça le bandeau
+           mangeait le haut de la vue d'ensemble et du champ de recherche. */
+        body.hors-ligne .container { margin-top: 93px; }
+
+        /* Sur l'écran de connexion l'en-tête est masqué : le bandeau remonte
+           en haut plutôt que de flotter dans le vide. */
+        body.sur-connexion #bandeau-hors-ligne { top: 0; }
+        body.sur-connexion.hors-ligne .container { margin-top: 33px; }
+
         /* Voile derrière le menu ouvert. Il rend l'état sans ambiguïté :
            sans lui, le menu se superpose au bouton « +10 » de sa propre
            ligne et un appui réflexe tombe sur « Supprimer ». */
@@ -1591,7 +1672,10 @@
     <div class="modal" id="product-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 class="modal-title" id="product-modal-title">Nouveau Produit</h3>
+                <div>
+                    <h3 class="modal-title" id="product-modal-title">Nouveau Produit</h3>
+                    <div id="product-auteur" class="product-auteur"></div>
+                </div>
                 <button class="close-modal" data-modal="product-modal">×</button>
             </div>
             <form id="product-form">
@@ -1892,13 +1976,19 @@
         </div>
     </nav>
 
+    <!-- Prévient quand le réseau manque : sans réseau, rien ne s'enregistre. -->
+    <div id="bandeau-hors-ligne">Hors ligne — vos saisies ne sont pas enregistrées</div>
+
+    <!-- Messages de confirmation -->
+    <div id="toasts"></div>
+
     <!-- Voile affiché derrière un menu « ⋯ » ouvert : rend l'état visible
          et absorbe le premier appui ailleurs. -->
     <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
-    <script src="config.js?v=20260912"></script>
-    <script src="database.js?v=20260912"></script>
-    <script src="app.js?v=20260912"></script>
+    <script src="config.js?v=20260914"></script>
+    <script src="database.js?v=20260914"></script>
+    <script src="app.js?v=20260914"></script>
 </body>
 </html>

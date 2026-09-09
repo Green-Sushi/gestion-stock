@@ -93,7 +93,10 @@ function applyPermissions() {
 
     // Éléments réservés au patron
     const patronOnlyElements = [
-        'add-product-btn',          // Bouton ajouter produit
+        // 'add-product-btn' retiré le 08/09/2026 : les employés peuvent
+        // créer des produits. Créer est constructif, supprimer est
+        // destructif — et depuis la migration de traçabilité, on sait
+        // désormais qui a créé quoi. Modifier et supprimer restent au patron.
         'add-supplier-btn',         // Bouton ajouter fournisseur
         'manage-users-btn',         // Bouton gérer utilisateurs
         // Blocs de l'ecran Parametres reserves au patron. 'setting-users'
@@ -170,6 +173,10 @@ function showPage(pageId) {
         page.classList.add('active');
         AppState.currentPage = pageId;
     }
+
+    // L'en-tête est masqué sur l'écran de connexion : le bandeau hors-ligne
+    // doit y remonter en haut plutôt que de flotter dans le vide.
+    document.body.classList.toggle('sur-connexion', pageId === 'login-page');
 
     // Mettre à jour la navigation
     if (pageId !== 'login-page' && pageId !== 'products-page') {
@@ -309,6 +316,62 @@ function confirmLogout() {
 }
 
 // ====================
+// MESSAGES ET ÉTAT DU RÉSEAU
+// ====================
+
+// Affiche un message court en bas de l'écran. L'application n'en avait aucun :
+// rien ne disait jamais « c'est enregistré », donc rien ne distinguait une
+// saisie prise en compte d'une saisie perdue.
+function notifier(message, type = 'ok', duree = 2600) {
+    const zone = document.getElementById('toasts');
+    if (!zone) return;
+
+    const el = document.createElement('div');
+    el.className = 'toast ' + type;
+    el.setAttribute('role', 'status');
+    el.textContent = message;
+    zone.appendChild(el);
+
+    setTimeout(() => el.remove(), duree);
+}
+
+// Vrai si le téléphone se sait hors ligne. `navigator.onLine` ment parfois
+// dans l'autre sens (il se croit en ligne alors que rien ne passe) : c'est
+// pourquoi on vérifie AUSSI le résultat réel de chaque enregistrement.
+function estHorsLigne() {
+    return navigator.onLine === false;
+}
+
+function majBandeauReseau() {
+    const horsLigne = estHorsLigne();
+    const bandeau = document.getElementById('bandeau-hors-ligne');
+    if (bandeau) bandeau.classList.toggle('visible', horsLigne);
+    // Le contenu descend au lieu d'être recouvert par le bandeau.
+    document.body.classList.toggle('hors-ligne', horsLigne);
+}
+
+// Message unique pour un enregistrement qui a échoué. On distingue le réseau
+// du reste : « hors ligne » se corrige tout seul, une vraie erreur non.
+function signalerEchec(prefixe, erreur) {
+    if (estHorsLigne()) {
+        notifier('Hors ligne — ' + prefixe + ' non enregistré', 'err', 4000);
+        return;
+    }
+
+    // Cas le plus fréquent en wifi faible : le téléphone SE CROIT en ligne
+    // mais rien ne passe. La couche réseau renvoie alors un texte technique
+    // anglais (« Failed to fetch »), incompréhensible pour l'utilisateur.
+    const texte = String(erreur || '');
+    const echecReseau = /failed to fetch|networkerror|network request failed|load failed|timeout/i.test(texte);
+
+    if (echecReseau || !texte) {
+        notifier(prefixe + ' non enregistré — vérifiez la connexion', 'err', 4500);
+    } else {
+        notifier(prefixe + ' : ' + texte, 'err', 4500);
+    }
+}
+
+// ====================
 // LISTENERS GLOBAUX
 // ====================
 
@@ -391,6 +454,17 @@ function setupGlobalListeners() {
             }
         }
     });
+
+    // État du réseau : bandeau permanent tant qu'il manque.
+    window.addEventListener('online', () => {
+        majBandeauReseau();
+        notifier('Connexion rétablie', 'ok');
+    });
+    window.addEventListener('offline', () => {
+        majBandeauReseau();
+        notifier('Hors ligne — vos saisies ne partiront pas', 'err', 5000);
+    });
+    majBandeauReseau();
 
     // Surveillance de l'echeance : au retour dans l'application (le cas le
     // plus frequent : elle a dormi la nuit) et toutes les minutes.
@@ -870,12 +944,19 @@ async function adjustProductQuantity(productId, delta) {
     const result = await db.updateProduct(productId, { quantity: newQuantity });
 
     if (!result.success) {
-        // Si l'update échoue, revenir à l'ancienne valeur
+        // L'affichage revient à l'ancienne valeur : ce que tu vois redevient
+        // ce qui est réellement en base.
         product.quantity = oldQuantity;
         if (qtyElement) {
             qtyElement.textContent = oldQuantity;
         }
-        alert('❌ Erreur lors de la mise à jour : ' + result.error);
+        // Reconstruire la liste détruit un menu « ⋯ » ouvert SANS effacer son
+        // voile : l'écran resterait gris sans explication. On ferme d'abord.
+        closeAllProductMenus();
+        // Et on conserve le filtre de recherche en cours, sinon la liste
+        // complète réapparaît alors que le champ affiche toujours son texte.
+        renderProducts(document.getElementById('product-search')?.value || '');
+        signalerEchec('Quantité', result.error);
     } else {
         // Mettre à jour le compteur d'alertes
         await updateAlertCount();
@@ -953,13 +1034,13 @@ async function deleteProduct(productId, productName) {
     showLoading(false);
 
     if (result.success) {
-        // Recharger les produits et mettre à jour l'affichage
+        notifier('Produit supprimé');
         await loadProducts();
         renderProducts();
         await updateAlertCount();
         renderCategories();
     } else {
-        alert('❌ Erreur lors de la suppression : ' + result.error);
+        signalerEchec('Suppression', result.error);
     }
 }
 
@@ -982,6 +1063,27 @@ function openProductModal(product = null) {
         option.textContent = supplier.name;
         supplierSelect.appendChild(option);
     });
+
+    // Origine de la fiche : vide pour les produits antérieurs au 08/09/2026,
+    // c'est normal et affiché comme tel.
+    const auteur = document.getElementById('product-auteur');
+    if (auteur) {
+        const quand = product?.created_at
+            ? new Date(product.created_at).toLocaleDateString('fr-FR')
+            : null;
+
+        if (product && product.created_by_name) {
+            auteur.textContent = 'Ajouté par ' + product.created_by_name
+                + (quand ? ' le ' + quand : '');
+        } else if (product && product.created_by) {
+            // Auteur enregistré mais sans nom : cas résiduel, on n'invente pas.
+            auteur.textContent = quand ? 'Ajouté le ' + quand : '';
+        } else if (product) {
+            auteur.textContent = 'Fiche antérieure au suivi des créations';
+        } else {
+            auteur.textContent = '';
+        }
+    }
 
     if (product) {
         // Mode édition
@@ -1034,13 +1136,14 @@ async function handleProductSubmit(e) {
     showLoading(false);
 
     if (result.success) {
+        notifier(AppState.editingProduct ? 'Produit modifié' : 'Produit ajouté');
         closeModal('product-modal');
         await loadProducts();
         renderProducts();
         await updateAlertCount();
         renderCategories();
     } else {
-        alert('❌ Erreur: ' + result.error);
+        signalerEchec('Produit', result.error);
     }
 }
 
@@ -1171,11 +1274,12 @@ async function handleSupplierSubmit(e) {
     showLoading(false);
 
     if (result.success) {
+        notifier(AppState.editingSupplier ? 'Fournisseur modifié' : 'Fournisseur ajouté');
         closeModal('supplier-modal');
         await loadSuppliers();
         renderSuppliers();
     } else {
-        alert('❌ Erreur: ' + result.error);
+        signalerEchec('Fournisseur', result.error);
     }
 }
 
@@ -1546,13 +1650,23 @@ async function saveSettings() {
     const whatsappNumber = document.getElementById('whatsapp-input').value;
 
     showLoading(true);
-    await db.updateSetting('email_notifications', emailEnabled.toString());
-    await db.updateSetting('email_recipient', emailRecipient);
-    await db.updateSetting('whatsapp_notifications', whatsappEnabled.toString());
-    await db.updateSetting('whatsapp_number', whatsappNumber);
+    // Cette fonction annonçait « sauvegardé ! » sans jamais regarder le
+    // résultat : les quatre enregistrements pouvaient tous échouer, le
+    // message de succès s'affichait quand même.
+    const resultats = await Promise.all([
+        db.updateSetting('email_notifications', emailEnabled.toString()),
+        db.updateSetting('email_recipient', emailRecipient),
+        db.updateSetting('whatsapp_notifications', whatsappEnabled.toString()),
+        db.updateSetting('whatsapp_number', whatsappNumber)
+    ]);
     showLoading(false);
 
-    alert('✅ Paramètres sauvegardés !');
+    const rate = resultats.find(r => !r || !r.success);
+    if (rate) {
+        signalerEchec('Paramètres', rate && rate.error);
+    } else {
+        notifier('Paramètres enregistrés');
+    }
 }
 
 // ====================
@@ -1826,10 +1940,11 @@ async function handleUserSubmit(e) {
         if (cestMoi && pinSaisi !== '') {
             adminPinSession = pinSaisi;
         }
+        notifier(enEdition ? 'Compte modifié' : 'Compte créé');
         closeModal('user-modal');
         await renderUsersList();
     } else {
-        alert('❌ Erreur: ' + result.error);
+        signalerEchec('Compte', result.error);
     }
 }
 
@@ -1843,9 +1958,10 @@ async function deleteUser(userId) {
     showLoading(false);
 
     if (result.success) {
+        notifier('Compte supprimé');
         await renderUsersList();
     } else {
-        alert('❌ Erreur: ' + result.error);
+        signalerEchec('Suppression du compte', result.error);
     }
 }
 
@@ -2047,11 +2163,12 @@ async function handleFrozenSubmit(e) {
     showLoading(false);
 
     if (result.success) {
+        notifier('Congélation enregistrée');
         closeModal('frozen-modal');
         await loadFrozenSushi();
         renderFrozenList();
     } else {
-        alert('❌ Erreur: ' + result.error);
+        signalerEchec('Congélation', result.error);
     }
 }
 

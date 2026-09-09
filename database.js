@@ -162,9 +162,14 @@ class DatabaseManager {
 
     async createSupplier(supplierData) {
         try {
+            const avecAuteur = {
+                ...supplierData,
+                created_by: this.currentUser?.id || null,
+                created_by_name: this.currentUser?.name || null
+            };
             const { data, error } = await this.supabase
                 .from('suppliers')
-                .insert([supplierData])
+                .insert([avecAuteur])
                 .select()
                 .single();
 
@@ -256,9 +261,19 @@ class DatabaseManager {
 
     async createProduct(productData) {
         try {
+            // L'auteur de la création est désormais enregistré : sans lui,
+            // « on sait qui fait quoi » aurait été faux pour les créations.
+            // On inscrit AUSSI le nom, pas seulement l'identifiant : sans lui,
+            // l'application devrait pouvoir lire les noms de tous les comptes
+            // pour les afficher — donc les exposer à quiconque a la clé.
+            const avecAuteur = {
+                ...productData,
+                created_by: this.currentUser?.id || null,
+                created_by_name: this.currentUser?.name || null
+            };
             const { data, error } = await this.supabase
                 .from('products')
-                .insert([productData])
+                .insert([avecAuteur])
                 .select()
                 .single();
 

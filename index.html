@@ -1648,9 +1648,13 @@
             background: #e6f4ea;
             color: #1e6b3a;
             border-radius: 13px;
-            padding: 12px 14px;
+            padding: 10px 14px;
             margin-bottom: 14px;
             font-size: .9rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
         }
 
         .releve-fait.correction {
@@ -1658,14 +1662,7 @@
             color: #8a5219;
         }
 
-        .releve-fait-note {
-            font-size: .82rem;
-            opacity: .85;
-            margin-top: 4px;
-            line-height: 1.45;
-        }
-
-        .releve-fait .btn { margin-top: 10px; }
+        .releve-fait .btn { flex: none; }
 
         /* Un champ verrouillé doit SE VOIR verrouillé, sinon on tape dedans
            sans comprendre pourquoi rien ne se passe. */
@@ -2074,13 +2071,13 @@
 
             <div class="categories-grid">
                 <div class="category-card" id="carte-stock">
-                    <img src="./images/categories/section-stock.webp?v=20261015"
-                         onerror="this.onerror=null; this.src='./images/categories/section-stock.png?v=20261015';"
+                    <img src="./images/categories/section-stock.webp?v=20261016"
+                         onerror="this.onerror=null; this.src='./images/categories/section-stock.png?v=20261016';"
                          alt="Stock" class="category-image">
                 </div>
                 <div class="category-card" id="carte-suivi">
-                    <img src="./images/categories/section-suivi.webp?v=20261015"
-                         onerror="this.onerror=null; this.src='./images/categories/section-suivi.png?v=20261015';"
+                    <img src="./images/categories/section-suivi.webp?v=20261016"
+                         onerror="this.onerror=null; this.src='./images/categories/section-suivi.png?v=20261016';"
                          alt="Suivi" class="category-image">
                 </div>
             </div>
@@ -2765,8 +2762,8 @@
     <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
-<script src="config.js?v=20261015"></script>
-    <script src="database.js?v=20261015"></script>
-    <script src="app.js?v=20261015"></script>
+<script src="config.js?v=20261016"></script>
+    <script src="database.js?v=20261016"></script>
+    <script src="app.js?v=20261016"></script>
 </body>
 </html>

@@ -3697,58 +3697,38 @@ function afficherEtatReleve(deja, dejaFait, verrouille, moment) {
         return;
     }
 
-    // Qui l'a fait, et quand. On prend la première ligne : elles ont toutes
-    // été enregistrées ensemble.
+    // Toutes les lignes ont été enregistrées ensemble : la première suffit.
     const premiere = Object.values(deja)[0];
     const qui = (premiere.user_name || '').trim();
-    const quand = premiere.created_at ? heureRestaurant(premiere.created_at) : null;
     const reprise = premiere.origine === 'hygie';
 
-    let phrase;
-    if (reprise) {
-        phrase = `Relevé du ${moment} repris du système Hygie.`;
-    } else if (qui && quand) {
-        phrase = `Relevé du ${moment} déjà fait par ${qui}, à ${quand}.`;
-    } else if (quand) {
-        phrase = `Relevé du ${moment} déjà fait à ${quand}.`;
-    } else {
-        phrase = `Relevé du ${moment} déjà fait.`;
-    }
+    const phrase = reprise ? 'Repris du système Hygie'
+                 : qui ? `Fait par ${qui}`
+                 : 'Relevé fait';
 
     if (verrouille) {
-        etat.innerHTML = `
-            <div class="releve-fait">
-                <strong>✓ ${phrase}</strong>
-                <div class="releve-fait-note">Inutile de le refaire. Une erreur de saisie ? Vous pouvez le corriger — l'ancienne valeur restera enregistrée.</div>
-                <button type="button" class="btn btn-small btn-secondary" id="releve-corriger-btn">Corriger ce relevé</button>
-            </div>`;
+        // Corriger une valeur d'un registre sanitaire n'est pas un geste
+        // d'employé : le bouton n'existe que pour le patron.
+        const boutonCorriger = db.isPatron()
+            ? '<button type="button" class="btn btn-small btn-secondary" id="releve-corriger-btn">Corriger</button>'
+            : '';
+
+        etat.innerHTML = `<div class="releve-fait"><strong>✓ ${phrase}</strong>${boutonCorriger}</div>`;
         bouton.style.display = 'none';
 
-        document.getElementById('releve-corriger-btn').addEventListener('click', () => {
-            releveDeverrouille = true;
-            renderReleveSaisie();
-        });
-    } else {
-        etat.innerHTML = `
-            <div class="releve-fait correction">
-                <strong>Correction de ce relevé</strong>
-                <div class="releve-fait-note">${phrase} L'ancienne valeur sera conservée dans l'historique des corrections.</div>
-            </div>`;
-        bouton.style.display = '';
-        bouton.textContent = 'Enregistrer la correction';
+        const corriger = document.getElementById('releve-corriger-btn');
+        if (corriger) {
+            corriger.addEventListener('click', () => {
+                releveDeverrouille = true;
+                renderReleveSaisie();
+            });
+        }
+        return;
     }
-}
 
-// Charge les relevés du jour affiché. Appelée à chaque changement de date,
-// car la fenêtre des oublis ne remonte qu'à sept jours.
-async function chargerJourReleve() {
-    const jour = document.getElementById('releve-jour').value;
-    if (!jour) { AppState.relevesDuJour = []; return; }
-
-    const result = await db.getReleves(jour, jour);
-    // En cas d'échec on n'invente rien : la liste reste vide et le bandeau
-    // hors-ligne, lui, dit déjà que le réseau manque.
-    AppState.relevesDuJour = result.success ? result.data : [];
+    etat.innerHTML = `<div class="releve-fait correction"><strong>Correction — ${phrase}</strong></div>`;
+    bouton.style.display = '';
+    bouton.textContent = 'Enregistrer la correction';
 }
 
 function renderReleveSaisie() {
@@ -3774,7 +3754,11 @@ function renderReleveSaisie() {
     // Déjà relevé ? On le DIT, et on verrouille. Sans ça, la personne
     // suivante voyait des champs pré-remplis comme d'habitude, tapait ses
     // valeurs, et écrasait celles du matin sans jamais l'apprendre.
-    const dejaFait = Object.keys(deja).length > 0;
+    //
+    // On ne verrouille QUE si toutes les enceintes sont couvertes : un relevé
+    // interrompu — batterie vide, service qui reprend — doit pouvoir être
+    // terminé par n'importe qui, sans passer par le patron.
+    const dejaFait = Object.keys(deja).length >= AppState.equipements.length;
     const verrouille = dejaFait && !releveDeverrouille;
     afficherEtatReleve(deja, dejaFait, verrouille, moment);
 

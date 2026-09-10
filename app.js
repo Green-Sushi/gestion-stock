@@ -33,7 +33,8 @@ const AppState = {
     productsLu: undefined,
     equipements: [],
     derniersReleves: {},
-    relevesRecents: []
+    relevesRecents: [],
+    relevesDuJour: []
 };
 
 // Adresses signées des photos de réception, en mémoire pour la session.
@@ -702,12 +703,19 @@ function setupGlobalListeners() {
     document.getElementById('releve-save-btn').addEventListener('click', handleReleveSave);
     document.getElementById('export-releve-btn').addEventListener('click', exportReleveList);
 
-    document.getElementById('releve-jour').addEventListener('change', renderReleveSaisie);
+    document.getElementById('releve-jour').addEventListener('change', async () => {
+        releveDeverrouille = false;
+        showLoading(true);
+        await chargerJourReleve();
+        showLoading(false);
+        renderReleveSaisie();
+    });
 
     document.querySelectorAll('.releve-moment').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.releve-moment').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
+            releveDeverrouille = false;
             renderReleveSaisie();
         });
     });
@@ -3509,8 +3517,8 @@ async function loadReleveEcran() {
     const [equip, derniers, recents] = await Promise.all([
         db.getEquipements(),
         db.getDerniersReleves(),
-        // On charge la fenêtre des oublis ET le jour affiché, qui peut être
-        // antérieur si l'on rattrape un relevé.
+        // La fenêtre des oublis seulement. Le jour AFFICHÉ est chargé à
+        // part, juste après : il peut être bien antérieur si l'on rattrape.
         db.getReleves(jourMoinsN(aujourdhui, FENETRE_OUBLIS_JOURS), aujourdhui)
     ]);
 
@@ -3523,6 +3531,8 @@ async function loadReleveEcran() {
     AppState.equipements = equip.data;
     AppState.derniersReleves = derniers.success ? derniers.data : {};
     AppState.relevesRecents = recents.success ? recents.data : [];
+
+    await chargerJourReleve();
 }
 
 // Les couples (jour, moment) des derniers jours pour lesquels AUCUN relevé
@@ -3592,6 +3602,78 @@ function renderReleveManquants() {
     `;
 }
 
+// Vrai quand l'utilisateur a explicitement demandé à corriger un relevé déjà
+// fait. Remis à faux dès qu'on change de jour ou de moment : déverrouiller
+// une fois ne doit pas déverrouiller tout le reste.
+let releveDeverrouille = false;
+
+// Le bandeau du haut et le bouton du bas doivent raconter la même chose :
+// soit « à faire », soit « déjà fait par X, voulez-vous corriger ? ».
+function afficherEtatReleve(deja, dejaFait, verrouille, moment) {
+    const etat = document.getElementById('releve-etat');
+    const bouton = document.getElementById('releve-save-btn');
+
+    if (!dejaFait) {
+        etat.innerHTML = '';
+        bouton.style.display = '';
+        bouton.textContent = 'Enregistrer le relevé';
+        return;
+    }
+
+    // Qui l'a fait, et quand. On prend la première ligne : elles ont toutes
+    // été enregistrées ensemble.
+    const premiere = Object.values(deja)[0];
+    const qui = (premiere.user_name || '').trim();
+    const quand = premiere.created_at ? heureRestaurant(premiere.created_at) : null;
+    const reprise = premiere.origine === 'hygie';
+
+    let phrase;
+    if (reprise) {
+        phrase = `Relevé du ${moment} repris du système Hygie.`;
+    } else if (qui && quand) {
+        phrase = `Relevé du ${moment} déjà fait par ${qui}, à ${quand}.`;
+    } else if (quand) {
+        phrase = `Relevé du ${moment} déjà fait à ${quand}.`;
+    } else {
+        phrase = `Relevé du ${moment} déjà fait.`;
+    }
+
+    if (verrouille) {
+        etat.innerHTML = `
+            <div class="releve-fait">
+                <strong>✓ ${phrase}</strong>
+                <div class="releve-fait-note">Inutile de le refaire. Une erreur de saisie ? Vous pouvez le corriger — l'ancienne valeur restera enregistrée.</div>
+                <button type="button" class="btn btn-small btn-secondary" id="releve-corriger-btn">Corriger ce relevé</button>
+            </div>`;
+        bouton.style.display = 'none';
+
+        document.getElementById('releve-corriger-btn').addEventListener('click', () => {
+            releveDeverrouille = true;
+            renderReleveSaisie();
+        });
+    } else {
+        etat.innerHTML = `
+            <div class="releve-fait correction">
+                <strong>Correction de ce relevé</strong>
+                <div class="releve-fait-note">${phrase} L'ancienne valeur sera conservée dans l'historique des corrections.</div>
+            </div>`;
+        bouton.style.display = '';
+        bouton.textContent = 'Enregistrer la correction';
+    }
+}
+
+// Charge les relevés du jour affiché. Appelée à chaque changement de date,
+// car la fenêtre des oublis ne remonte qu'à sept jours.
+async function chargerJourReleve() {
+    const jour = document.getElementById('releve-jour').value;
+    if (!jour) { AppState.relevesDuJour = []; return; }
+
+    const result = await db.getReleves(jour, jour);
+    // En cas d'échec on n'invente rien : la liste reste vide et le bandeau
+    // hors-ligne, lui, dit déjà que le réseau manque.
+    AppState.relevesDuJour = result.success ? result.data : [];
+}
+
 function renderReleveSaisie() {
     const container = document.getElementById('releve-liste');
     const jour = document.getElementById('releve-jour').value;
@@ -3603,12 +3685,21 @@ function renderReleveSaisie() {
         return;
     }
 
-    // Valeurs déjà enregistrées pour ce jour et ce moment : on les affiche
-    // telles quelles, c'est une correction, pas une nouvelle saisie.
+    // Valeurs déjà enregistrées pour CE jour et CE moment. Elles viennent de
+    // AppState.relevesDuJour, chargé pour le jour affiché — et non de la
+    // fenêtre des sept derniers jours : en rattrapant une date plus
+    // ancienne, l'écran aurait cru la journée vierge et l'aurait écrasée.
     const deja = {};
-    (AppState.relevesRecents || []).forEach(r => {
+    (AppState.relevesDuJour || []).forEach(r => {
         if (r.jour === jour && r.moment === moment) deja[r.equipement_id] = r;
     });
+
+    // Déjà relevé ? On le DIT, et on verrouille. Sans ça, la personne
+    // suivante voyait des champs pré-remplis comme d'habitude, tapait ses
+    // valeurs, et écrasait celles du matin sans jamais l'apprendre.
+    const dejaFait = Object.keys(deja).length > 0;
+    const verrouille = dejaFait && !releveDeverrouille;
+    afficherEtatReleve(deja, dejaFait, verrouille, moment);
 
     container.innerHTML = AppState.equipements.map(e => {
         const enregistre = deja[e.id];
@@ -3625,7 +3716,7 @@ function renderReleveSaisie() {
                 </div>
                 <input type="number" step="1" inputmode="decimal"
                        class="releve-ligne-champ" data-min="${e.seuil_min}" data-max="${e.seuil_max}"
-                       value="${formatTemp(valeur)}">
+                       value="${formatTemp(valeur)}"${verrouille ? ' readonly' : ''}>
             </div>
         `;
     }).join('');
@@ -3709,7 +3800,8 @@ async function handleReleveSave() {
         notifier(`Relevé${enRetard} enregistré`);
     }
 
-    await loadReleveEcran();
+    releveDeverrouille = false;
+    await loadReleveEcran();   // recharge aussi le jour affiché
     renderReleveManquants();
     renderReleveSaisie();
     renderReleveHistorique();
@@ -3750,7 +3842,19 @@ async function renderReleveHistorique() {
     }
 
     container.innerHTML = '<div class="empty-state"><div class="empty-state-text">Chargement…</div></div>';
-    const result = await db.getReleves(debut, fin);
+    // Les corrections sont lues avec les relevés : une trace que personne ne
+    // voit ne sert à rien.
+    const [result, corrections] = await Promise.all([
+        db.getReleves(debut, fin),
+        db.getCorrectionsReleves(debut, fin)
+    ]);
+
+    const joursCorriges = {};
+    if (corrections.success) {
+        corrections.data.forEach(c => {
+            (joursCorriges[c.jour] = joursCorriges[c.jour] || []).push(c);
+        });
+    }
 
     if (!result.success) {
         container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div>
@@ -3793,9 +3897,23 @@ async function renderReleveHistorique() {
             .some(e => releveEnRetard(e.matin) || releveEnRetard(e.soir));
         if (rattrape) source += '<span class="releve-source retard">saisi en retard</span>';
 
+        // Une valeur d'un registre qui change doit se voir, pas seulement
+        // exister en base.
+        const corr = joursCorriges[jour];
+        if (corr) {
+            source += `<span class="releve-source correction" title="${corr.length} correction(s)">corrigé</span>`;
+        }
+
+        const detailCorrections = corr ? `
+                <div class="releve-corrections">
+                    ${corr.map(c => `${c.equipement_nom} (${c.moment}) : ${formatTemp(c.temperature_avant)}° → ${formatTemp(c.temperature_apres)}°`
+                        + `${c.corrige_par ? `, par ${c.corrige_par}` : ''} le ${dateRestaurant(c.corrige_le)}`).join('<br>')}
+                </div>` : '';
+
         return `
             <div class="releve-jour-bloc">
                 <div class="releve-jour-titre">${dateSeuleFr(jour)}${source}</div>
+                ${detailCorrections}
                 <div class="releve-jour-valeurs">
                     <span class="releve-jour-entete">Enceinte</span>
                     <span class="releve-jour-entete v">Matin</span>

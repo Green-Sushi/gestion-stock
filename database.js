@@ -1225,6 +1225,24 @@ class DatabaseManager {
     // RELEVÉS DE TEMPÉRATURE
     // ====================
 
+    // Les corrections apportées à des relevés déjà enregistrés. Tracées par
+    // un déclencheur en base, donc impossibles à contourner depuis l'app.
+    async getCorrectionsReleves(jourDebut, jourFin) {
+        try {
+            const { data, error } = await this.supabase
+                .from('releves_corrections')
+                .select('releve_id, equipement_nom, jour, moment, temperature_avant, temperature_apres, corrige_par, corrige_le')
+                .gte('jour', jourDebut)
+                .lte('jour', jourFin)
+                .order('corrige_le', { ascending: false });
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Erreur lecture corrections:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
     async getEquipements() {
         try {
             const { data, error } = await this.supabase

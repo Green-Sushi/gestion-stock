@@ -1561,6 +1561,55 @@
             color: #8a5219;
         }
 
+        /* Relevé déjà fait : on le dit AVANT que la personne suivante ne
+           saisisse par-dessus. Le champ est verrouillé tant qu'elle n'a pas
+           demandé explicitement à corriger. */
+        .releve-fait {
+            background: #e6f4ea;
+            color: #1e6b3a;
+            border-radius: 13px;
+            padding: 12px 14px;
+            margin-bottom: 14px;
+            font-size: .9rem;
+        }
+
+        .releve-fait.correction {
+            background: #fdf1e3;
+            color: #8a5219;
+        }
+
+        .releve-fait-note {
+            font-size: .82rem;
+            opacity: .85;
+            margin-top: 4px;
+            line-height: 1.45;
+        }
+
+        .releve-fait .btn { margin-top: 10px; }
+
+        /* Un champ verrouillé doit SE VOIR verrouillé, sinon on tape dedans
+           sans comprendre pourquoi rien ne se passe. */
+        .releve-ligne-champ[readonly] {
+            background: #eef3f3;
+            border-color: #dfe8e8;
+            color: #6f8686;
+        }
+
+        .releve-source.correction {
+            background: #fde8e8;
+            color: #a33;
+        }
+
+        .releve-corrections {
+            font-size: .78rem;
+            line-height: 1.5;
+            color: #a33;
+            background: #fdf4f4;
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin-bottom: 8px;
+        }
+
         .releve-manquant {
             background: #fdf1e3;
             color: #8a5219;
@@ -1922,13 +1971,13 @@
             </div>
             <div class="categories-grid">
                 <div class="category-card" id="carte-stock">
-                    <img src="./images/categories/section-stock.webp?v=20261011"
-                         onerror="this.onerror=null; this.src='./images/categories/section-stock.png?v=20261011';"
+                    <img src="./images/categories/section-stock.webp?v=20261012"
+                         onerror="this.onerror=null; this.src='./images/categories/section-stock.png?v=20261012';"
                          alt="Stock" class="category-image">
                 </div>
                 <div class="category-card" id="carte-suivi">
-                    <img src="./images/categories/section-suivi.webp?v=20261011"
-                         onerror="this.onerror=null; this.src='./images/categories/section-suivi.png?v=20261011';"
+                    <img src="./images/categories/section-suivi.webp?v=20261012"
+                         onerror="this.onerror=null; this.src='./images/categories/section-suivi.png?v=20261012';"
                          alt="Suivi" class="category-image">
                 </div>
             </div>
@@ -2088,6 +2137,7 @@
             <!-- Ce qui n'a pas été relevé ces derniers jours. Un trou dans un
                  registre se remarque ; encore faut-il le voir à temps. -->
             <div id="releve-manquants"></div>
+            <div id="releve-etat"></div>
 
             <div class="releve-barre">
                 <input type="date" class="form-input" id="releve-jour">
@@ -2612,8 +2662,8 @@
     <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
-<script src="config.js?v=20261011"></script>
-    <script src="database.js?v=20261011"></script>
-    <script src="app.js?v=20261011"></script>
+<script src="config.js?v=20261012"></script>
+    <script src="database.js?v=20261012"></script>
+    <script src="app.js?v=20261012"></script>
 </body>
 </html>

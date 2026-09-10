@@ -310,3 +310,72 @@ GRANT EXECUTE ON FUNCTION public.ajuster_quantite_produit(UUID, NUMERIC, UUID, T
 --   DROP FUNCTION public.ajuster_quantite_produit(UUID, NUMERIC, UUID, TEXT);
 --   ⚠️ Le retour arrière ramène la perte d'incréments. À ne faire qu'avec
 --      un retour du code.
+
+-- =====================================================================
+-- RELEVÉS : DÉJÀ FAIT, ET TRAÇAGE DES CORRECTIONS — 2026-09-09
+-- =====================================================================
+-- Question de Lénaïc : si le relevé du matin est fait, peut-on empêcher
+-- quelqu'un de le refaire ?
+--
+-- L'unicité (équipement, jour, moment) empêchait déjà les doublons de
+-- LIGNES. Mais rien n'avertissait la personne suivante : elle voyait des
+-- champs pré-remplis comme d'habitude, tapait ses valeurs, et écrasait
+-- celles du matin sans jamais l'apprendre.
+--
+-- Deux réponses :
+--   1. côté écran, le relevé déjà fait est ANNONCÉ et VERROUILLÉ. Corriger
+--      demande un geste explicite ;
+--   2. ici, l'ancienne valeur est CONSERVÉE. Le déclencheur est posé sur la
+--      base et non dans l'application : une correction laisse une trace même
+--      si elle vient d'ailleurs.
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS public.releves_corrections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    releve_id UUID NOT NULL,
+    equipement_nom TEXT NOT NULL,
+    jour DATE NOT NULL,
+    moment TEXT NOT NULL,
+    temperature_avant NUMERIC(4,1) NOT NULL,
+    temperature_apres NUMERIC(4,1) NOT NULL,
+    origine_avant TEXT,
+    corrige_par TEXT,
+    corrige_le TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_corrections_jour ON public.releves_corrections (jour DESC);
+
+CREATE OR REPLACE FUNCTION public.tracer_correction_releve()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+    IF NEW.temperature IS DISTINCT FROM OLD.temperature THEN
+        INSERT INTO releves_corrections
+            (releve_id, equipement_nom, jour, moment,
+             temperature_avant, temperature_apres, origine_avant, corrige_par)
+        VALUES
+            (OLD.id, OLD.equipement_nom, OLD.jour, OLD.moment,
+             OLD.temperature, NEW.temperature, OLD.origine, NEW.user_name);
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_tracer_correction_releve ON public.releves_temperature;
+CREATE TRIGGER trg_tracer_correction_releve
+    BEFORE UPDATE ON public.releves_temperature
+    FOR EACH ROW EXECUTE FUNCTION public.tracer_correction_releve();
+
+ALTER TABLE public.releves_corrections ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS corrections_all ON public.releves_corrections;
+CREATE POLICY corrections_all ON public.releves_corrections FOR ALL USING (true) WITH CHECK (true);
+
+-- Consultation : toutes les corrections d'un mois.
+--   SELECT jour, moment, equipement_nom, temperature_avant, temperature_apres,
+--          corrige_par, corrige_le
+--   FROM public.releves_corrections
+--   WHERE jour >= '2026-09-01' AND jour < '2026-10-01' ORDER BY corrige_le DESC;
+
+-- Retour arrière :
+--   DROP TRIGGER trg_tracer_correction_releve ON public.releves_temperature;
+--   DROP FUNCTION public.tracer_correction_releve();
+--   DROP TABLE public.releves_corrections;

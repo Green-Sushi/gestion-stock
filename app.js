@@ -191,7 +191,33 @@ function updateRoleIcon() {
 // NAVIGATION
 // ====================
 
-function showPage(pageId) {
+// `depuisHistorique` vaut true quand c'est le bouton retour du téléphone qui
+// nous amène ici : il ne faut alors PAS réempiler une entrée d'historique,
+// sinon reculer d'un écran en exigerait deux.
+function showPage(pageId, depuisHistorique = false) {
+    // Sans ces entrées d'historique, l'application ne disait rien au
+    // téléphone quand on changeait d'écran : le bouton retour d'Android
+    // sortait de l'application au lieu de reculer dedans, et l'on
+    // retombait sur le code PIN.
+    if (!depuisHistorique && pageId !== AppState.currentPage) {
+        // L'écran de connexion REMPLACE l'historique au lieu de s'y
+        // ajouter : après une déconnexion, reculer ne doit pas ramener
+        // dans une session fermée.
+        const versLaRacine = pageId === 'home-page' && AppState.currentPage === 'login-page';
+
+        if (pageId === 'login-page' || versLaRacine) {
+            // Deux cas où l'on REMPLACE au lieu d'empiler :
+            // - la connexion : après une déconnexion, reculer ne doit pas
+            //   ramener dans une session fermée ;
+            // - l'arrivée sur l'accueil après avoir saisi le code : l'accueil
+            //   devient la racine. Sans ça, reculer depuis l'accueil
+            //   raffichait l'écran du code PIN.
+            history.replaceState({ page: pageId }, '');
+        } else {
+            history.pushState({ page: pageId }, '');
+        }
+    }
+
     // Masquer toutes les pages
     document.querySelectorAll('.page').forEach(page => {
         page.classList.remove('active');
@@ -3839,6 +3865,58 @@ async function exportReleveList() {
     const sujet = encodeURIComponent(`🌡️ Relevé de températures - ${periode}`);
     window.location.href = `mailto:greensushi.mq@gmail.com?subject=${sujet}&body=${encodeURIComponent(texte)}`;
 }
+
+// ====================
+// BOUTON RETOUR DU TÉLÉPHONE
+// ====================
+
+// Une fenêtre ouverte se ferme AVANT que l'on recule d'écran : sur une
+// saisie de réception avec trois photos en attente, reculer d'un coup
+// jusqu'à l'accueil ferait tout perdre.
+function fermerFenetreOuverte() {
+    const ouverte = document.querySelector('.modal.active');
+    if (!ouverte) return false;
+    closeModal(ouverte.id);
+    return true;
+}
+
+window.addEventListener('popstate', (e) => {
+    // On vient de consommer une entrée d'historique pour fermer la fenêtre :
+    // on la remet, sinon le prochain retour sauterait deux écrans.
+    if (fermerFenetreOuverte()) {
+        history.pushState({ page: AppState.currentPage }, '');
+        return;
+    }
+
+    const cible = e.state?.page;
+
+    // Plus d'historique à nous : on laisse le téléphone faire son travail
+    // (quitter l'application), sauf si une session est ouverte — auquel cas
+    // on ramène à l'accueil plutôt que de sortir sur un geste involontaire.
+    if (!cible) {
+        if (AppState.currentPage && AppState.currentPage !== 'login-page') {
+            showPage('home-page', true);
+            history.pushState({ page: 'home-page' }, '');
+        }
+        return;
+    }
+
+    // Reculer ne doit jamais faire rentrer dans une session fermée.
+    if (cible !== 'login-page' && !db.currentUser) {
+        showPage('login-page', true);
+        return;
+    }
+
+    // Ni ressortir sur l'écran du code alors que la session est ouverte.
+    // Filet de sûreté : l'accueil est censé être la racine (voir showPage).
+    if (cible === 'login-page' && db.currentUser) {
+        showPage('home-page', true);
+        history.pushState({ page: 'home-page' }, '');
+        return;
+    }
+
+    showPage(cible, true);
+});
 
 // ====================
 // FONCTIONS GLOBALES (appelées depuis HTML onclick)

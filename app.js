@@ -3624,8 +3624,10 @@ async function updateReleveOverview() {
         if (!complet(jour, 'matin')) retards++;
         if (!complet(jour, 'soir')) retards++;
     }
+    // Un chiffre, comme les autres compteurs de l'accueil : « 0 » en vert
+    // se lit plus vite qu'un symbole, et se compare aux jours précédents.
     poserCaseReleve('releve-cell-retard',
-        retards === 0 ? '✓' : String(retards),
+        String(retards),
         retards === 0 ? 'ok' : 'nok');
 
     // --- Cases 2 et 3 : aujourd'hui ---

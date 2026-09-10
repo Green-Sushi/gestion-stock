@@ -2,7 +2,18 @@
 class DatabaseManager {
     // Duree d'une session : 12 heures. Couvre une journee de travail sans
     // gener, et un telephone oublie ne reste pas ouvert indefiniment.
-    static SESSION_DUREE_MS = 12 * 60 * 60 * 1000;
+    // Une heure SANS ACTIVITÉ. L'adresse de l'application est publique et
+    // seul un code à six chiffres la protège : un téléphone posé sur le
+    // comptoir, ou perdu, ne doit pas rester ouvert.
+    //
+    // L'échéance repart à chaque action (voir prolongerSession) : compter
+    // 98 produits ou relever 13 enceintes prend un moment, et se faire
+    // déconnecter au milieu ferait perdre la saisie en cours.
+    static SESSION_DUREE_MS = 60 * 60 * 1000;
+
+    // On ne réécrit pas le stockage à chaque geste : une fois par minute
+    // suffit pour une échéance qui se compte en heure.
+    static SESSION_PROLONGE_TOUS_LES_MS = 60 * 1000;
 
     // Plafond de fiches de traçabilité lues d'un coup. Au-delà, l'écran le
     // DIT — il ne cache jamais en silence.
@@ -98,6 +109,26 @@ class DatabaseManager {
 
         this.currentUser = session;
         return this.currentUser;
+    }
+
+    // Repousse l'échéance. Appelée à chaque action de l'utilisateur.
+    prolongerSession() {
+        if (!this.currentUser) return;
+        if (this.estSessionExpiree(this.currentUser)) return;
+
+        const maintenant = Date.now();
+        const derniere = this.derniereProlongation || 0;
+        if (maintenant - derniere < DatabaseManager.SESSION_PROLONGE_TOUS_LES_MS) return;
+
+        this.derniereProlongation = maintenant;
+        this.currentUser.expiresAt = maintenant + DatabaseManager.SESSION_DUREE_MS;
+        try {
+            localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
+        } catch (e) {
+            // Stockage plein ou refusé : la session reste valable en mémoire
+            // jusqu'à la fermeture. Rien à signaler à l'utilisateur.
+            console.error('Prolongation de session non enregistrée:', e);
+        }
     }
 
     estSessionExpiree(session) {

@@ -384,7 +384,7 @@ function retourConnexion(message) {
 }
 
 // Verifie que la session est toujours valide. Appelee au retour dans
-// l'application et periodiquement : l'echeance de 12 h tombe presque toujours
+// l'application et periodiquement : l'echeance tombe presque toujours
 // pendant que l'application dort en arriere-plan, pas au demarrage.
 function verifierSessionActive() {
     if (!AppState.currentUser) return;
@@ -568,6 +568,14 @@ function setupGlobalListeners() {
         if (!document.hidden) verifierSessionActive();
     });
     setInterval(verifierSessionActive, 60 * 1000);
+
+    // Toute action repousse l'échéance d'une heure. On écoute en phase de
+    // capture pour que le geste compte même si un gestionnaire l'arrête en
+    // chemin, et en 'passive' pour ne pas gêner le défilement.
+    ['pointerdown', 'keydown', 'change'].forEach(evenement => {
+        document.addEventListener(evenement, () => db.prolongerSession(),
+                                  { capture: true, passive: true });
+    });
 
     // Menu « ⋯ » des lignes produit : un seul écouteur global pour fermer
     // le menu ouvert dès qu'on touche ailleurs (ou qu'on quitte la page).
@@ -2943,10 +2951,10 @@ function compresserImage(fichier) {
 // Renvoie l'adresse signée d'une photo, mise en cache pour ne pas la
 // redemander à chaque redessin de la liste.
 //
-// L'adresse expire au bout d'1 h côté Supabase, alors qu'une session dure
-// 12 h : un cache qui ne vieillirait jamais afficherait des vignettes
-// mortes tout l'après-midi. On la considère donc périmée au bout de
-// 50 minutes, avec 10 minutes de marge avant l'expiration réelle.
+// L'adresse expire au bout d'1 h côté Supabase, et une session peut durer
+// bien plus longtemps tant qu'on s'en sert : un cache qui ne vieillirait
+// jamais afficherait des vignettes mortes. On la considère donc périmée au
+// bout de 50 minutes, avec 10 minutes de marge avant l'expiration réelle.
 const DUREE_ADRESSE_PHOTO_MS = 50 * 60 * 1000;
 
 async function getCachedPhotoUrl(storagePath) {

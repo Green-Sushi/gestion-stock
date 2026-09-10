@@ -306,6 +306,34 @@ class DatabaseManager {
         }
     }
 
+    // Ajuste la quantité en confiant le calcul à la BASE, pas au téléphone.
+    //
+    // Avant, l'application lisait sa copie locale, ajoutait le delta et
+    // réécrivait le total. À deux téléphones, la seconde écriture écrasait
+    // la première : deux « +1 » simultanés ne donnaient qu'un seul. Pire, un
+    // appareil dont la liste datait de la matinée réécrivait une valeur
+    // périmée par-dessus le comptage de l'autre.
+    //
+    // Renvoie la quantité qui FAIT FOI, celle calculée en base.
+    async ajusterQuantiteProduit(productId, delta) {
+        try {
+            const { data, error } = await this.supabase.rpc('ajuster_quantite_produit', {
+                p_product_id: productId,
+                p_delta: delta,
+                p_user_id: this.currentUser?.id || null,
+                p_user_name: this.currentUser?.name || null
+            });
+
+            if (error) throw error;
+            if (!data || data.length === 0) throw new Error('Produit introuvable');
+
+            return { success: true, data: Number(data[0].quantite_apres) };
+        } catch (error) {
+            console.error('Erreur ajustement quantité:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
     async updateProduct(productId, productData) {
         try {
             // Récupérer l'ancienne quantité

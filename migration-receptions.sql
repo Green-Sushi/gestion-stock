@@ -244,3 +244,69 @@ CREATE POLICY releves_all ON public.releves_temperature FOR ALL USING (true) WIT
 -- Retour arrière :
 --   DROP TABLE public.releves_temperature;
 --   DROP TABLE public.equipements;
+
+-- =====================================================================
+-- INCRÉMENT ATOMIQUE DES QUANTITÉS — 2026-09-09
+-- =====================================================================
+-- Question de Lénaïc : deux employés peuvent-ils travailler en même temps
+-- sur deux téléphones ? Oui — mais la vérification a révélé un défaut.
+--
+-- L'application lisait la quantité dans SA copie locale, ajoutait le delta,
+-- puis réécrivait le total. Deux téléphones qui comptent ensemble se
+-- recouvraient : dix « +1 » simultanés donnaient +1. Mesuré, avant/après.
+--
+-- Pire encore : un appareil dont la liste datait de la matinée réécrivait
+-- une valeur périmée par-dessus le comptage de l'autre, sans rien signaler.
+--
+-- La trace du défaut existe dans stock_movements : le 15/12/2025, deux
+-- mouvements portent le même quantity_before (17 -> 18 et 17 -> 19). Ce
+-- n'était donc pas théorique.
+--
+-- Ici, c'est la BASE qui lit et additionne, sous verrou de ligne.
+-- =====================================================================
+
+CREATE OR REPLACE FUNCTION public.ajuster_quantite_produit(
+    p_product_id UUID,
+    p_delta NUMERIC,
+    p_user_id UUID DEFAULT NULL,
+    p_user_name TEXT DEFAULT NULL
+)
+RETURNS TABLE (quantite_avant NUMERIC, quantite_apres NUMERIC)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_avant NUMERIC;
+    v_apres NUMERIC;
+BEGIN
+    -- FOR UPDATE : la ligne est verrouillée le temps du calcul. C'est CE
+    -- verrou qui empêche la perte d'un incrément.
+    SELECT quantity INTO v_avant FROM products WHERE id = p_product_id FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Produit introuvable';
+    END IF;
+
+    v_apres := GREATEST(0, v_avant + p_delta);
+
+    UPDATE products SET quantity = v_apres WHERE id = p_product_id;
+
+    IF v_apres IS DISTINCT FROM v_avant THEN
+        INSERT INTO stock_movements
+            (product_id, user_id, user_name, movement_type, quantity_before, quantity_after, notes)
+        VALUES
+            (p_product_id, p_user_id, p_user_name, 'ajustement', v_avant, v_apres, 'Ajustement manuel');
+    END IF;
+
+    RETURN QUERY SELECT v_avant, v_apres;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.ajuster_quantite_produit(UUID, NUMERIC, UUID, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ajuster_quantite_produit(UUID, NUMERIC, UUID, TEXT) TO anon, authenticated;
+
+-- Retour arrière :
+--   DROP FUNCTION public.ajuster_quantite_produit(UUID, NUMERIC, UUID, TEXT);
+--   ⚠️ Le retour arrière ramène la perte d'incréments. À ne faire qu'avec
+--      un retour du code.

@@ -898,6 +898,16 @@ function showCategoryProducts(category) {
     document.getElementById('category-title').textContent = category.name;
     showPage('products-page');
     renderProducts();
+
+    // À deux téléphones, la liste chargée ce matin peut être fausse le soir.
+    // On affiche d'abord ce qu'on a — l'écran est immédiat — puis on relit et
+    // on corrige. Pas de voile d'attente : ce serait une gêne quotidienne
+    // pour un cas qui ne change rien neuf fois sur dix.
+    loadProducts().then(() => {
+        if (AppState.currentPage !== 'products-page') return;
+        renderProducts(document.getElementById('product-search')?.value || '');
+        updateStockOverview();
+    });
 }
 
 // ====================
@@ -1163,16 +1173,15 @@ async function adjustProductQuantity(productId, delta) {
     // Mettre à jour dans AppState
     product.quantity = newQuantity;
 
-    // Sauvegarder dans la base de données
-    const result = await db.updateProduct(productId, { quantity: newQuantity });
+    // C'est la BASE qui additionne, pas nous : voir ajusterQuantiteProduit.
+    // Sans ça, deux téléphones qui comptent en même temps se recouvraient.
+    const result = await db.ajusterQuantiteProduit(productId, delta);
 
     if (!result.success) {
         // L'affichage revient à l'ancienne valeur : ce que tu vois redevient
         // ce qui est réellement en base.
         product.quantity = oldQuantity;
-        if (qtyElement) {
-            qtyElement.textContent = oldQuantity;
-        }
+        if (qtyElement) qtyElement.textContent = oldQuantity;
         // Reconstruire la liste détruit un menu « ⋯ » ouvert SANS effacer son
         // voile : l'écran resterait gris sans explication. On ferme d'abord.
         closeAllProductMenus();
@@ -1180,15 +1189,31 @@ async function adjustProductQuantity(productId, delta) {
         // complète réapparaît alors que le champ affiche toujours son texte.
         renderProducts(document.getElementById('product-search')?.value || '');
         signalerEchec('Quantité', result.error);
-    } else {
-        // Mettre à jour le compteur d'alertes
-        await updateAlertCount();
-        // Garder le bandeau juste. On n'appelle PAS renderCategories() ici :
-        // elle reconstruirait 6 balises <img> (6,8 Mo au total) sur une page
-        // masquée, à chaque appui sur +/-. Les pastilles de catégorie sont
-        // recalculées de toute façon aux quatre entrées dans l'accueil.
-        updateStockOverview();
+        return;
     }
+
+    // La base fait foi. Si un autre téléphone a modifié ce produit entre
+    // temps, le chiffre qu'on venait d'afficher était faux : on le remplace
+    // par le vrai, sans avertissement — l'employé voit simplement le bon.
+    const officielle = result.data;
+    product.quantity = officielle;
+
+    if (officielle !== newQuantity && qtyElement) {
+        qtyElement.textContent = officielle;
+        const { stockLevel: niveau, isLowStock: bas } =
+            calculateStockLevel(officielle, product.alert_threshold);
+        const conteneur = qtyElement.closest('.product-quantity');
+        if (conteneur) conteneur.className = `product-quantity ${niveau}`;
+        const carte = qtyElement.closest('.product-item');
+        if (carte) carte.classList.toggle('low-stock-alert', bas);
+    }
+
+    await updateAlertCount();
+    // Garder le bandeau juste. On n'appelle PAS renderCategories() ici :
+    // elle reconstruirait les balises <img> des cartes sur une page masquée,
+    // à chaque appui sur +/-. Les pastilles sont recalculées de toute façon
+    // à chaque entrée dans l'accueil ou dans Stock.
+    updateStockOverview();
 }
 
 // Déplacer un produit vers le haut (Patron uniquement)

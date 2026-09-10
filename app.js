@@ -263,6 +263,12 @@ function showPage(pageId, depuisHistorique = false) {
         renderCategories();
     }
 
+    // L'accueil s'affiche TOUT DE SUITE ; l'état des relevés se remplit
+    // juste après, sans faire attendre.
+    if (pageId === 'home-page') {
+        updateReleveOverview();
+    }
+
     if (pageId === 'frozen-page') {
         loadFrozenSushi().then(() => renderFrozenList());
     }
@@ -722,6 +728,8 @@ function setupGlobalListeners() {
 
     document.getElementById('releve-filter-month').addEventListener('change', renderReleveHistorique);
     document.getElementById('releve-filter-year').addEventListener('change', renderReleveHistorique);
+
+    document.getElementById('releve-overview').addEventListener('click', () => showPage('releve-page'));
 
     document.getElementById('carte-stock').addEventListener('click', () => showPage('stock-page'));
     document.getElementById('carte-suivi').addEventListener('click', () => showPage('suivi-page'));
@@ -3580,6 +3588,73 @@ function releveEnRetard(releve) {
     return (new Date(releve.created_at).getTime() - debutDuJour) > DELAI_RETARD_MS;
 }
 
+// Le module de l'accueil : trois cases lisibles sans rien ouvrir.
+//   Retards : les relevés non faits des jours PASSÉS.
+//   Matin / Soir : ceux d'aujourd'hui.
+async function updateReleveOverview() {
+    const aujourdhui = aujourdhuiRestaurant();
+
+    const [equip, recents] = await Promise.all([
+        AppState.equipements.length ? { success: true, data: AppState.equipements } : db.getEquipements(),
+        db.getReleves(jourMoinsN(aujourdhui, FENETRE_OUBLIS_JOURS), aujourdhui)
+    ]);
+
+    if (!equip.success || !recents.success) {
+        // On n'invente pas un état vert quand on n'a pas pu lire : les trois
+        // cases restent grises, et le bandeau hors-ligne dit déjà pourquoi.
+        return;
+    }
+    if (equip.data) AppState.equipements = equip.data;
+
+    const attendu = AppState.equipements.length;
+    const faits = {};
+    recents.data.forEach(r => {
+        const cle = `${r.jour}|${r.moment}`;
+        faits[cle] = (faits[cle] || 0) + 1;
+    });
+
+    // Un relevé compte comme fait s'il couvre TOUTES les enceintes : un
+    // relevé partiel est un trou, pas un relevé.
+    const complet = (jour, moment) => (faits[`${jour}|${moment}`] || 0) >= attendu;
+
+    // --- Case 1 : les retards, sur les jours passés uniquement ---
+    let retards = 0;
+    for (let i = 1; i < FENETRE_OUBLIS_JOURS; i++) {
+        const jour = jourMoinsN(aujourdhui, i);
+        if (!complet(jour, 'matin')) retards++;
+        if (!complet(jour, 'soir')) retards++;
+    }
+    poserCaseReleve('releve-cell-retard',
+        retards === 0 ? '✓' : String(retards),
+        retards === 0 ? 'ok' : 'nok');
+
+    // --- Cases 2 et 3 : aujourd'hui ---
+    const heure = Number(partiesDateRestaurant(new Date()).heure);
+
+    const matinFait = complet(aujourdhui, 'matin');
+    poserCaseReleve('releve-cell-matin',
+        matinFait ? 'OK' : 'NON',
+        matinFait ? 'ok' : 'nok');
+
+    const soirFait = complet(aujourdhui, 'soir');
+    if (soirFait) {
+        poserCaseReleve('releve-cell-soir', 'OK', 'ok');
+    } else if (heure < 18) {
+        // Pas encore dû : ni bon, ni fautif.
+        poserCaseReleve('releve-cell-soir', '·', 'attente');
+    } else {
+        poserCaseReleve('releve-cell-soir', 'NON', 'nok');
+    }
+}
+
+function poserCaseReleve(id, valeur, etat) {
+    const cellule = document.getElementById(id);
+    if (!cellule) return;
+    cellule.querySelector('.releve-overview-valeur').textContent = valeur;
+    cellule.classList.remove('ok', 'nok', 'attente');
+    cellule.classList.add(etat);
+}
+
 function renderReleveManquants() {
     const box = document.getElementById('releve-manquants');
     const manquants = relevesManquants();
@@ -3805,6 +3880,7 @@ async function handleReleveSave() {
     renderReleveManquants();
     renderReleveSaisie();
     renderReleveHistorique();
+    updateReleveOverview();
 }
 
 async function renderReleveHistorique() {

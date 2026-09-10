@@ -340,6 +340,70 @@
         .stock-overview-bar.ok { background: #27ae60; }
 
         /* === CARTES CATÉGORIES === */
+        /* Même forme que la vue d'ensemble du stock, juste au-dessus : trois
+           cases, un mot, une barre de couleur. On lit l'état des relevés
+           sans rien ouvrir. Le module entier ouvre l'écran Relevé. */
+        .releve-overview {
+            background: white;
+            border-radius: 13px;
+            padding: 14px 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            margin-top: 12px;
+            cursor: pointer;
+        }
+
+        .releve-overview-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            border-left: 1px solid rgba(0,0,0,0.08);
+            min-width: 0;
+        }
+
+        .releve-overview-cell:first-child { border-left: none; }
+
+        /* Gros et net : ça se lit d'un coup d'œil, debout, en cuisine. */
+        .releve-overview-valeur {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            line-height: 1.2;
+            color: #b8c4c4;
+        }
+
+        .releve-overview-label {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: .68rem;
+            font-weight: 700;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            color: #7b8c8c;
+            margin-top: 2px;
+        }
+
+        .releve-overview-bar {
+            width: 60%;
+            height: 5px;
+            border-radius: 3px;
+            margin-top: 6px;
+            background: #dfe8e8;
+        }
+
+        .releve-overview-cell.ok .releve-overview-valeur { color: #1e9e5a; }
+        .releve-overview-cell.ok .releve-overview-bar { background: #1e9e5a; }
+
+        .releve-overview-cell.nok .releve-overview-valeur { color: #e74c3c; }
+        .releve-overview-cell.nok .releve-overview-bar { background: #e74c3c; }
+
+        /* Le relevé du soir n'est pas « en faute » à 10 h du matin : il n'est
+           pas encore dû. Le peindre en rouge toute la journée apprendrait à
+           ignorer le rouge. */
+        .releve-overview-cell.attente .releve-overview-valeur { color: #b8860b; }
+        .releve-overview-cell.attente .releve-overview-bar { background: #e3b341; }
+
         .categories-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -1969,15 +2033,36 @@
                     <div class="stock-overview-bar ok"></div>
                 </div>
             </div>
+            <!-- État des relevés de températures, d'un coup d'œil. Rempli par
+                 updateReleveOverview() : l'accueil ne doit jamais attendre
+                 le réseau pour s'afficher. -->
+            <div class="releve-overview" id="releve-overview">
+                <div class="releve-overview-cell" id="releve-cell-retard">
+                    <div class="releve-overview-valeur">–</div>
+                    <div class="releve-overview-label">Retards</div>
+                    <div class="releve-overview-bar"></div>
+                </div>
+                <div class="releve-overview-cell" id="releve-cell-matin">
+                    <div class="releve-overview-valeur">–</div>
+                    <div class="releve-overview-label">Matin</div>
+                    <div class="releve-overview-bar"></div>
+                </div>
+                <div class="releve-overview-cell" id="releve-cell-soir">
+                    <div class="releve-overview-valeur">–</div>
+                    <div class="releve-overview-label">Soir</div>
+                    <div class="releve-overview-bar"></div>
+                </div>
+            </div>
+
             <div class="categories-grid">
                 <div class="category-card" id="carte-stock">
-                    <img src="./images/categories/section-stock.webp?v=20261012"
-                         onerror="this.onerror=null; this.src='./images/categories/section-stock.png?v=20261012';"
+                    <img src="./images/categories/section-stock.webp?v=20261013"
+                         onerror="this.onerror=null; this.src='./images/categories/section-stock.png?v=20261013';"
                          alt="Stock" class="category-image">
                 </div>
                 <div class="category-card" id="carte-suivi">
-                    <img src="./images/categories/section-suivi.webp?v=20261012"
-                         onerror="this.onerror=null; this.src='./images/categories/section-suivi.png?v=20261012';"
+                    <img src="./images/categories/section-suivi.webp?v=20261013"
+                         onerror="this.onerror=null; this.src='./images/categories/section-suivi.png?v=20261013';"
                          alt="Suivi" class="category-image">
                 </div>
             </div>
@@ -2662,8 +2747,8 @@
     <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
-<script src="config.js?v=20261012"></script>
-    <script src="database.js?v=20261012"></script>
-    <script src="app.js?v=20261012"></script>
+<script src="config.js?v=20261013"></script>
+    <script src="database.js?v=20261013"></script>
+    <script src="app.js?v=20261013"></script>
 </body>
 </html>

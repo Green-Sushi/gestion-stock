@@ -517,6 +517,24 @@ class DatabaseManager {
         }
     }
 
+    // Le dernier mouvement de stock, tous produits confondus. Sert à dire
+    // depuis combien de temps personne n'a compté.
+    async getDernierMouvement() {
+        try {
+            const { data, error } = await this.supabase
+                .from('stock_movements')
+                .select('created_at, user_name')
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (error) throw error;
+            return { success: true, data: (data && data[0]) || null };
+        } catch (error) {
+            console.error('Erreur lecture dernier mouvement:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
     async getStockMovements(productId = null, limit = 50) {
         try {
             let query = this.supabase

@@ -267,6 +267,7 @@ function showPage(pageId, depuisHistorique = false) {
     // juste après, sans faire attendre.
     if (pageId === 'home-page') {
         updateReleveOverview();
+        updateDernierMouvement();
     }
 
     if (pageId === 'frozen-page') {
@@ -889,6 +890,54 @@ function renderCategories() {
     updateStockOverview();
 }
 
+// Depuis quand personne n'a compté. Trois chiffres verts sur un stock que
+// personne n'a touché depuis dix jours ne veulent plus rien dire : cette
+// ligne remet la date sous les yeux.
+async function updateDernierMouvement() {
+    const ligne = document.getElementById('stock-dernier');
+    if (!ligne) return;
+
+    const result = await db.getDernierMouvement();
+    if (!result.success) {
+        // On n'affiche rien plutôt qu'une date fausse ou un « jamais »
+        // trompeur : le bandeau hors-ligne dit déjà que le réseau manque.
+        ligne.textContent = '';
+        ligne.className = 'stock-dernier';
+        return;
+    }
+
+    if (!result.data) {
+        ligne.innerHTML = 'Aucun mouvement de stock enregistré';
+        ligne.className = 'stock-dernier';
+        return;
+    }
+
+    const quand = new Date(result.data.created_at);
+    const jourMouvement = (() => {
+        const p = partiesDateRestaurant(quand);
+        return `${p.annee}-${p.mois}-${p.jour}`;
+    })();
+    const aujourdhui = aujourdhuiRestaurant();
+
+    // Différence en JOURS de calendrier, pas en heures : « hier à 23 h » et
+    // « hier à 8 h » se disent tous les deux « hier ».
+    const enJours = (t) => {
+        const [a, m, j] = t.split('-').map(Number);
+        return Date.UTC(a, m - 1, j);
+    };
+    const ecart = Math.round((enJours(aujourdhui) - enJours(jourMouvement)) / 86400000);
+
+    let age, etat;
+    if (ecart <= 0)      { age = "aujourd'hui"; etat = 'recent'; }
+    else if (ecart === 1) { age = 'hier';        etat = 'recent'; }
+    else if (ecart <= 6)  { age = `il y a ${ecart} jours`; etat = 'tiede'; }
+    else                  { age = `il y a ${ecart} jours`; etat = 'vieux'; }
+
+    ligne.className = `stock-dernier ${etat}`;
+    ligne.innerHTML = `Dernier mouvement <span class="age">${age}</span>`
+        + ` — ${dateSeuleFr(jourMouvement)} à ${heureRestaurant(quand)}`;
+}
+
 // Totaliser le nombre de produits par niveau de stock pour le bandeau d'accueil
 function updateStockOverview() {
     let critical = 0;
@@ -1225,6 +1274,7 @@ async function adjustProductQuantity(productId, delta) {
     }
 
     await updateAlertCount();
+    updateDernierMouvement();
     // Garder le bandeau juste. On n'appelle PAS renderCategories() ici :
     // elle reconstruirait les balises <img> des cartes sur une page masquée,
     // à chaque appui sur +/-. Les pastilles sont recalculées de toute façon

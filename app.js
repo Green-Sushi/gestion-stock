@@ -3601,9 +3601,9 @@ function relevesManquants() {
     for (let i = 0; i < FENETRE_OUBLIS_JOURS; i++) {
         const jour = jourMoinsN(aujourdhui, i);
         ['matin', 'soir'].forEach(moment => {
-            // Le relevé du soir du jour même n'est pas « oublié » : la
-            // journée n'est pas finie.
-            if (i === 0 && moment === 'soir' && Number(partiesDateRestaurant(new Date()).heure) < 18) return;
+            // Aujourd'hui, un relevé n'est « oublié » qu'une fois son heure
+            // passée : les employés arrivent à 15 h et partent vers 22 h 30.
+            if (i === 0 && !releveDejaDu(moment)) return;
             if (!faits.has(`${jour}|${moment}`)) manquants.push({ jour, moment });
         });
     }
@@ -3633,6 +3633,14 @@ function releveEnRetard(releve) {
     const [a, m, j] = releve.jour.split('-').map(Number);
     const debutDuJour = instantRestaurant(a, m, j).getTime();
     return (new Date(releve.created_at).getTime() - debutDuJour) > DELAI_RETARD_MS;
+}
+
+// Un relevé du jour est-il DÛ à cette heure-ci ? Voir les horaires dans
+// config.js : les employés arrivent à 15 h, partent vers 22 h 30.
+function releveDejaDu(moment) {
+    const maintenant = minutesRestaurant();
+    return moment === 'matin' ? maintenant >= RELEVE_MATIN_DU_MIN
+                              : maintenant >= RELEVE_SOIR_DU_MIN;
 }
 
 // Le module de l'accueil : trois cases lisibles sans rien ouvrir.
@@ -3678,22 +3686,18 @@ async function updateReleveOverview() {
         retards === 0 ? 'ok' : 'nok');
 
     // --- Cases 2 et 3 : aujourd'hui ---
-    const heure = Number(partiesDateRestaurant(new Date()).heure);
-
-    const matinFait = complet(aujourdhui, 'matin');
-    poserCaseReleve('releve-cell-matin',
-        matinFait ? 'OK' : 'NON',
-        matinFait ? 'ok' : 'nok');
-
-    const soirFait = complet(aujourdhui, 'soir');
-    if (soirFait) {
-        poserCaseReleve('releve-cell-soir', 'OK', 'ok');
-    } else if (heure < 18) {
-        // Pas encore dû : ni bon, ni fautif.
-        poserCaseReleve('releve-cell-soir', '·', 'attente');
-    } else {
-        poserCaseReleve('releve-cell-soir', 'NON', 'nok');
-    }
+    // Tant que l'heure n'est pas venue, la case n'est ni bonne ni fautive :
+    // le restaurant n'a pas encore ouvert, ou le service n'est pas fini.
+    ['matin', 'soir'].forEach(moment => {
+        const fait = complet(aujourdhui, moment);
+        if (fait) {
+            poserCaseReleve(`releve-cell-${moment}`, 'OK', 'ok');
+        } else if (releveDejaDu(moment)) {
+            poserCaseReleve(`releve-cell-${moment}`, 'NON', 'nok');
+        } else {
+            poserCaseReleve(`releve-cell-${moment}`, '·', 'attente');
+        }
+    });
 }
 
 function poserCaseReleve(id, valeur, etat) {

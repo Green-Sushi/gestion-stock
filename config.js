@@ -16,6 +16,19 @@ const ALERT_CONFIG = {
     whatsappNumber: '' // ex: +596696123456
 };
 
+// Horaires réels du restaurant. Ils décident du moment où un relevé non
+// fait devient un OUBLI plutôt qu'un « pas encore l'heure ».
+//
+//   Les employés arrivent à 15 h    -> c'est le relevé dit « du matin ».
+//   Service jusqu'à 22 h côté client, départ vers 22 h 30 / 23 h
+//                                   -> c'est le relevé dit « du soir ».
+//
+// Avant ces heures, une case vide n'est pas une faute : personne n'est là.
+// Peindre en rouge une case qui NE PEUT PAS être verte apprendrait à
+// ignorer le rouge, et le rouge doit rester un signal.
+const RELEVE_MATIN_DU_MIN = 15 * 60;        // 15 h 00
+const RELEVE_SOIR_DU_MIN  = 22 * 60 + 30;   // 22 h 30
+
 // Numéro de version des illustrations. Sans lui, remplacer une image sans
 // changer son nom de fichier ne servait à rien : le téléphone gardait
 // l'ancienne en mémoire, parfois plusieurs jours. À incrémenter à CHAQUE
@@ -120,6 +133,13 @@ function instantDepuisChampDateHeure(valeur) {
     const [annee, mois, jour] = datePart.split('-').map(Number);
     const [heure, minute] = (heurePart || '00:00').split(':').map(Number);
     return instantRestaurant(annee, mois, jour, heure, minute);
+}
+
+// L'heure qu'il est AU RESTAURANT, en minutes depuis minuit. Sert à savoir
+// si un relevé est déjà dû.
+function minutesRestaurant(valeur) {
+    const p = partiesDateRestaurant(valeur || new Date());
+    return Number(p.heure) * 60 + Number(p.minute);
 }
 
 // Une date SANS heure (une DLC : « 2026-03-31 ») n'a pas de fuseau : elle se

@@ -3600,6 +3600,9 @@ function relevesManquants() {
 
     for (let i = 0; i < FENETRE_OUBLIS_JOURS; i++) {
         const jour = jourMoinsN(aujourdhui, i);
+        // Restaurant fermé : personne n'était là pour relever. Sans cette
+        // ligne, chaque lundi ajoutait deux oublis pour toujours.
+        if (estJourDeFermeture(jour)) continue;
         ['matin', 'soir'].forEach(moment => {
             // Aujourd'hui, un relevé n'est « oublié » qu'une fois son heure
             // passée : les employés arrivent à 15 h et partent vers 22 h 30.
@@ -3676,6 +3679,7 @@ async function updateReleveOverview() {
     let retards = 0;
     for (let i = 1; i < FENETRE_OUBLIS_JOURS; i++) {
         const jour = jourMoinsN(aujourdhui, i);
+        if (estJourDeFermeture(jour)) continue;   // restaurant fermé
         if (!complet(jour, 'matin')) retards++;
         if (!complet(jour, 'soir')) retards++;
     }
@@ -3688,10 +3692,14 @@ async function updateReleveOverview() {
     // --- Cases 2 et 3 : aujourd'hui ---
     // Tant que l'heure n'est pas venue, la case n'est ni bonne ni fautive :
     // le restaurant n'a pas encore ouvert, ou le service n'est pas fini.
+    const ferme = estJourDeFermeture(aujourdhui);
     ['matin', 'soir'].forEach(moment => {
         const fait = complet(aujourdhui, moment);
         if (fait) {
             poserCaseReleve(`releve-cell-${moment}`, 'OK', 'ok');
+        } else if (ferme) {
+            // Jour de fermeture : rien n'est attendu, rien n'est en faute.
+            poserCaseReleve(`releve-cell-${moment}`, '—', 'attente');
         } else if (releveDejaDu(moment)) {
             poserCaseReleve(`releve-cell-${moment}`, 'NON', 'nok');
         } else {
@@ -3718,7 +3726,7 @@ function renderReleveManquants() {
     }
 
     const lignes = manquants.slice(0, 8).map(m =>
-        `<li>${dateSeuleFr(m.jour)} — ${m.moment}</li>`).join('');
+        `<li>${dateSeuleFr(m.jour)} — ${m.moment === 'matin' ? 'midi' : 'soir'}</li>`).join('');
     const reste = manquants.length > 8 ? `<li>… et ${manquants.length - 8} autre(s)</li>` : '';
 
     box.innerHTML = `
@@ -3737,12 +3745,12 @@ let releveDeverrouille = false;
 
 // Le bandeau du haut et le bouton du bas doivent raconter la même chose :
 // soit « à faire », soit « déjà fait par X, voulez-vous corriger ? ».
-function afficherEtatReleve(deja, dejaFait, verrouille, moment, jour) {
+function afficherEtatReleve(deja, dejaFait, verrouille, moment, jour, avisFerme = '') {
     const etat = document.getElementById('releve-etat');
     const bouton = document.getElementById('releve-save-btn');
 
     if (!dejaFait) {
-        etat.innerHTML = '';
+        etat.innerHTML = avisFerme;
         bouton.style.display = '';
         bouton.textContent = 'Enregistrer le relevé';
         return;
@@ -3763,7 +3771,8 @@ function afficherEtatReleve(deja, dejaFait, verrouille, moment, jour) {
     } else if (journeeBouclee) {
         phrase = qui ? `Relevés du jour faits — dernier par ${qui}` : 'Relevés du jour faits';
     } else {
-        phrase = qui ? `Relevé du ${moment} fait par ${qui}` : `Relevé du ${moment} fait`;
+        const nom = moment === 'matin' ? 'midi' : 'soir';
+        phrase = qui ? `Relevé du ${nom} fait par ${qui}` : `Relevé du ${nom} fait`;
     }
 
     if (verrouille) {
@@ -3850,7 +3859,14 @@ function renderReleveSaisie() {
     const dejaFait = momentComplet(jour, moment);
     const verrouille = dejaFait && !releveDeverrouille;
 
-    afficherEtatReleve(deja, dejaFait, verrouille, moment, jour);
+    // Jour de fermeture : on le DIT, sans interdire pour autant. Il arrive
+    // qu'on passe un lundi ; le relevé fait ce jour-là est parfaitement
+    // valable, il n'est simplement jamais attendu.
+    const avisFerme = (estJourDeFermeture(jour) && !dejaFait)
+        ? '<div class="releve-ferme">Restaurant fermé ce jour-là — aucun relevé attendu</div>'
+        : '';
+
+    afficherEtatReleve(deja, dejaFait, verrouille, moment, jour, avisFerme);
 
     // Relevé fait et non déverrouillé : on n'affiche PAS les températures.
     // Les remontrer inviterait à les retaper, ce qui est précisément le

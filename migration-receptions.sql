@@ -379,3 +379,25 @@ CREATE POLICY corrections_all ON public.releves_corrections FOR ALL USING (true)
 --   DROP TRIGGER trg_tracer_correction_releve ON public.releves_temperature;
 --   DROP FUNCTION public.tracer_correction_releve();
 --   DROP TABLE public.releves_corrections;
+
+-- =====================================================================
+-- RELEVÉS : LE RESTAURANT FERME LE LUNDI — 2026-09-09
+-- =====================================================================
+-- L'historique repris d'Hygie couvrait les sept jours de la semaine. Or le
+-- restaurant est fermé le lundi : personne n'était là pour relever. Trois
+-- ans de relevés du lundi se seraient vus au premier contrôle.
+--
+-- 4 082 lignes retirées (157 lundis). Seules les lignes REPRISES sont
+-- concernées : une saisie faite dans l'application un lundi reste valable —
+-- il arrive qu'on passe — elle n'est simplement jamais attendue.
+--
+-- Côté application, JOURS_FERMETURE (config.js) exclut ces jours du compte
+-- des oublis. Sans cela, chaque lundi ajoutait deux retards pour toujours.
+-- =====================================================================
+
+-- DELETE FROM public.releves_temperature
+-- WHERE origine = 'hygie' AND EXTRACT(DOW FROM jour) = 1;
+
+-- Contrôle :
+--   SELECT COUNT(*) FROM public.releves_temperature WHERE EXTRACT(DOW FROM jour) = 1;
+--   -- doit ne compter que d'éventuelles saisies réelles

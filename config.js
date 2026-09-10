@@ -135,6 +135,20 @@ function instantDepuisChampDateHeure(valeur) {
     return instantRestaurant(annee, mois, jour, heure, minute);
 }
 
+// Jours de fermeture, au sens de la semaine JavaScript : 0 = dimanche,
+// 1 = lundi. Personne n'est au restaurant ces jours-là, donc aucun relevé
+// n'y est attendu — et un relevé absent n'y est pas un oubli.
+const JOURS_FERMETURE = [1];   // lundi
+
+// `jourNu` au format aaaa-mm-jj. On passe par une date en temps universel
+// pour lire le jour de la semaine : une date sans heure n'a pas de fuseau,
+// et la convertir en heure locale la ferait basculer d'un jour.
+function estJourDeFermeture(jourNu) {
+    if (!jourNu) return false;
+    const [a, m, j] = String(jourNu).split('-').map(Number);
+    return JOURS_FERMETURE.includes(new Date(Date.UTC(a, m - 1, j)).getUTCDay());
+}
+
 // L'heure qu'il est AU RESTAURANT, en minutes depuis minuit. Sert à savoir
 // si un relevé est déjà dû.
 function minutesRestaurant(valeur) {

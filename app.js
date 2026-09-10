@@ -288,6 +288,7 @@ function showPage(pageId, depuisHistorique = false) {
         if (!champJour.value) champJour.value = aujourdhuiRestaurant();
 
         loadReleveEcran().then(() => {
+            choisirMomentAFaire();
             renderReleveManquants();
             renderReleveSaisie();
             renderReleveHistorique();
@@ -723,6 +724,7 @@ function setupGlobalListeners() {
         showLoading(true);
         await chargerJourReleve();
         showLoading(false);
+        choisirMomentAFaire();
         renderReleveSaisie();
     });
 
@@ -730,7 +732,6 @@ function setupGlobalListeners() {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.releve-moment').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            releveDeverrouille = false;
             renderReleveSaisie();
         });
     });
@@ -805,18 +806,10 @@ function renderCategories() {
     };
 
     CATEGORIES.forEach(category => {
-        // Compter les produits de cette catégorie
-        const categoryProducts = AppState.products.filter(p => p.category === category.id);
-
-        // Compter les produits en alerte (rouge) et en limite (orange)
-        let alertCount = 0;
-        let warningCount = 0;
-        categoryProducts.forEach(p => {
-            const { stockLevel } = calculateStockLevel(p.quantity, p.alert_threshold);
-            if (stockLevel === 'stock-critical') alertCount++;
-            else if (stockLevel === 'stock-warning') warningCount++;
-        });
-
+        // Pas de compteur sur la carte : le module de l'accueil donne déjà
+        // le total, et l'écran Alertes la liste. Sept cartes portant chacune
+        // deux pastilles chargeaient l'écran sans rien apprendre d'utile
+        // au moment où l'on choisit un rayon.
         const card = document.createElement('div');
         card.className = 'category-card';
         card.dataset.category = category.id;
@@ -824,10 +817,6 @@ function renderCategories() {
             <img src="./images/categories/${categoryImages[category.id]}.webp?v=${VERSION_VISUELS}"
                  onerror="this.onerror=null; this.src='./images/categories/${categoryImages[category.id]}.png?v=${VERSION_VISUELS}';"
                  alt="${category.name}" class="category-image">
-            <div class="category-badges">
-                ${alertCount > 0 ? `<div class="category-badge alerts" title="${alertCount} en alerte">${alertCount}</div>` : ''}
-                ${warningCount > 0 ? `<div class="category-badge warning" title="${warningCount} en limite">${warningCount}</div>` : ''}
-            </div>
         `;
 
         card.addEventListener('click', () => {
@@ -3744,7 +3733,7 @@ let releveDeverrouille = false;
 
 // Le bandeau du haut et le bouton du bas doivent raconter la même chose :
 // soit « à faire », soit « déjà fait par X, voulez-vous corriger ? ».
-function afficherEtatReleve(deja, dejaFait, verrouille, moment) {
+function afficherEtatReleve(deja, dejaFait, verrouille, moment, jour) {
     const etat = document.getElementById('releve-etat');
     const bouton = document.getElementById('releve-save-btn');
 
@@ -3760,9 +3749,18 @@ function afficherEtatReleve(deja, dejaFait, verrouille, moment) {
     const qui = (premiere.user_name || '').trim();
     const reprise = premiere.origine === 'hygie';
 
-    const phrase = reprise ? 'Repris du système Hygie'
-                 : qui ? `Fait par ${qui}`
-                 : 'Relevé fait';
+    // Les DEUX relevés du jour sont faits : on le dit d'une seule phrase,
+    // plutôt que de parler d'un moment alors que la journée est bouclée.
+    const journeeBouclee = momentComplet(jour, 'matin') && momentComplet(jour, 'soir');
+
+    let phrase;
+    if (reprise) {
+        phrase = 'Repris du système Hygie';
+    } else if (journeeBouclee) {
+        phrase = qui ? `Relevés du jour faits — dernier par ${qui}` : 'Relevés du jour faits';
+    } else {
+        phrase = qui ? `Relevé du ${moment} fait par ${qui}` : `Relevé du ${moment} fait`;
+    }
 
     if (verrouille) {
         // Corriger une valeur d'un registre sanitaire n'est pas un geste
@@ -3789,36 +3787,74 @@ function afficherEtatReleve(deja, dejaFait, verrouille, moment) {
     bouton.textContent = 'Enregistrer la correction';
 }
 
+// Les relevés d'un moment donné, pour le jour affiché.
+function relevesDuMoment(jour, moment) {
+    const parEnceinte = {};
+    (AppState.relevesDuJour || []).forEach(r => {
+        if (r.jour === jour && r.moment === moment) parEnceinte[r.equipement_id] = r;
+    });
+    return parEnceinte;
+}
+
+// Complet = TOUTES les enceintes couvertes. Un relevé interrompu — batterie
+// vide, service qui reprend — n'est pas un relevé fait, et doit rester
+// ouvert pour être terminé.
+function momentComplet(jour, moment) {
+    const n = AppState.equipements.length;
+    return n > 0 && Object.keys(relevesDuMoment(jour, moment)).length >= n;
+}
+
+// Ouvre l'écran sur le relevé qu'il RESTE à faire, plutôt que sur le matin
+// par défaut : à 19 h, personne ne vient saisir le matin.
+function choisirMomentAFaire() {
+    const jour = document.getElementById('releve-jour').value;
+    if (!jour) return;
+
+    const aFaire = !momentComplet(jour, 'matin') ? 'matin'
+                 : !momentComplet(jour, 'soir') ? 'soir'
+                 : null;
+    if (!aFaire) return;   // journée bouclée : on ne bouge pas la sélection
+
+    document.querySelectorAll('.releve-moment').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.moment === aFaire);
+    });
+}
+
 function renderReleveSaisie() {
     const container = document.getElementById('releve-liste');
     const jour = document.getElementById('releve-jour').value;
     const moment = document.querySelector('.releve-moment.active').dataset.moment;
 
     if (!AppState.equipements || AppState.equipements.length === 0) {
+        document.getElementById('releve-etat').innerHTML = '';
+        document.getElementById('releve-save-btn').style.display = 'none';
         container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🌡️</div>
             <div class="empty-state-text">Aucun équipement — vérifiez la connexion</div></div>`;
         return;
     }
 
-    // Valeurs déjà enregistrées pour CE jour et CE moment. Elles viennent de
-    // AppState.relevesDuJour, chargé pour le jour affiché — et non de la
-    // fenêtre des sept derniers jours : en rattrapant une date plus
-    // ancienne, l'écran aurait cru la journée vierge et l'aurait écrasée.
-    const deja = {};
-    (AppState.relevesDuJour || []).forEach(r => {
-        if (r.jour === jour && r.moment === moment) deja[r.equipement_id] = r;
+    // Les deux boutons portent l'état de LEUR moment : un relevé déjà fait
+    // est grisé et n'est plus sélectionnable. C'est le premier signal, avant
+    // même d'avoir lu quoi que ce soit.
+    document.querySelectorAll('.releve-moment').forEach(btn => {
+        const fait = momentComplet(jour, btn.dataset.moment);
+        btn.classList.toggle('fait', fait);
+        btn.disabled = fait && !releveDeverrouille;
     });
 
-    // Déjà relevé ? On le DIT, et on verrouille. Sans ça, la personne
-    // suivante voyait des champs pré-remplis comme d'habitude, tapait ses
-    // valeurs, et écrasait celles du matin sans jamais l'apprendre.
-    //
-    // On ne verrouille QUE si toutes les enceintes sont couvertes : un relevé
-    // interrompu — batterie vide, service qui reprend — doit pouvoir être
-    // terminé par n'importe qui, sans passer par le patron.
-    const dejaFait = Object.keys(deja).length >= AppState.equipements.length;
+    const deja = relevesDuMoment(jour, moment);
+    const dejaFait = momentComplet(jour, moment);
     const verrouille = dejaFait && !releveDeverrouille;
-    afficherEtatReleve(deja, dejaFait, verrouille, moment);
+
+    afficherEtatReleve(deja, dejaFait, verrouille, moment, jour);
+
+    // Relevé fait et non déverrouillé : on n'affiche PAS les températures.
+    // Les remontrer inviterait à les retaper, ce qui est précisément le
+    // geste qu'on veut éviter.
+    if (verrouille) {
+        container.innerHTML = '';
+        return;
+    }
 
     container.innerHTML = AppState.equipements.map(e => {
         const enregistre = deja[e.id];
@@ -3835,7 +3871,7 @@ function renderReleveSaisie() {
                 </div>
                 <input type="number" step="1" inputmode="decimal"
                        class="releve-ligne-champ" data-min="${e.seuil_min}" data-max="${e.seuil_max}"
-                       value="${formatTemp(valeur)}"${verrouille ? ' readonly' : ''}>
+                       value="${formatTemp(valeur)}">
             </div>
         `;
     }).join('');
@@ -3921,6 +3957,7 @@ async function handleReleveSave() {
 
     releveDeverrouille = false;
     await loadReleveEcran();   // recharge aussi le jour affiché
+    choisirMomentAFaire();
     renderReleveManquants();
     renderReleveSaisie();
     renderReleveHistorique();

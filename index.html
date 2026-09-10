@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#088F8F">
@@ -89,20 +89,28 @@
         }
 
         /* === HEADER === */
+        /* Les `env(safe-area-inset-*)` valent zéro partout où il n'y a rien
+           à éviter — un Android, un ordinateur — et prennent la bonne valeur
+           sur un iPhone à encoche. C'est l'adaptation automatique qui
+           manquait : rien n'est codé en dur pour un modèle donné. */
         header {
             background: linear-gradient(135deg, #088F8F 0%, #066b6b 100%);
             color: white;
             padding: 15px;
+            padding-top: calc(15px + env(safe-area-inset-top));
+            padding-left: calc(15px + env(safe-area-inset-left));
+            padding-right: calc(15px + env(safe-area-inset-right));
             box-shadow: 0 2px 10px rgba(0,0,0,0.15);
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             z-index: 100;
-            height: 60px;
+            height: calc(60px + env(safe-area-inset-top));
             display: flex;
             align-items: center;
             justify-content: space-between;
+            box-sizing: border-box;
         }
 
         header h1 {
@@ -139,12 +147,17 @@
 
         /* === CONTENEUR PRINCIPAL === */
         .container {
-            margin-top: 60px;
-            margin-bottom: 70px;
+            margin-top: calc(60px + env(safe-area-inset-top));
+            margin-bottom: calc(70px + env(safe-area-inset-bottom));
             padding: 15px;
+            /* En paysage, l'encoche mord sur le côté : le retrait ne descend
+               jamais sous les 15 px habituels. */
+            padding-left: max(15px, env(safe-area-inset-left));
+            padding-right: max(15px, env(safe-area-inset-right));
             max-width: 800px;
             margin-left: auto;
             margin-right: auto;
+            box-sizing: border-box;
         }
 
         /* === PAGES === */
@@ -334,9 +347,18 @@
             margin-top: 20px;
             width: 100%;
             max-width: 100%;
+            /* Une piste de grille ne s'élargit jamais au contenu : c'est la
+               règle qui manquait, et qui ne se voyait que sur Safari. */
+            min-width: 0;
         }
 
-        .category-card {
+        .categories-grid > * { min-width: 0; }
+
+        /* Les cartes de Stock et celles de Suivi partagent CE bloc, et non
+           deux blocs jumeaux : ils avaient divergé, et la conséquence ne se
+           voyait que sur iPhone. */
+        .category-card,
+        .frozen-card {
             background: white;
             border-radius: 18px;
             padding: 15px;
@@ -349,6 +371,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            /* Ces deux lignes manquaient aux cartes de Suivi, et c'est tout
+               le défaut : sans elles, Safari calcule la largeur de la colonne
+               sur la taille NATURELLE de l'illustration (512 px) au lieu de
+               la laisser rétrécir. La grille débordait alors à droite.
+               Chrome, sur Android, tolérait la même faute en silence. */
             min-width: 0;
             overflow: hidden;
         }
@@ -521,8 +548,8 @@
 
         .fab {
             position: fixed;
-            bottom: 85px;
-            right: 20px;
+            bottom: calc(85px + env(safe-area-inset-bottom));
+            right: calc(20px + env(safe-area-inset-right));
             width: 60px;
             height: 60px;
             border-radius: 50%;
@@ -740,7 +767,7 @@
             position: fixed;
             left: 12px;
             right: 12px;
-            bottom: 84px;            /* au-dessus de la barre d'onglets */
+            bottom: calc(84px + env(safe-area-inset-bottom));   /* au-dessus de la barre d'onglets */
             z-index: 300;            /* au-dessus du voile et des fenêtres */
             display: flex;
             flex-direction: column;
@@ -779,7 +806,7 @@
         #bandeau-hors-ligne {
             display: none;
             position: fixed;
-            top: 60px;               /* sous l'en-tête */
+            top: calc(60px + env(safe-area-inset-top));   /* sous l'en-tête */
             left: 0;
             right: 0;
             /* Sous les fenêtres (200) : une fenêtre ouverte hors ligne ne doit
@@ -798,12 +825,12 @@
 
         /* Le contenu descend au lieu d'être recouvert : sans ça le bandeau
            mangeait le haut de la vue d'ensemble et du champ de recherche. */
-        body.hors-ligne .container { margin-top: 93px; }
+        body.hors-ligne .container { margin-top: calc(93px + env(safe-area-inset-top)); }
 
         /* Sur l'écran de connexion l'en-tête est masqué : le bandeau remonte
            en haut plutôt que de flotter dans le vide. */
-        body.sur-connexion #bandeau-hors-ligne { top: 0; }
-        body.sur-connexion.hors-ligne .container { margin-top: 33px; }
+        body.sur-connexion #bandeau-hors-ligne { top: env(safe-area-inset-top); }
+        body.sur-connexion.hors-ligne .container { margin-top: calc(33px + env(safe-area-inset-top)); }
 
         /* Voile derrière le menu ouvert. Il rend l'état sans ambiguïté :
            sans lui, le menu se superpose au bouton « +10 » de sa propre
@@ -1037,6 +1064,15 @@
             background: rgba(0,0,0,0.5);
             z-index: 200;
             padding: 20px;
+            /* Le voile couvre tout l'écran, encoche comprise — c'est voulu.
+               Mais son CONTENU s'en écarte : sans ça, la croix de fermeture
+               d'une fenêtre haute passait sous l'encoche, et le bouton
+               Enregistrer sous la barre d'accueil. */
+            padding-top: calc(20px + env(safe-area-inset-top));
+            padding-bottom: calc(20px + env(safe-area-inset-bottom));
+            padding-left: calc(20px + env(safe-area-inset-left));
+            padding-right: calc(20px + env(safe-area-inset-right));
+            box-sizing: border-box;
             overflow-y: auto;
         }
 
@@ -1052,7 +1088,10 @@
             padding: 25px;
             max-width: 500px;
             width: 100%;
-            max-height: 90vh;
+            /* 90vh compte la hauteur TOTALE de l'écran, encoche et barre
+               d'accueil incluses : une fenêtre haute débordait malgré le
+               retrait ci-dessus. */
+            max-height: calc(90vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
             overflow-y: auto;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
@@ -1202,6 +1241,10 @@
             box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
             z-index: 100;
             padding: 8px 0;
+            /* La barre d'accueil de l'iPhone mangeait le bas des onglets. */
+            padding-bottom: calc(8px + env(safe-area-inset-bottom));
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
         }
 
         .tab {
@@ -1669,24 +1712,6 @@
             font-weight: 600;
         }
 
-        .frozen-card {
-            background: white;
-            border-radius: 18px;
-            padding: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-            cursor: pointer;
-            transition: all 0.3s;
-            /* Bordure retirée pour que cette carte se comporte exactement
-               comme les six cartes de catégorie : l'illustration s'affiche
-               en entier, centrée dans le retrait de 15 px. */
-            border: 2px solid transparent;
-            aspect-ratio: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-
         .frozen-card:active {
             transform: scale(0.98);
         }
@@ -1897,13 +1922,13 @@
             </div>
             <div class="categories-grid">
                 <div class="category-card" id="carte-stock">
-                    <img src="./images/categories/section-stock.webp?v=20261009"
-                         onerror="this.onerror=null; this.src='./images/categories/section-stock.png?v=20261009';"
+                    <img src="./images/categories/section-stock.webp?v=20261010"
+                         onerror="this.onerror=null; this.src='./images/categories/section-stock.png?v=20261010';"
                          alt="Stock" class="category-image">
                 </div>
                 <div class="category-card" id="carte-suivi">
-                    <img src="./images/categories/section-suivi.webp?v=20261009"
-                         onerror="this.onerror=null; this.src='./images/categories/section-suivi.png?v=20261009';"
+                    <img src="./images/categories/section-suivi.webp?v=20261010"
+                         onerror="this.onerror=null; this.src='./images/categories/section-suivi.png?v=20261010';"
                          alt="Suivi" class="category-image">
                 </div>
             </div>
@@ -2587,8 +2612,8 @@
     <div id="product-menu-backdrop"></div>
 
     <!-- SCRIPTS -->
-<script src="config.js?v=20261009"></script>
-    <script src="database.js?v=20261009"></script>
-    <script src="app.js?v=20261009"></script>
+<script src="config.js?v=20261010"></script>
+    <script src="database.js?v=20261010"></script>
+    <script src="app.js?v=20261010"></script>
 </body>
 </html>

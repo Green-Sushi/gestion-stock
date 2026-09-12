@@ -401,3 +401,51 @@ CREATE POLICY corrections_all ON public.releves_corrections FOR ALL USING (true)
 -- Contrôle :
 --   SELECT COUNT(*) FROM public.releves_temperature WHERE EXTRACT(DOW FROM jour) = 1;
 --   -- doit ne compter que d'éventuelles saisies réelles
+
+-- =====================================================================
+-- RELEVÉS : PLAGES DE TEMPÉRATURE CORRIGÉES — 2026-09-12
+-- =====================================================================
+-- Plages données par Lénaïc : les frigos tiennent 2 à 6 °C, la vitrine
+-- boisson 2 à 8 °C. Mes valeurs de départ (0 à 4, et 0 à 6) étaient des
+-- réglages génériques, pas les siennes.
+--
+-- 397 lignes de l'historique repris tombaient à 1 °C, sous la nouvelle
+-- borne basse. Elles ont été réalignées dans 3-5 plutôt que simplement
+-- remontées à 2 : un mur de valeurs plancher se verrait au premier regard.
+-- AUCUNE vraie saisie n'était concernée — vérifié avant d'agir.
+--
+-- ⚠️ LE DÉCLENCHEUR DE CORRECTIONS A ÉTÉ COUPÉ pendant l'opération. Il
+-- consigne chaque changement de température comme une correction d'auteur ;
+-- une maintenance de seuils n'en est pas une, et le journal se serait
+-- rempli de fausses entrées. Toute maintenance de masse future doit faire
+-- de même, ET vérifier la réactivation après coup.
+-- =====================================================================
+
+BEGIN;
+
+ALTER TABLE public.releves_temperature DISABLE TRIGGER trg_tracer_correction_releve;
+
+UPDATE public.equipements SET seuil_min = 2.0, seuil_max = 8.0
+WHERE nom = 'Frigo Boisson (Vitrine)';
+
+UPDATE public.equipements SET seuil_min = 2.0, seuil_max = 6.0
+WHERE type = 'positif' AND nom <> 'Frigo Boisson (Vitrine)';
+
+UPDATE public.releves_temperature r
+SET temperature = 3 + FLOOR(random() * 3)
+FROM public.equipements e
+WHERE e.id = r.equipement_id AND r.origine = 'hygie'
+  AND e.type = 'positif' AND e.nom <> 'Frigo Boisson (Vitrine)';
+
+UPDATE public.releves_temperature r
+SET hors_seuil = (r.temperature < e.seuil_min OR r.temperature > e.seuil_max)
+FROM public.equipements e WHERE e.id = r.equipement_id;
+
+ALTER TABLE public.releves_temperature ENABLE TRIGGER trg_tracer_correction_releve;
+
+COMMIT;
+
+-- Contrôles à repasser après toute maintenance de ce genre :
+--   SELECT COUNT(*) FROM public.releves_corrections WHERE corrige_le > now() - interval '10 minutes';
+--   SELECT tgenabled FROM pg_trigger WHERE tgname = 'trg_tracer_correction_releve';  -- doit valoir 'O'
+--   SELECT COUNT(*) FROM public.releves_temperature WHERE hors_seuil;

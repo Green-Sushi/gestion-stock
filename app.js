@@ -307,10 +307,30 @@ function updateActiveTab(pageId) {
     }
 }
 
+// Le voile d'attente couvre TOUT l'écran. S'il reste affiché, l'application
+// est morte pour l'utilisateur, sans un mot d'explication — c'est exactement
+// ce qui s'est produit quand une fonction manquante a levé une erreur entre
+// showLoading(true) et showLoading(false).
+//
+// Vingt-et-un endroits l'affichent. Plutôt que d'en emballer vingt-et-un, un
+// garde-fou unique : au-delà de ce délai, le voile tombe de lui-même et dit
+// pourquoi. Un écran qui explique vaut mieux qu'un écran figé.
+const DELAI_MAX_VOILE_MS = 20 * 1000;
+let minuteurVoile = null;
+
 function showLoading(show) {
     const loading = document.getElementById('loading');
+
+    if (minuteurVoile) { clearTimeout(minuteurVoile); minuteurVoile = null; }
+
     if (show) {
         loading.classList.add('active');
+        minuteurVoile = setTimeout(() => {
+            minuteurVoile = null;
+            loading.classList.remove('active');
+            console.error('Voile d\'attente retiré par sécurité après ' + (DELAI_MAX_VOILE_MS / 1000) + ' s');
+            notifier('Cela prend trop de temps — vérifiez la connexion et réessayez', 'err', 6000);
+        }, DELAI_MAX_VOILE_MS);
     } else {
         loading.classList.remove('active');
     }
@@ -722,8 +742,16 @@ function setupGlobalListeners() {
     document.getElementById('releve-jour').addEventListener('change', async () => {
         releveDeverrouille = false;
         showLoading(true);
-        await chargerJourReleve();
-        showLoading(false);
+        try {
+            await chargerJourReleve();
+        } catch (e) {
+            // Le voile couvre tout l'écran : le laisser après une erreur
+            // bloque l'application sans rien expliquer. Il tombe toujours.
+            console.error('Chargement du jour impossible:', e);
+            signalerEchec('Relevés du jour', e.message);
+        } finally {
+            showLoading(false);
+        }
         choisirMomentAFaire();
         renderReleveSaisie();
     });
@@ -3798,6 +3826,19 @@ function afficherEtatReleve(deja, dejaFait, verrouille, moment, jour, avisFerme 
     etat.innerHTML = `<div class="releve-fait correction"><strong>Correction — ${phrase}</strong></div>`;
     bouton.style.display = '';
     bouton.textContent = 'Enregistrer la correction';
+}
+
+// Charge les relevés du jour affiché. Appelée à chaque changement de date,
+// car la fenêtre des oublis ne remonte qu'à sept jours : en rattrapant une
+// date plus ancienne, l'écran croirait la journée vierge et l'écraserait.
+async function chargerJourReleve() {
+    const jour = document.getElementById('releve-jour').value;
+    if (!jour) { AppState.relevesDuJour = []; return; }
+
+    const result = await db.getReleves(jour, jour);
+    // En cas d'échec on n'invente rien : la liste reste vide, et le bandeau
+    // hors-ligne dit déjà que le réseau manque.
+    AppState.relevesDuJour = result.success ? result.data : [];
 }
 
 // Les relevés d'un moment donné, pour le jour affiché.
